@@ -62,6 +62,13 @@ class PureImportFlowTests(unittest.TestCase):
         self.assertFalse(preview.can_save)
         self.assertIn("khong khop", preview.errors[-1])
 
+    def test_labeled_full_paste_can_include_confirmed_outside_odds(self):
+        preview = parse_app_odds_text("Tran 1 | Chau A | Home | -0.5 | app 2.10 | ngoai 1.95")
+
+        self.assertEqual(preview.lines[0].app_odds, Decimal("2.10"))
+        self.assertEqual(preview.lines[0].outside_odds, Decimal("1.95"))
+        self.assertEqual(preview.lines[0].status, "ready")
+
 
 if __name__ == "__main__":
     unittest.main()
