@@ -1,0 +1,82 @@
+{% extends "odds/base.html" %}
+
+{% block content %}
+<section class="page-title">
+  <div>
+    <p class="eyebrow">Buoc 2</p>
+    <h1>Nhap ve</h1>
+  </div>
+  <a class="button secondary" href="{% url 'odds:summary' %}">Xem tong ket</a>
+</section>
+
+<section class="workgrid">
+  <form method="post" class="panel">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <label for="{{ form.market_line.id_for_label }}">Dong ty le da san sang</label>
+    {{ form.market_line }}
+    <label for="{{ form.customer_name.id_for_label }}">Ten khach</label>
+    {{ form.customer_name }}
+    <label for="{{ form.customer_stake.id_for_label }}">Von khach</label>
+    {{ form.customer_stake }}
+    <label for="{{ form.note.id_for_label }}">Ghi chu</label>
+    {{ form.note }}
+    <button class="button" type="submit" {% if not ready_lines %}disabled{% endif %}>Tao ve va luu snapshot</button>
+  </form>
+
+  <div class="panel">
+    <h2>Dong ty le san sang</h2>
+    {% if ready_lines %}
+      <div class="compact-list">
+        {% for line in ready_lines %}
+          <div class="compact-row">
+            <strong>{{ line.match_name }}</strong>
+            <span>{{ line.market_type }} / {{ line.selection }}</span>
+            <span>App {{ line.app_odds }} - Ngoai {{ line.outside_odds }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">Chua co dong ty le ready. Hay import va nhap outside odds truoc.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section-head">
+  <div>
+    <p class="eyebrow">Ve gan day</p>
+    <h2>Snapshot da luu</h2>
+  </div>
+</section>
+
+<div class="tablewrap">
+  <table class="data-table responsive-table">
+    <thead>
+      <tr>
+        <th>Ngay</th>
+        <th>Khach</th>
+        <th>Tran</th>
+        <th>Von</th>
+        <th>Nhap app</th>
+        <th>Con lai</th>
+        <th>Odds snapshot</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in tickets %}
+        <tr>
+          <td data-label="Ngay">{{ ticket.ticket_date }}</td>
+          <td data-label="Khach">{{ ticket.customer_name|default:"-" }}</td>
+          <td data-label="Tran">{{ ticket.match_name_snapshot }} / {{ ticket.selection_snapshot }}</td>
+          <td data-label="Von">{{ ticket.customer_stake }}</td>
+          <td data-label="Nhap app">{{ ticket.app_stake }}</td>
+          <td data-label="Con lai">{{ ticket.remaining_cash }}</td>
+          <td data-label="Odds snapshot">App {{ ticket.app_odds_snapshot }} - Ngoai {{ ticket.outside_odds_snapshot }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="empty">Chua co ve.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
