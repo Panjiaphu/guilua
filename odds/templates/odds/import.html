@@ -1,0 +1,122 @@
+{% extends "odds/base.html" %}
+
+{% block content %}
+<section class="page-title">
+  <div>
+    <p class="eyebrow">Buoc 1</p>
+    <h1>Import ty le app</h1>
+  </div>
+  <a class="button secondary" href="{% url 'odds:tickets' %}">Sang nhap ve</a>
+</section>
+
+<section class="workgrid">
+  <form method="post" class="panel">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="parse_app">
+    <label for="raw_app_text">Du lieu copy tu san app</label>
+    <textarea id="raw_app_text" name="raw_app_text" rows="12" placeholder="Tran | Loai keo | Lua chon | Handicap | Ty le app">{{ preview.raw_app_text|default:"" }}</textarea>
+    <button class="button" type="submit">Parse preview</button>
+  </form>
+
+  <form method="post" class="panel">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="merge_outside">
+    <label for="outside_odds_text">Paste ty le ngoai theo thu tu dong</label>
+    <textarea id="outside_odds_text" name="outside_odds_text" rows="12" placeholder="1.82&#10;1.91&#10;2.05"></textarea>
+    <button class="button" type="submit" {% if not preview %}disabled{% endif %}>Ghep ty le ngoai</button>
+  </form>
+</section>
+
+{% if preview %}
+<section class="section-head">
+  <div>
+    <p class="eyebrow">Preview</p>
+    <h2>{{ preview.ready_count }} / {{ preview.lines|length }} dong san sang</h2>
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_lines">
+    <button class="button" type="submit" {% if not preview.can_save %}disabled{% endif %}>Luu bang ty le</button>
+  </form>
+</section>
+
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="update_manual">
+  <div class="tablewrap">
+    <table class="data-table responsive-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tran</th>
+          <th>Loai keo</th>
+          <th>Lua chon</th>
+          <th>Handicap</th>
+          <th>App odds</th>
+          <th>Outside odds</th>
+          <th>Trang thai</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in preview.lines %}
+          <tr>
+            <td data-label="#">{{ line.row_number }}</td>
+            <td data-label="Tran">{{ line.match_name }}</td>
+            <td data-label="Loai keo">{{ line.market_type }}</td>
+            <td data-label="Lua chon">{{ line.selection }}</td>
+            <td data-label="Handicap">{{ line.handicap|default:"-" }}</td>
+            <td data-label="App odds">{{ line.app_odds|default:"-" }}</td>
+            <td data-label="Outside odds">
+              <input class="odds-input" name="outside_odds_{{ line.row_number }}" value="{{ line.outside_odds|default:'' }}" inputmode="decimal">
+            </td>
+            <td data-label="Trang thai">
+              <span class="badge {{ line.status }}">{{ line.status }}</span>
+              {% if line.error %}<div class="row-error">{{ line.error }}</div>{% endif %}
+              {% if line.warning %}<div class="row-warning">{{ line.warning }}</div>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="actions">
+    <button class="button secondary" type="submit">Cap nhat thu cong</button>
+  </div>
+</form>
+{% endif %}
+
+{% if recent_lines %}
+<section class="section-head">
+  <div>
+    <p class="eyebrow">Da luu gan day</p>
+    <h2>Dong ty le moi</h2>
+  </div>
+</section>
+<div class="tablewrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Tran</th>
+        <th>Loai keo</th>
+        <th>Lua chon</th>
+        <th>App</th>
+        <th>Ngoai</th>
+        <th>Trang thai</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in recent_lines %}
+        <tr>
+          <td>{{ line.match_name }}</td>
+          <td>{{ line.market_type }}</td>
+          <td>{{ line.selection }}</td>
+          <td>{{ line.app_odds }}</td>
+          <td>{{ line.outside_odds|default:"-" }}</td>
+          <td><span class="badge {{ line.status }}">{{ line.status }}</span></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
