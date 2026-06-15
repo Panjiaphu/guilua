@@ -1,7 +1,6 @@
-from decimal import Decimal
-
 from django import forms
 from django.utils import timezone
+from decimal import Decimal
 
 from .models import MarketLine, Ticket
 
@@ -24,6 +23,21 @@ class TicketCreateForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["market_line"].queryset = MarketLine.objects.filter(status="ready")
+
+
+class BulkTicketForm(forms.Form):
+    raw_tickets = forms.CharField(
+        label="Paste danh sach ve",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "rows": 7,
+                "placeholder": "L001 1000\nL002 500\nL003 2000",
+            }
+        ),
+    )
+    customer_name = forms.CharField(label="Ten khach", required=False, max_length=120)
+    note = forms.CharField(label="Ghi chu", required=False, max_length=255)
 
 
 class SummaryDateForm(forms.Form):
