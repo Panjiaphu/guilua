@@ -5,6 +5,14 @@ import re
 
 ODDS_PATTERN = re.compile(r"(?<![\d.])(?:[1-9]\d*)(?:\.\d{1,3})?(?![\d.])")
 SPLIT_PATTERN = re.compile(r"\s*(?:\t|\||,|;)\s*")
+APP_LABEL_PATTERN = re.compile(
+    r"(?:\bapp\b|ty\s*le\s*app|t[ỷy]\s*l[eệ]\s*app)\D*(?P<odds>[1-9]\d*(?:[\.,]\d{1,3})?)",
+    re.IGNORECASE,
+)
+OUTSIDE_LABEL_PATTERN = re.compile(
+    r"(?:ngoai|ngo[aà]i|outside|ty\s*le\s*ngoai|t[ỷy]\s*l[eệ]\s*ngo[aà]i)\D*(?P<odds>[1-9]\d*(?:[\.,]\d{1,3})?)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -84,6 +92,18 @@ def _extract_app_odds(parts):
     return None, None
 
 
+def _extract_labeled_odds(raw_line):
+    app_match = APP_LABEL_PATTERN.search(raw_line)
+    outside_match = OUTSIDE_LABEL_PATTERN.search(raw_line)
+    app_odds = parse_decimal(app_match.group("odds")) if app_match else None
+    outside_odds = parse_decimal(outside_match.group("odds")) if outside_match else None
+    return app_odds, outside_odds
+
+
+def _is_labeled_odds_part(part):
+    return APP_LABEL_PATTERN.search(part) or OUTSIDE_LABEL_PATTERN.search(part)
+
+
 def parse_app_odds_text(raw_app_text):
     preview = ImportPreview(raw_app_text=raw_app_text or "")
     source_lines = [line.strip() for line in preview.raw_app_text.splitlines() if line.strip()]
@@ -93,13 +113,20 @@ def parse_app_odds_text(raw_app_text):
 
     for row_number, raw_line in enumerate(source_lines, start=1):
         parts = [part.strip() for part in SPLIT_PATTERN.split(raw_line) if part.strip()]
+        labeled_app_odds, labeled_outside_odds = _extract_labeled_odds(raw_line)
         if len(parts) >= 4:
-            app_odds, odds_index = _extract_app_odds(parts)
+            app_odds, odds_index = (
+                (labeled_app_odds, None)
+                if labeled_app_odds is not None
+                else _extract_app_odds(parts)
+            )
             match_name = parts[0]
             market_type = parts[1]
             selection = parts[2]
             handicap_parts = [
-                part for idx, part in enumerate(parts[3:]) if idx + 3 != odds_index
+                part
+                for idx, part in enumerate(parts[3:])
+                if idx + 3 != odds_index and not _is_labeled_odds_part(part)
             ]
             line = PreviewLine(
                 row_number=row_number,
@@ -108,6 +135,7 @@ def parse_app_odds_text(raw_app_text):
                 selection=selection,
                 handicap=" ".join(handicap_parts),
                 app_odds=app_odds,
+                outside_odds=labeled_outside_odds,
                 raw_text=raw_line,
             )
         else:
