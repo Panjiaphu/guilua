@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from .forms import SummaryDateForm, TicketCreateForm
+from .forms import BulkTicketForm, SummaryDateForm, TicketCreateForm
 from .models import MarketLine, OddsImportBatch, Ticket
 from .services.import_flow import (
     ImportPreview,
@@ -16,10 +16,16 @@ from .services.import_flow import (
     parse_decimal,
     refresh_preview_status,
 )
-from .services.tickets import create_ticket_from_market_line, summarize_day
+from .services.tickets import (
+    create_ticket_from_market_line,
+    create_tickets_from_preview,
+    parse_ticket_batch_text,
+    summarize_day,
+)
 
 
 SESSION_PREVIEW_KEY = "odds_import_preview"
+SESSION_TICKET_PREVIEW_KEY = "ticket_batch_preview"
 
 
 def _line_to_dict(line):
@@ -150,8 +156,15 @@ def import_odds(request):
 
 
 def tickets(request):
-    form = TicketCreateForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
+    action = request.POST.get("action") if request.method == "POST" else ""
+    form = TicketCreateForm(request.POST if action == "create_single" else None, prefix="single")
+    bulk_form = BulkTicketForm(request.POST if action == "parse_bulk" else None, prefix="bulk")
+    ticket_preview = None
+    preview_data = request.session.get(SESSION_TICKET_PREVIEW_KEY)
+    if preview_data:
+        ticket_preview = parse_ticket_batch_text(preview_data.get("raw_tickets", ""))
+
+    if request.method == "POST" and action == "create_single" and form.is_valid():
         try:
             ticket = create_ticket_from_market_line(
                 market_line=form.cleaned_data["market_line"],
@@ -162,14 +175,52 @@ def tickets(request):
         except (ValidationError, ValueError) as exc:
             form.add_error(None, exc)
         else:
-            messages.success(request, f"Da tao ve #{ticket.id} va luu snapshot odds.")
+            messages.success(request, f"Da tao ve {ticket.ticket_code} va luu snapshot odds.")
             return redirect("odds:tickets")
+
+    elif request.method == "POST" and action == "parse_bulk" and bulk_form.is_valid():
+        raw_tickets = bulk_form.cleaned_data["raw_tickets"]
+        ticket_preview = parse_ticket_batch_text(raw_tickets)
+        request.session[SESSION_TICKET_PREVIEW_KEY] = {
+            "raw_tickets": raw_tickets,
+            "customer_name": bulk_form.cleaned_data["customer_name"],
+            "note": bulk_form.cleaned_data["note"],
+        }
+        request.session.modified = True
+        if ticket_preview.errors:
+            messages.error(request, ticket_preview.errors[-1])
+        else:
+            messages.success(
+                request,
+                f"Da phan tich {len(ticket_preview.lines)} dong ve, {ticket_preview.ready_count} dong hop le.",
+            )
+
+    elif request.method == "POST" and action == "save_bulk":
+        preview_data = request.session.get(SESSION_TICKET_PREVIEW_KEY)
+        if not preview_data:
+            messages.error(request, "Chua co preview ve de luu.")
+        else:
+            ticket_preview = parse_ticket_batch_text(preview_data.get("raw_tickets", ""))
+            try:
+                tickets = create_tickets_from_preview(
+                    ticket_preview,
+                    customer_name=preview_data.get("customer_name", ""),
+                    note=preview_data.get("note", ""),
+                )
+            except (ValidationError, ValueError) as exc:
+                messages.error(request, exc)
+            else:
+                request.session.pop(SESSION_TICKET_PREVIEW_KEY, None)
+                messages.success(request, f"Da luu {len(tickets)} ve va snapshot odds.")
+                return redirect("odds:tickets")
 
     return render(
         request,
         "odds/tickets.html",
         {
             "form": form,
+            "bulk_form": bulk_form,
+            "ticket_preview": ticket_preview,
             "ready_lines": MarketLine.objects.filter(status="ready").order_by("-created_at")[:20],
             "tickets": Ticket.objects.select_related("market_line").order_by("-created_at")[:30],
         },
