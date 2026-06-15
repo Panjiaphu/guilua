@@ -49,3 +49,27 @@ python manage.py runserver
 ```
 
 Khong dua secret that vao repo. Dung `.env.example` lam mau cau hinh.
+
+## Deploy Render
+
+Repo co san `render.yaml`, `runtime.txt`, `.python-version` va scripts trong `scripts/`.
+
+Build command:
+
+```bash
+bash scripts/build_render.sh
+```
+
+Start command:
+
+```bash
+bash scripts/start_render.sh
+```
+
+Health check:
+
+```text
+/healthz/
+```
+
+Xem chi tiet trong `docs/deploy-render.md`.
