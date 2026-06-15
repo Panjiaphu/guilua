@@ -1,0 +1,70 @@
+{% extends "odds/base.html" %}
+
+{% block content %}
+<section class="page-title">
+  <div>
+    <p class="eyebrow">Buoc 3</p>
+    <h1>Tong ket ngay</h1>
+  </div>
+  <a class="button secondary" href="{% url 'odds:import' %}">Import them ty le</a>
+</section>
+
+<form method="get" class="datebar">
+  {{ form.ticket_date.label_tag }}
+  {{ form.ticket_date }}
+  <button class="button secondary" type="submit">Xem ngay</button>
+</form>
+
+<section class="metrics">
+  <div class="metric"><span>So ve</span><strong>{{ summary.ticket_count }}</strong></div>
+  <div class="metric"><span>Tong von khach</span><strong>{{ summary.customer_stake }}</strong></div>
+  <div class="metric"><span>Tong nhap app</span><strong>{{ summary.app_stake }}</strong></div>
+  <div class="metric"><span>Tien con lai</span><strong>{{ summary.remaining_cash }}</strong></div>
+  <div class="metric"><span>Lai neu khach thang</span><strong>{{ summary.profit_if_win }}</strong></div>
+  <div class="metric"><span>Lai neu khach thua</span><strong>{{ summary.profit_if_lose }}</strong></div>
+</section>
+
+<section class="workgrid">
+  <div class="panel">
+    <h2>Copy ke toan</h2>
+    <textarea rows="9" readonly>{{ copy_text }}</textarea>
+  </div>
+  <div class="panel">
+    <h2>Trang thai ve</h2>
+    <div class="compact-list">
+      <div class="compact-row"><strong>{{ summary.open_count }}</strong><span>Dang mo</span></div>
+      <div class="compact-row"><strong>{{ summary.settled_count }}</strong><span>Da doi soat</span></div>
+      <div class="compact-row"><strong>{{ summary.settled_profit }}</strong><span>Lai da doi soat</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="tablewrap">
+  <table class="data-table responsive-table">
+    <thead>
+      <tr>
+        <th>Khach</th>
+        <th>Tran</th>
+        <th>Von</th>
+        <th>Nhap app</th>
+        <th>Con lai</th>
+        <th>Lai win/lose</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in tickets %}
+        <tr>
+          <td data-label="Khach">{{ ticket.customer_name|default:"-" }}</td>
+          <td data-label="Tran">{{ ticket.match_name_snapshot }} / {{ ticket.selection_snapshot }}</td>
+          <td data-label="Von">{{ ticket.customer_stake }}</td>
+          <td data-label="Nhap app">{{ ticket.app_stake }}</td>
+          <td data-label="Con lai">{{ ticket.remaining_cash }}</td>
+          <td data-label="Lai win/lose">{{ ticket.profit_if_win }} / {{ ticket.profit_if_lose }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="empty">Ngay nay chua co ve.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
