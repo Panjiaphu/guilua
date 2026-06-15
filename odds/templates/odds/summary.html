@@ -4,7 +4,8 @@
 <section class="page-title">
   <div>
     <p class="eyebrow">Buoc 3</p>
-    <h1>Tong ket ngay</h1>
+    <h2>Tong ket ngay</h2>
+    <p class="page-subtitle">Tong hop von khach, tien nhap app, tien con lai va cac kich ban lai/lo.</p>
   </div>
   <a class="button secondary" href="{% url 'odds:import' %}">Import them ty le</a>
 </section>
@@ -44,6 +45,7 @@
     <thead>
       <tr>
         <th>Khach</th>
+        <th>Ma ve</th>
         <th>Tran</th>
         <th>Von</th>
         <th>Nhap app</th>
@@ -55,6 +57,7 @@
       {% for ticket in tickets %}
         <tr>
           <td data-label="Khach">{{ ticket.customer_name|default:"-" }}</td>
+          <td data-label="Ma ve">{{ ticket.ticket_code }}</td>
           <td data-label="Tran">{{ ticket.match_name_snapshot }} / {{ ticket.selection_snapshot }}</td>
           <td data-label="Von">{{ ticket.customer_stake }}</td>
           <td data-label="Nhap app">{{ ticket.app_stake }}</td>
@@ -62,7 +65,7 @@
           <td data-label="Lai win/lose">{{ ticket.profit_if_win }} / {{ ticket.profit_if_lose }}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="6" class="empty">Ngay nay chua co ve.</td></tr>
+        <tr><td colspan="7" class="empty">Ngay nay chua co ve.</td></tr>
       {% endfor %}
     </tbody>
   </table>
