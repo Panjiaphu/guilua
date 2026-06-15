@@ -4,26 +4,39 @@
 <section class="page-title">
   <div>
     <p class="eyebrow">Buoc 1</p>
-    <h1>Import ty le app</h1>
+    <h2>Import ty le tu san app</h2>
+    <p class="page-subtitle">Du lieu app chi lay ty le app. Ty le ngoai phai do nguoi dung nhap hoac paste rieng.</p>
   </div>
   <a class="button secondary" href="{% url 'odds:tickets' %}">Sang nhap ve</a>
 </section>
 
-<section class="workgrid">
+<section class="workgrid import-grid">
   <form method="post" class="panel">
     {% csrf_token %}
     <input type="hidden" name="action" value="parse_app">
-    <label for="raw_app_text">Du lieu copy tu san app</label>
-    <textarea id="raw_app_text" name="raw_app_text" rows="12" placeholder="Tran | Loai keo | Lua chon | Handicap | Ty le app">{{ preview.raw_app_text|default:"" }}</textarea>
-    <button class="button" type="submit">Parse preview</button>
+    <div class="panel-head">
+      <div>
+        <span class="step-pill">Muc 1</span>
+        <h3>Paste du lieu san app</h3>
+      </div>
+    </div>
+    <label for="raw_app_text">Moi dong gom tran, loai keo, lua chon, handicap, ty le app</label>
+    <textarea id="raw_app_text" name="raw_app_text" rows="10" placeholder="Tran 1 | Chau A | Doi nha | -0.5 | 2.10&#10;Tran 1 | Chau A | Doi khach | +0.5 | 1.85">{{ preview.raw_app_text|default:"" }}</textarea>
+    <button class="button full-mobile" type="submit">Phan tich du lieu</button>
   </form>
 
   <form method="post" class="panel">
     {% csrf_token %}
     <input type="hidden" name="action" value="merge_outside">
-    <label for="outside_odds_text">Paste ty le ngoai theo thu tu dong</label>
-    <textarea id="outside_odds_text" name="outside_odds_text" rows="12" placeholder="1.82&#10;1.91&#10;2.05"></textarea>
-    <button class="button" type="submit" {% if not preview %}disabled{% endif %}>Ghep ty le ngoai</button>
+    <div class="panel-head">
+      <div>
+        <span class="step-pill teal">Muc 2</span>
+        <h3>Nhap nhanh ty le ngoai</h3>
+      </div>
+    </div>
+    <label for="outside_odds_text">Paste theo dung thu tu dong preview</label>
+    <textarea id="outside_odds_text" name="outside_odds_text" rows="10" placeholder="1.95&#10;1.75&#10;2.10"></textarea>
+    <button class="button full-mobile" type="submit" {% if not preview %}disabled{% endif %}>Ap dung theo thu tu</button>
   </form>
 </section>
 
@@ -66,7 +79,7 @@
             <td data-label="Lua chon">{{ line.selection }}</td>
             <td data-label="Handicap">{{ line.handicap|default:"-" }}</td>
             <td data-label="App odds">{{ line.app_odds|default:"-" }}</td>
-            <td data-label="Outside odds">
+            <td data-label="Ty le ngoai">
               <input class="odds-input" name="outside_odds_{{ line.row_number }}" value="{{ line.outside_odds|default:'' }}" inputmode="decimal">
             </td>
             <td data-label="Trang thai">
@@ -96,6 +109,7 @@
   <table class="data-table">
     <thead>
       <tr>
+        <th>Ma</th>
         <th>Tran</th>
         <th>Loai keo</th>
         <th>Lua chon</th>
@@ -107,6 +121,7 @@
     <tbody>
       {% for line in recent_lines %}
         <tr>
+          <td>{{ line.code }}</td>
           <td>{{ line.match_name }}</td>
           <td>{{ line.market_type }}</td>
           <td>{{ line.selection }}</td>
