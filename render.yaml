@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: guilua
+    runtime: python
+    plan: standard
+    buildCommand: bash scripts/build_render.sh
+    startCommand: bash scripts/start_render.sh
+    healthCheckPath: /healthz/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: DEBUG
+        value: false
+      - key: USE_SQLITE
+        value: true
+      - key: RUN_MIGRATIONS_DURING_BUILD
+        value: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
