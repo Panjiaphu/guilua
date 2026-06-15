@@ -6,7 +6,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 import django
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import Client, TestCase
 
 django.setup()
 
@@ -152,3 +152,13 @@ class TicketWorkflowTests(TestCase):
 
         self.assertFalse(preview.can_save)
         self.assertIn("chua san sang", preview.lines[0].error)
+
+
+class RouteRenderTests(TestCase):
+    def test_main_routes_render(self):
+        client = Client()
+
+        for path in ["/", "/tickets/", "/summary/"]:
+            with self.subTest(path=path):
+                response = client.get(path)
+                self.assertEqual(response.status_code, 200)
