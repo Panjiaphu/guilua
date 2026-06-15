@@ -15,7 +15,7 @@ Django webapp scaffold cho quy trinh ke toan ty le va ve.
 
 ## Trang thai hien tai
 
-Full scaffold da duoc chuan bi trong workspace cua agent voi local commit `c114bf2 feat: build odds ticket workflow`.
+Repo da co scaffold Django cho workflow import ty le, nhap ve va tong ket ngay.
 
 Cac nhom file chinh:
 
@@ -24,6 +24,7 @@ Cac nhom file chinh:
 - `odds/services/`: parse import, tinh tien, tao ve snapshot, tong ket ngay.
 - `odds/views.py`: man import, nhap ve, tong ket.
 - `odds/templates/odds/`: UI thao tac nhanh.
+- `odds/static/odds/app.css`: responsive layout.
 - `odds/tests/`: test luat nghiep vu.
 
 ## Kiem tra da chay trong workspace
