@@ -13,7 +13,7 @@ django.setup()
 from odds.models import MarketLine
 from odds.services.calculations import TicketCalculationError, calculate_ticket
 from odds.services.import_flow import merge_outside_odds, parse_app_odds_text
-from odds.services.tickets import create_ticket_from_market_line
+from odds.services.tickets import create_ticket_from_market_line, parse_ticket_batch_text
 
 
 class CalculationTests(unittest.TestCase):
@@ -107,3 +107,48 @@ class TicketWorkflowTests(TestCase):
         self.assertEqual(ticket.app_odds_snapshot, Decimal("2.000"))
         self.assertEqual(ticket.outside_odds_snapshot, Decimal("1.800"))
         self.assertEqual(ticket.app_stake, Decimal("900.00"))
+
+    def test_market_line_and_ticket_codes_are_generated(self):
+        line = MarketLine.objects.create(
+            match_name="A vs B",
+            market_type="Handicap",
+            selection="A",
+            handicap="-0.5",
+            app_odds=Decimal("2.00"),
+            outside_odds=Decimal("1.80"),
+        )
+        ticket = create_ticket_from_market_line(line, customer_stake=Decimal("1000"))
+
+        self.assertTrue(line.code.startswith("L"))
+        self.assertTrue(ticket.ticket_code.startswith("A"))
+        self.assertEqual(ticket.status, "pending")
+
+    def test_bulk_ticket_preview_uses_market_line_code(self):
+        line = MarketLine.objects.create(
+            match_name="A vs B",
+            market_type="Handicap",
+            selection="A",
+            handicap="-0.5",
+            app_odds=Decimal("2.00"),
+            outside_odds=Decimal("1.80"),
+        )
+
+        preview = parse_ticket_batch_text(f"{line.code} 1000")
+
+        self.assertTrue(preview.can_save)
+        self.assertEqual(preview.lines[0].market_code, line.code)
+        self.assertEqual(preview.lines[0].app_stake, Decimal("900.00"))
+
+    def test_bulk_ticket_preview_blocks_missing_outside_odds(self):
+        line = MarketLine.objects.create(
+            match_name="A vs B",
+            market_type="Handicap",
+            selection="A",
+            handicap="-0.5",
+            app_odds=Decimal("2.00"),
+        )
+
+        preview = parse_ticket_batch_text(f"{line.code} 1000")
+
+        self.assertFalse(preview.can_save)
+        self.assertIn("chua san sang", preview.lines[0].error)
