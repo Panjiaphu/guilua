@@ -4,7 +4,8 @@
 <section class="page-title">
   <div>
     <p class="eyebrow">Buoc 2</p>
-    <h1>Nhap ve</h1>
+    <h2>Nhap ve nhanh</h2>
+    <p class="page-subtitle">Chi tao ve tu dong ty le ready. Moi ve luu snapshot odds tai thoi diem tao.</p>
   </div>
   <a class="button secondary" href="{% url 'odds:summary' %}">Xem tong ket</a>
 </section>
@@ -12,6 +13,13 @@
 <section class="workgrid">
   <form method="post" class="panel">
     {% csrf_token %}
+    <input type="hidden" name="action" value="create_single">
+    <div class="panel-head">
+      <div>
+        <span class="step-pill teal">Ve don</span>
+        <h3>Chon dong va nhap von</h3>
+      </div>
+    </div>
     {{ form.non_field_errors }}
     <label for="{{ form.market_line.id_for_label }}">Dong ty le da san sang</label>
     {{ form.market_line }}
@@ -21,26 +29,100 @@
     {{ form.customer_stake }}
     <label for="{{ form.note.id_for_label }}">Ghi chu</label>
     {{ form.note }}
-    <button class="button" type="submit" {% if not ready_lines %}disabled{% endif %}>Tao ve va luu snapshot</button>
+    <button class="button full-mobile" type="submit" {% if not ready_lines %}disabled{% endif %}>Tao ve va luu snapshot</button>
   </form>
 
-  <div class="panel">
-    <h2>Dong ty le san sang</h2>
-    {% if ready_lines %}
-      <div class="compact-list">
-        {% for line in ready_lines %}
-          <div class="compact-row">
-            <strong>{{ line.match_name }}</strong>
-            <span>{{ line.market_type }} / {{ line.selection }}</span>
-            <span>App {{ line.app_odds }} - Ngoai {{ line.outside_odds }}</span>
-          </div>
-        {% endfor %}
+  <form method="post" class="panel">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="parse_bulk">
+    <div class="panel-head">
+      <div>
+        <span class="step-pill purple">Paste list</span>
+        <h3>Nhap ve hang loat</h3>
       </div>
-    {% else %}
-      <p class="empty">Chua co dong ty le ready. Hay import va nhap outside odds truoc.</p>
-    {% endif %}
+    </div>
+    <label for="{{ bulk_form.raw_tickets.id_for_label }}">Dinh dang: L001 1000</label>
+    {{ bulk_form.raw_tickets }}
+    <div class="two-field-row">
+      <div>
+        <label for="{{ bulk_form.customer_name.id_for_label }}">Ten khach</label>
+        {{ bulk_form.customer_name }}
+      </div>
+      <div>
+        <label for="{{ bulk_form.note.id_for_label }}">Ghi chu</label>
+        {{ bulk_form.note }}
+      </div>
+    </div>
+    <button class="button full-mobile" type="submit">Phan tich ve</button>
+  </form>
+</section>
+
+{% if ticket_preview %}
+<section class="section-head">
+  <div>
+    <p class="eyebrow">Preview ve</p>
+    <h2>{{ ticket_preview.ready_count }} / {{ ticket_preview.lines|length }} dong hop le</h2>
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_bulk">
+    <button class="button" type="submit" {% if not ticket_preview.can_save %}disabled{% endif %}>Luu danh sach ve</button>
+  </form>
+</section>
+
+<div class="tablewrap">
+  <table class="data-table responsive-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Dong</th>
+        <th>Tran</th>
+        <th>Von</th>
+        <th>Nhap app</th>
+        <th>Con lai</th>
+        <th>Trang thai</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for line in ticket_preview.lines %}
+        <tr>
+          <td data-label="#">{{ line.row_number }}</td>
+          <td data-label="Dong">{{ line.market_code|default:"-" }}</td>
+          <td data-label="Tran">{% if line.market_line %}{{ line.market_line.match_name }} / {{ line.market_line.selection }}{% else %}-{% endif %}</td>
+          <td data-label="Von">{{ line.customer_stake|default:"-" }}</td>
+          <td data-label="Nhap app">{{ line.app_stake|default:"-" }}</td>
+          <td data-label="Con lai">{{ line.remaining_cash|default:"-" }}</td>
+          <td data-label="Trang thai">
+            <span class="badge {{ line.status }}">{{ line.status }}</span>
+            {% if line.error %}<div class="row-error">{{ line.error }}</div>{% endif %}
+            {% if line.warning %}<div class="row-warning">{{ line.warning }}</div>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<section class="section-head">
+  <div>
+    <p class="eyebrow">Dong ready</p>
+    <h2>Co the tao ve</h2>
   </div>
 </section>
+
+<div class="ready-grid">
+  {% for line in ready_lines %}
+    <div class="line-card">
+      <strong>{{ line.code }}</strong>
+      <span>{{ line.match_name }}</span>
+      <small>{{ line.market_type }} / {{ line.selection }} / {{ line.handicap|default:"-" }}</small>
+      <b>App {{ line.app_odds }} · Ngoai {{ line.outside_odds }}</b>
+    </div>
+  {% empty %}
+    <div class="panel empty-panel">Chua co dong ty le ready. Hay import va nhap outside odds truoc.</div>
+  {% endfor %}
+</div>
 
 <section class="section-head">
   <div>
@@ -54,6 +136,7 @@
     <thead>
       <tr>
         <th>Ngay</th>
+        <th>Ma ve</th>
         <th>Khach</th>
         <th>Tran</th>
         <th>Von</th>
@@ -66,6 +149,7 @@
       {% for ticket in tickets %}
         <tr>
           <td data-label="Ngay">{{ ticket.ticket_date }}</td>
+          <td data-label="Ma ve">{{ ticket.ticket_code }}</td>
           <td data-label="Khach">{{ ticket.customer_name|default:"-" }}</td>
           <td data-label="Tran">{{ ticket.match_name_snapshot }} / {{ ticket.selection_snapshot }}</td>
           <td data-label="Von">{{ ticket.customer_stake }}</td>
@@ -74,7 +158,7 @@
           <td data-label="Odds snapshot">App {{ ticket.app_odds_snapshot }} - Ngoai {{ ticket.outside_odds_snapshot }}</td>
         </tr>
       {% empty %}
-        <tr><td colspan="7" class="empty">Chua co ve.</td></tr>
+        <tr><td colspan="8" class="empty">Chua co ve.</td></tr>
       {% endfor %}
     </tbody>
   </table>
