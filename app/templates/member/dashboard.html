@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block content %}
 <section class="dashboard">
   <div class="welcome">
@@ -6,7 +7,7 @@
       <p class="eyebrow">{{ t("member.dashboard") }}</p>
       <h1>{{ user.full_name or user.email }}</h1>
     </div>
-    {% if user.is_email_verified %}<span class="badge ok">{{ t("auth.verify_badge") }}</span>{% else %}<span class="badge warn">Email pending</span>{% endif %}
+    {% if user.is_email_verified %}<span class="badge ok">{{ t("auth.verify_badge") }}</span>{% else %}<span class="badge warn">{{ t("auth.email_pending") }}</span>{% endif %}
   </div>
 
   <div class="layout">
@@ -17,28 +18,36 @@
       </div>
       <form method="post" action="/member/requests" class="form split">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label>Type
+        <label>{{ t("member.form.type") }}
           <select name="request_type" required>
             <option value="send_home">{{ t("nav.send_home") }}</option>
             <option value="buy_usdt">{{ t("nav.buy_usdt") }}</option>
             <option value="sell_usdt">{{ t("nav.sell_usdt") }}</option>
           </select>
         </label>
-        <label>TWD<input type="number" name="amount_twd" min="0" step="0.01" placeholder="10000"></label>
-        <label>USDT<input type="number" name="amount_usdt" min="0" step="0.000001" placeholder="300"></label>
-        <label>Recipient<input type="text" name="recipient_name" placeholder="Nguyen Van A"></label>
-        <label>Bank<input type="text" name="recipient_bank" placeholder="VCB"></label>
-        <label>Account<input type="text" name="recipient_account" placeholder="0123456789"></label>
-        <label class="wide">Note<textarea name="member_note" rows="3"></textarea></label>
-        <button class="button primary wide" type="submit">Submit</button>
+        <label>{{ t("member.form.amount_twd") }}<input type="number" name="amount_twd" min="0" step="0.01" placeholder="10000"></label>
+        <label>{{ t("member.form.amount_usdt") }}<input type="number" name="amount_usdt" min="0" step="0.000001" placeholder="300"></label>
+        <label>{{ t("member.form.recipient") }}<input type="text" name="recipient_name" placeholder="Nguyễn Văn A"></label>
+        <label>{{ t("member.form.bank") }}<input type="text" name="recipient_bank" placeholder="VCB"></label>
+        <label>{{ t("member.form.account") }}<input type="text" name="recipient_account" placeholder="0123456789"></label>
+        <label class="wide">{{ t("member.form.note") }}<textarea name="member_note" rows="3"></textarea></label>
+        <button class="button primary wide" type="submit">{{ t("member.form.submit") }}</button>
       </form>
     </section>
 
     <aside class="account-card">
+      <span class="icon">{{ icons.icon("rate") }}</span>
       <h2>{{ t("nav.rates") }}</h2>
       {% for pair, rate in rates.items() %}
-        <div class="account-line"><span>{{ pair.replace("_", " -> ") }}</span><strong>{{ rate.buy_rate }}</strong></div>
+        <div class="account-line"><span>{{ pair_label(pair) }}</span><strong>{{ rate.buy_rate }}</strong></div>
       {% endfor %}
+      <div class="support-box">
+        <h3>{{ t("member.support") }}</h3>
+        <p>{{ t("member.support_desc") }}</p>
+        <span>{{ t("admin.contact.email") }}: {{ admin_contact.email }}</span>
+        <span>{{ t("admin.contact.line") }}: {{ admin_contact.line }}</span>
+        <span>{{ t("admin.contact.phone") }}: {{ admin_contact.phone }}</span>
+      </div>
     </aside>
   </div>
 
@@ -49,22 +58,22 @@
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Ref</th><th>Type</th><th>Amount</th><th>Status</th><th>Updated</th></tr></thead>
+        <thead><tr><th>{{ t("table.ref") }}</th><th>{{ t("table.type") }}</th><th>{{ t("table.amount") }}</th><th>{{ t("table.status") }}</th><th>{{ t("table.updated") }}</th></tr></thead>
         <tbody>
           {% for item in requests %}
             <tr>
               <td>{{ item.reference_code }}</td>
-              <td>{{ item.request_type.value }}</td>
+              <td>{{ type_label(item.request_type) }}</td>
               <td>
                 {% if item.amount_twd %}{{ item.amount_twd }} TWD{% endif %}
                 {% if item.amount_usdt %}<br>{{ item.amount_usdt }} USDT{% endif %}
                 {% if item.amount_vnd %}<br>{{ item.amount_vnd }} VND{% endif %}
               </td>
-              <td><span class="status">{{ t("status." ~ item.status.value) }}</span></td>
+              <td><span class="status">{{ status_label(item.status) }}</span></td>
               <td>{{ item.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="empty">No requests yet</td></tr>
+            <tr><td colspan="5" class="empty">{{ t("member.empty") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -56,8 +56,8 @@ def create_transaction(
     queue_email(
         db,
         user.email,
-        f"Guilua request received: {item.reference_code}",
-        f"Your request {item.reference_code} is pending admin review.",
+        f"Guilua - đã nhận yêu cầu {item.reference_code}",
+        f"Yêu cầu {item.reference_code} của bạn đang chờ admin kiểm tra.",
         "member_transaction_created",
         user=user,
         transaction=item,
@@ -67,8 +67,8 @@ def create_transaction(
         queue_email(
             db,
             admin_email,
-            f"New Guilua request: {item.reference_code}",
-            f"New {item.request_type.value} request from {user.email}.",
+            f"Guilua - yêu cầu mới {item.reference_code}",
+            f"Thành viên {user.email} vừa tạo yêu cầu {item.request_type.value}.",
             "admin_transaction_created",
             user=user,
             transaction=item,

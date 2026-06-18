@@ -1,26 +1,27 @@
 # Guilua Finance Webapp
 
-FastAPI webapp cho Guilua: gui tien TWD ve Viet Nam, mua USDT, ban USDT,
-member dashboard, admin dashboard, manual fallback rates va email notification
-queue. UI ho tro Vietnamese va Traditional Chinese.
+FastAPI webapp cho Guilua: gửi tiền TWD về Việt Nam, mua USDT, bán USDT,
+dashboard thành viên, dashboard admin, tỷ giá thủ công dự phòng và hàng đợi
+email notification. UI hỗ trợ tiếng Việt có dấu và tiếng Trung phồn thể.
 
-Repo truoc day co Django scaffold trong `config/` va `odds/`. Code do duoc giu
-lai de khong xoa lich su, nhung entrypoint deploy hien tai la FastAPI:
+Repo trước đây có Django scaffold trong `config/` và `odds/`. Code đó được giữ
+lại để không xóa lịch sử, nhưng entrypoint deploy hiện tại là FastAPI:
 `app.main:app`.
 
-## Chuc nang hien co
+## Chức năng hiện có
 
-- Dang ky, dang nhap, dang xuat bang session cookie signed va CSRF token.
-- Password hashing bang PBKDF2.
-- Email verification token va email queue.
-- Member dashboard: tao request `send_home`, `buy_usdt`, `sell_usdt`.
-- Admin dashboard: cap nhat trang thai request, ghi chu noi bo, cap nhat manual rate.
-- Exchange rates: manual fallback cho `TWD_VND` va `USDT_TWD`, san sang gan live provider qua env.
+- Đăng ký, đăng nhập, đăng xuất bằng signed session cookie và CSRF token.
+- Password hashing bằng PBKDF2.
+- Email verification token và email queue.
+- Member dashboard: tạo request `send_home`, `buy_usdt`, `sell_usdt`.
+- Admin dashboard: cập nhật trạng thái request, ghi chú nội bộ, cập nhật manual rate.
+- Admin contact: `panjiaphu@gmail.com`, LINE `@827sxbki`, phone `0906938893`.
+- Exchange rates: manual fallback cho `TWD_VND` và `USDT_TWD`, sẵn sàng gắn live provider qua env.
 - Alembic migration cho PostgreSQL/SQLite.
-- Render deploy scripts va health check `/healthz/`.
-- Admin seed qua `ADMIN_SEED_EMAIL` va `ADMIN_SEED_PASSWORD` khi database chua co admin.
+- Render deploy scripts và health check `/healthz/`.
+- Admin seed qua `ADMIN_SEED_EMAIL` và `ADMIN_SEED_PASSWORD` khi database chưa có admin.
 
-## Chay local
+## Chạy local
 
 ```bash
 python -m venv .venv
@@ -40,19 +41,23 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Khong dua secret that vao repo. Dung `.env.example` lam mau cau hinh.
+Tạo hoặc cập nhật tài khoản admin local:
+
+```bash
+python scripts/create_admin.py --email panjiaphu@gmail.com --password "<mật-khẩu-admin-mạnh>"
+```
+
+Không đưa secret thật vào repo. Dùng `.env.example` làm mẫu cấu hình.
 
 ## Deploy Render
 
-Repo co san `render.yaml`, `runtime.txt`, `.python-version` va scripts trong `scripts/`.
-
-Build command:
+Build Command:
 
 ```bash
 bash scripts/build_render.sh
 ```
 
-Start command:
+Start Command:
 
 ```bash
 bash scripts/start_render.sh
@@ -64,10 +69,11 @@ Health check:
 /healthz/
 ```
 
-Xem chi tiet trong `docs/deploy-render.md`.
+Xem chi tiết trong `docs/deploy-render.md`.
 
-## Mock / can backend that
+## Phần còn cần backend thật
 
-- Email da co queue va SMTP sender, nhung can cau hinh SMTP env that tren Render.
-- Live exchange provider la optional qua `EXCHANGE_RATE_PROVIDER_URL`; neu chua co provider, app dung manual fallback rate.
-- Admin seed da co env password, nhung nen thay bang flow tao admin rieng truoc production.
+- Email đã có queue và SMTP sender, nhưng cần cấu hình SMTP env thật trên Render.
+- Live exchange provider là optional qua `EXCHANGE_RATE_PROVIDER_URL`; nếu chưa có provider, app dùng manual fallback rate.
+- Two-way email hiện mới ở mức dữ liệu email queue và thông tin admin; cần mailbox inbound/webhook thật để xử lý email member reply.
+- Admin seed đã có env password, nhưng nên thay bằng flow tạo admin riêng trước production.

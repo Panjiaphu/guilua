@@ -1,6 +1,8 @@
 # Deploy Render cho Guilua
 
-App hien tai deploy bang FastAPI + Gunicorn/Uvicorn:
+App hiện tại deploy bằng FastAPI + Gunicorn/Uvicorn.
+
+## Render Commands
 
 ```text
 Build Command: bash scripts/build_render.sh
@@ -8,52 +10,62 @@ Start Command: bash scripts/start_render.sh
 Health Check Path: /healthz/
 ```
 
-## Cau hinh khuyen nghi
+## Biến môi trường tối thiểu
 
-Environment variables toi thieu:
+Set các biến sau trong Render service:
 
 ```text
 APP_ENV=production
 DEBUG=false
-SECRET_KEY=<tao secret rieng dai hon 32 ky tu>
+SECRET_KEY=<secret riêng dài hơn 32 ký tự>
 USE_SQLITE=true
 SESSION_COOKIE_SECURE=true
 RUN_MIGRATIONS_DURING_BUILD=false
-ADMIN_SEED_EMAIL=<admin email>
-ADMIN_SEED_PASSWORD=<mat khau tam thoi toi thieu 14 ky tu>
+ADMIN_NOTIFICATION_EMAIL=panjiaphu@gmail.com
+ADMIN_LINE_ID=@827sxbki
+ADMIN_PHONE=0906938893
+ADMIN_SEED_EMAIL=panjiaphu@gmail.com
+ADMIN_SEED_PASSWORD=<mật khẩu admin tạm thời tối thiểu 14 ký tự>
 ```
 
-Voi cau hinh tren, app chay SQLite de smoke UI nhanh. Khi can du lieu ben vung,
-tao PostgreSQL hop le roi doi:
+Với cấu hình trên, app chạy SQLite để smoke UI nhanh. Với production thật nên
+dùng PostgreSQL để dữ liệu không phụ thuộc vào filesystem của web service:
 
 ```text
 USE_SQLITE=false
-DATABASE_URL=<postgres URL hop le>
+DATABASE_URL=<PostgreSQL URL hợp lệ>
 RUN_MIGRATIONS_DURING_BUILD=true
 ```
 
-`scripts/start_render.sh` se chay `alembic upgrade head` luc runtime roi moi bat
-Gunicorn. Nhu vay build khong chet vi database host loi, nhung app van co bang
+`scripts/start_render.sh` sẽ chạy `alembic upgrade head` lúc runtime rồi mới bật
+Gunicorn. Như vậy build không chết vì database host lỗi, nhưng app vẫn có bảng
 database khi start.
 
-Email optional:
+## Email notification
+
+Set SMTP khi muốn gửi email thật:
 
 ```text
-SMTP_HOST=
+SMTP_HOST=<smtp host>
 SMTP_PORT=587
-SMTP_USERNAME=
-SMTP_PASSWORD=
-SMTP_FROM_EMAIL=no-reply@your-domain
-ADMIN_NOTIFICATION_EMAIL=admin@your-domain
+SMTP_USERNAME=<smtp username>
+SMTP_PASSWORD=<smtp password>
+SMTP_FROM_EMAIL=<email gửi đi>
+SMTP_USE_TLS=true
 ```
 
-Live rate optional:
+Hiện app có email queue và SMTP sender. Email hai chiều đầy đủ vẫn cần thêm
+mailbox inbound hoặc webhook để nhận email reply từ member.
+
+## Live exchange rate
+
+Optional:
 
 ```text
 EXCHANGE_RATE_PROVIDER_URL=https://example.com/rates.json
 ```
 
-Provider JSON dang ky vong format:
+Provider JSON kỳ vọng format:
 
 ```json
 {
@@ -62,14 +74,4 @@ Provider JSON dang ky vong format:
 }
 ```
 
-Khong commit secret that vao repo.
-
-## Lenh local
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload
-```
+Không commit secret thật vào repo.

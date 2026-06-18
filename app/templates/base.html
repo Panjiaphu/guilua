@@ -7,9 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   </head>
   <body>
+    <div class="scene-bg" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="grid-floor"></span>
+    </div>
     <header class="topbar">
       <a class="brand" href="/?lang={{ locale }}">Guilua</a>
       <nav class="nav">
+        <a href="/?lang={{ locale }}">{{ t("nav.home") }}</a>
         <a href="/member?lang={{ locale }}">{{ t("nav.member") }}</a>
         <a href="/admin?lang={{ locale }}">{{ t("nav.admin") }}</a>
         <a href="/?lang=vi">VI</a>
@@ -29,5 +35,10 @@
     <main>
       {% block content %}{% endblock %}
     </main>
+    <footer class="footer">
+      <span>{{ t("admin.contact.email") }}: {{ admin_contact.email }}</span>
+      <span>{{ t("admin.contact.line") }}: {{ admin_contact.line }}</span>
+      <span>{{ t("admin.contact.phone") }}: {{ admin_contact.phone }}</span>
+    </footer>
   </body>
 </html>

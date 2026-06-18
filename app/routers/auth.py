@@ -12,6 +12,7 @@ from app.core.security import (
     verify_csrf,
     verify_password,
 )
+from app.core.i18n import resolve_locale, t
 from app.core.templates import context, templates
 from app.db.session import get_db
 from app.models import User
@@ -19,6 +20,10 @@ from app.services.email import queue_email
 
 
 router = APIRouter()
+
+
+def _message(request: Request, key: str) -> str:
+    return t(resolve_locale(request), key)
 
 
 @router.get("/register")
@@ -42,11 +47,13 @@ def register(
         return templates.TemplateResponse(
             request=request,
             name="auth/register.html",
-            context=context(request, error="Password must be at least 10 characters"),
+            context=context(request, error=_message(request, "error.password_short")),
         )
     existing = db.query(User).filter(User.email == normalized_email).first()
     if existing:
-        return templates.TemplateResponse(request=request, name="auth/register.html", context=context(request, error="Email already exists"))
+        return templates.TemplateResponse(
+            request=request, name="auth/register.html", context=context(request, error=_message(request, "error.email_exists"))
+        )
     user = User(
         email=normalized_email,
         password_hash=hash_password(password),
@@ -61,8 +68,8 @@ def register(
     queue_email(
         db,
         user.email,
-        "Verify your Guilua email",
-        f"Open this link to verify your email: {verify_url}",
+        "Guilua - xác minh email",
+        f"Mở liên kết này để xác minh email Guilua: {verify_url}",
         "email_verification",
         user=user,
     )
@@ -88,9 +95,13 @@ def login(
     verify_csrf(request, csrf_token)
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if not user or not verify_password(password, user.password_hash):
-        return templates.TemplateResponse(request=request, name="auth/login.html", context=context(request, error="Invalid email or password"))
+        return templates.TemplateResponse(
+            request=request, name="auth/login.html", context=context(request, error=_message(request, "error.invalid_login"))
+        )
     if not user.is_active:
-        return templates.TemplateResponse(request=request, name="auth/login.html", context=context(request, error="Account is disabled"))
+        return templates.TemplateResponse(
+            request=request, name="auth/login.html", context=context(request, error=_message(request, "error.account_disabled"))
+        )
     login_user(request, user)
     return RedirectResponse("/member", status_code=303)
 

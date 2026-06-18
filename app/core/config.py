@@ -31,8 +31,10 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str = "no-reply@guilua.local"
     smtp_use_tls: bool = True
-    admin_notification_email: str | None = None
-    admin_seed_email: str = "admin@guilua.local"
+    admin_notification_email: str | None = "panjiaphu@gmail.com"
+    admin_line_id: str = "@827sxbki"
+    admin_phone: str = "0906938893"
+    admin_seed_email: str = "panjiaphu@gmail.com"
     admin_seed_password: str | None = None
 
     exchange_rate_provider_url: str | None = None

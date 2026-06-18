@@ -1,0 +1,17 @@
+{% macro icon(name) -%}
+  {% if name == "send" %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M6 7l3-3h6l3 3M7 17l2 3h6l2-3"/><path d="M9 12h6"/></svg>
+  {% elif name == "usdt" %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 8h8M12 8v9M9 11.5c1.8.8 4.2.8 6 0"/></svg>
+  {% elif name == "sell" %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h10a4 4 0 0 1 0 8H8"/><path d="M9 11 5 15l4 4"/><path d="M18 5v4M20 7h-4"/></svg>
+  {% elif name == "shield" %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 2.9 8.2 7 10 4.1-1.8 7-5.3 7-10V6l-7-3Z"/><path d="m9.5 12 1.8 1.8 3.7-4"/></svg>
+  {% elif name == "mail" %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="m5 8 7 5 7-5"/></svg>
+  {% elif name == "rate" %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18 10 7l4 7 3-5 3 9"/><path d="M4 20h16"/></svg>
+  {% else %}
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+  {% endif %}
+{%- endmacro %}

@@ -55,8 +55,8 @@ def update_request(
     queue_email(
         db,
         item.user.email,
-        f"Guilua request update: {item.reference_code}",
-        f"Your request status is now {item.status.value}. Admin note: {item.admin_note or '-'}",
+        f"Guilua - cập nhật yêu cầu {item.reference_code}",
+        f"Trạng thái yêu cầu hiện tại: {item.status.value}. Ghi chú admin: {item.admin_note or '-'}",
         "member_transaction_status",
         user=item.user,
         transaction=item,

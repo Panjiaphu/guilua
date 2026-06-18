@@ -1,38 +1,66 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block content %}
 <section class="hero">
   <div>
-    <p class="eyebrow">Vietnam / Taiwan finance desk</p>
+    <p class="eyebrow">{{ t("home.kicker") }}</p>
     <h1>{{ t("home.title") }}</h1>
     <p>{{ t("home.subtitle") }}</p>
+    <div class="proof-row">
+      <span>{{ t("home.proof.secure") }}</span>
+      <span>{{ t("home.proof.manual") }}</span>
+      <span>{{ t("home.proof.admin") }}</span>
+    </div>
     <div class="hero-actions">
-      <a class="button primary" href="/register?lang={{ locale }}">{{ t("auth.register") }}</a>
-      <a class="button" href="/login?lang={{ locale }}">{{ t("auth.login") }}</a>
+      <a class="button primary" href="/register?lang={{ locale }}">{{ t("home.primary") }}</a>
+      <a class="button" href="/login?lang={{ locale }}">{{ t("home.secondary") }}</a>
     </div>
   </div>
-  <div class="phone-panel">
-    <div class="phone-header">Guilua</div>
-    <div class="step active">TWD -> VND</div>
-    <div class="quote-row"><span>10,000 TWD</span><strong>{{ "{:,.0f}".format(10000 * rates["TWD_VND"].buy_rate) }} VND</strong></div>
-    <div class="quote-row"><span>USDT Buy</span><strong>{{ rates["USDT_TWD"].buy_rate }} TWD</strong></div>
+  <div class="hero-console motion-card">
+    <div class="console-top">
+      <span>Guilua</span>
+      <strong>{{ t("home.hero_status") }}</strong>
+    </div>
+    <div class="console-balance">
+      <small>{{ t("home.hero_rate") }}</small>
+      <strong>{{ rates["TWD_VND"].buy_rate }} VND</strong>
+    </div>
+    <div class="console-grid">
+      <div><small>{{ t("nav.buy_usdt") }}</small><strong>{{ rates["USDT_TWD"].buy_rate }}</strong></div>
+      <div><small>{{ t("nav.sell_usdt") }}</small><strong>{{ rates["USDT_TWD"].sell_rate }}</strong></div>
+    </div>
+    <div class="console-flow">
+      <span>{{ t("home.ops.one") }}</span>
+      <span>{{ t("home.ops.two") }}</span>
+      <span>{{ t("home.ops.three") }}</span>
+    </div>
   </div>
 </section>
 
 <section class="grid three">
-  <article class="card">
-    <span class="icon">T</span>
-    <h2>{{ t("nav.send_home") }}</h2>
-    <p>TWD -> VND, recipient info, admin review, email status.</p>
+  <article class="feature-card gradient-pink">
+    <div class="card-glow"></div>
+    <div class="feature-inner">
+      <span class="icon">{{ icons.icon("send") }}</span>
+      <h2>{{ t("home.card.send.title") }}</h2>
+      <p>{{ t("home.card.send.desc") }}</p>
+    </div>
   </article>
-  <article class="card">
-    <span class="icon">U</span>
-    <h2>{{ t("nav.buy_usdt") }}</h2>
-    <p>Quote by TWD amount with manual fallback rate.</p>
+  <article class="feature-card gradient-cyan delay-1">
+    <div class="card-glow"></div>
+    <div class="feature-inner">
+      <span class="icon">{{ icons.icon("usdt") }}</span>
+      <h2>{{ t("home.card.buy.title") }}</h2>
+      <p>{{ t("home.card.buy.desc") }}</p>
+    </div>
   </article>
-  <article class="card">
-    <span class="icon">S</span>
-    <h2>{{ t("nav.sell_usdt") }}</h2>
-    <p>USDT amount converts to TWD payout estimate.</p>
+  <article class="feature-card gradient-violet delay-2">
+    <div class="card-glow"></div>
+    <div class="feature-inner">
+      <span class="icon">{{ icons.icon("sell") }}</span>
+      <h2>{{ t("home.card.sell.title") }}</h2>
+      <p>{{ t("home.card.sell.desc") }}</p>
+    </div>
   </article>
 </section>
 
@@ -44,9 +72,9 @@
   <div class="rate-grid">
     {% for pair, rate in rates.items() %}
       <div class="rate-card">
-        <span>{{ pair.replace("_", " -> ") }}</span>
+        <span>{{ pair_label(pair) }}</span>
         <strong>{{ rate.buy_rate }}</strong>
-        <small>Sell {{ rate.sell_rate }} · {{ rate.source }}</small>
+        <small>{{ t("rates.sell") }} {{ rate.sell_rate }} · {{ source_label(rate.source) }}</small>
       </div>
     {% endfor %}
   </div>

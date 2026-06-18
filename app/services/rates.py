@@ -26,7 +26,7 @@ def ensure_default_rates(db: Session) -> None:
                 sell_rate=sell_rate,
                 source="manual",
                 is_manual=True,
-                note="Initial manual fallback",
+                note="Manual fallback",
             )
         )
     db.commit()

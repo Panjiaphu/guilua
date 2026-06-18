@@ -19,7 +19,31 @@ services:
         value: true
       - key: RUN_MIGRATIONS_DURING_BUILD
         value: false
+      - key: ADMIN_NOTIFICATION_EMAIL
+        value: panjiaphu@gmail.com
+      - key: ADMIN_LINE_ID
+        value: "@827sxbki"
+      - key: ADMIN_PHONE
+        value: "0906938893"
+      - key: ADMIN_SEED_EMAIL
+        value: panjiaphu@gmail.com
       - key: SECRET_KEY
         sync: false
+      - key: ADMIN_SEED_PASSWORD
+        sync: false
       - key: DATABASE_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_USE_TLS
+        value: true
+      - key: EXCHANGE_RATE_PROVIDER_URL
         sync: false

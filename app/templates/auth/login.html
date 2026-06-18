@@ -2,6 +2,7 @@
 {% block content %}
 <section class="auth-card">
   <h1>{{ t("auth.login") }}</h1>
+  <p class="muted">{{ t("auth.login_hint") }}</p>
   {% if error %}<p class="alert">{{ error }}</p>{% endif %}
   <form method="post" action="/login" class="form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
