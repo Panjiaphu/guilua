@@ -13,8 +13,8 @@ def main():
     parser.add_argument("--phase", default="runtime", choices=["build", "runtime"])
     args = parser.parse_args()
 
-    debug = is_true(os.getenv("DEBUG", "false"))
-    use_sqlite = is_true(os.getenv("USE_SQLITE", "false"))
+    debug = is_true(os.getenv("DEBUG", "true"))
+    use_sqlite = is_true(os.getenv("USE_SQLITE", "true"))
     database_url = os.getenv("DATABASE_URL", "")
     secret_key = os.getenv("SECRET_KEY", "")
 

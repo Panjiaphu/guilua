@@ -9,5 +9,5 @@ if [[ "${USE_SQLITE:-false}" != "true" ]]; then
   python scripts/wait_for_database.py
 fi
 
-python manage.py migrate --noinput
-gunicorn config.wsgi:application --log-file -
+alembic upgrade head
+gunicorn app.main:app --worker-class uvicorn.workers.UvicornWorker --bind "0.0.0.0:${PORT:-8000}" --log-file -

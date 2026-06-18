@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="dashboard">
+  <div class="welcome">
+    <div>
+      <p class="eyebrow">{{ t("admin.dashboard") }}</p>
+      <h1>Guilua Admin</h1>
+    </div>
+    <span class="badge ok">{{ admin.email }}</span>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="section-head"><h2>{{ t("admin.requests") }}</h2><span>{{ requests|length }}</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Ref</th><th>Member</th><th>Type</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for item in requests %}
+              <tr>
+                <td>{{ item.reference_code }}</td>
+                <td>{{ item.user.email }}</td>
+                <td>{{ item.request_type.value }}</td>
+                <td>{% if item.amount_twd %}{{ item.amount_twd }} TWD{% endif %}{% if item.amount_usdt %}<br>{{ item.amount_usdt }} USDT{% endif %}</td>
+                <td><span class="status">{{ t("status." ~ item.status.value) }}</span></td>
+                <td>
+                  <form method="post" action="/admin/requests/{{ item.id }}" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <select name="status">
+                      {% for status in statuses %}
+                        <option value="{{ status.value }}" {% if status == item.status %}selected{% endif %}>{{ t("status." ~ status.value) }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="text" name="admin_note" value="{{ item.admin_note }}" placeholder="Note">
+                    <button class="button small" type="submit">Save</button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="empty">No requests</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="panel compact">
+      <h2>{{ t("rates.manual") }}</h2>
+      <form method="post" action="/admin/rates" class="form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Pair
+          <select name="pair">
+            <option value="TWD_VND">TWD -> VND</option>
+            <option value="USDT_TWD">USDT -> TWD</option>
+          </select>
+        </label>
+        <label>Buy<input type="number" name="buy_rate" step="0.000001" required></label>
+        <label>Sell<input type="number" name="sell_rate" step="0.000001" required></label>
+        <label>Note<input type="text" name="note"></label>
+        <button class="button primary" type="submit">Update</button>
+      </form>
+      <div class="email-list">
+        <h3>Email queue</h3>
+        {% for email in emails %}
+          <p><strong>{{ email.status.value }}</strong> · {{ email.recipient }} · {{ email.event_type }}</p>
+        {% else %}
+          <p class="empty">No email events</p>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

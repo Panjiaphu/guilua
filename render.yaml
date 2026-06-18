@@ -11,7 +11,11 @@ services:
         value: 3.12.13
       - key: DEBUG
         value: false
+      - key: APP_ENV
+        value: production
       - key: USE_SQLITE
+        value: true
+      - key: SESSION_COOKIE_SECURE
         value: true
       - key: RUN_MIGRATIONS_DURING_BUILD
         value: false

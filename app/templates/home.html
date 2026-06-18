@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Vietnam / Taiwan finance desk</p>
+    <h1>{{ t("home.title") }}</h1>
+    <p>{{ t("home.subtitle") }}</p>
+    <div class="hero-actions">
+      <a class="button primary" href="/register?lang={{ locale }}">{{ t("auth.register") }}</a>
+      <a class="button" href="/login?lang={{ locale }}">{{ t("auth.login") }}</a>
+    </div>
+  </div>
+  <div class="phone-panel">
+    <div class="phone-header">Guilua</div>
+    <div class="step active">TWD -> VND</div>
+    <div class="quote-row"><span>10,000 TWD</span><strong>{{ "{:,.0f}".format(10000 * rates["TWD_VND"].buy_rate) }} VND</strong></div>
+    <div class="quote-row"><span>USDT Buy</span><strong>{{ rates["USDT_TWD"].buy_rate }} TWD</strong></div>
+  </div>
+</section>
+
+<section class="grid three">
+  <article class="card">
+    <span class="icon">T</span>
+    <h2>{{ t("nav.send_home") }}</h2>
+    <p>TWD -> VND, recipient info, admin review, email status.</p>
+  </article>
+  <article class="card">
+    <span class="icon">U</span>
+    <h2>{{ t("nav.buy_usdt") }}</h2>
+    <p>Quote by TWD amount with manual fallback rate.</p>
+  </article>
+  <article class="card">
+    <span class="icon">S</span>
+    <h2>{{ t("nav.sell_usdt") }}</h2>
+    <p>USDT amount converts to TWD payout estimate.</p>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>{{ t("nav.rates") }}</h2>
+    <span>{{ t("rates.manual") }}</span>
+  </div>
+  <div class="rate-grid">
+    {% for pair, rate in rates.items() %}
+      <div class="rate-card">
+        <span>{{ pair.replace("_", " -> ") }}</span>
+        <strong>{{ rate.buy_rate }}</strong>
+        <small>Sell {{ rate.sell_rate }} · {{ rate.source }}</small>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
