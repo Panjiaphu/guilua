@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
+import json
 import smtplib
 from email.message import EmailMessage
 
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import EmailNotification, EmailStatus, TransactionRequest, User
+from app.models import EmailNotification, EmailReply, EmailStatus, TransactionRequest, User
 
 
 def queue_email(
@@ -67,3 +68,65 @@ def flush_email_queue(db: Session, limit: int = 20) -> list[EmailNotification]:
             item.sent_at = datetime.now(timezone.utc)
     db.commit()
     return pending
+
+
+def record_email_reply(
+    db: Session,
+    sender: str,
+    recipient: str,
+    subject: str,
+    body: str,
+    provider_message_id: str = "",
+    raw_payload: dict | None = None,
+) -> EmailReply:
+    normalized_sender = sender.strip().lower()
+    user = db.query(User).filter(User.email == normalized_sender).first()
+    transaction = _match_transaction(db, subject=subject, body=body)
+    reply = EmailReply(
+        sender=normalized_sender,
+        recipient=recipient.strip().lower(),
+        subject=subject.strip(),
+        body=body.strip(),
+        provider_message_id=provider_message_id.strip(),
+        raw_payload=json.dumps(raw_payload or {}, ensure_ascii=False),
+        user_id=user.id if user else None,
+        transaction_id=transaction.id if transaction else None,
+        is_processed=False,
+    )
+    db.add(reply)
+    settings = get_settings()
+    if settings.admin_notification_email:
+        reference = f"\nMã yêu cầu: {transaction.reference_code}" if transaction else ""
+        db.add(
+            EmailNotification(
+                recipient=settings.admin_notification_email,
+                subject=f"Guilua - email phản hồi từ {normalized_sender}",
+                body=f"Member vừa phản hồi email.{reference}\n\nTiêu đề: {subject.strip() or '-'}\n\n{body.strip()}",
+                event_type="inbound_email_reply",
+                user_id=user.id if user else None,
+                transaction_id=transaction.id if transaction else None,
+            )
+        )
+    db.commit()
+    db.refresh(reply)
+    return reply
+
+
+def mark_reply_processed(db: Session, reply_id: int) -> EmailReply | None:
+    reply = db.get(EmailReply, reply_id)
+    if not reply:
+        return None
+    reply.is_processed = True
+    db.commit()
+    db.refresh(reply)
+    return reply
+
+
+def _match_transaction(db: Session, subject: str, body: str) -> TransactionRequest | None:
+    haystack = f"{subject}\n{body}".upper()
+    for token in haystack.replace("#", " ").replace(":", " ").replace("-", " ").split():
+        if token.startswith("GL") and len(token) >= 6:
+            found = db.query(TransactionRequest).filter(TransactionRequest.reference_code == token).first()
+            if found:
+                return found
+    return None

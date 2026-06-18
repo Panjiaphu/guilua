@@ -48,6 +48,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     transactions: Mapped[list["TransactionRequest"]] = relationship(back_populates="user")
+    email_replies: Mapped[list["EmailReply"]] = relationship(back_populates="user")
 
 
 class ExchangeRate(Base):
@@ -90,6 +91,7 @@ class TransactionRequest(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     user: Mapped[User] = relationship(back_populates="transactions")
+    email_replies: Mapped[list["EmailReply"]] = relationship(back_populates="transaction")
 
 
 class EmailNotification(Base):
@@ -106,3 +108,22 @@ class EmailNotification(Base):
     transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transaction_requests.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailReply(Base):
+    __tablename__ = "email_replies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sender: Mapped[str] = mapped_column(String(255), index=True)
+    recipient: Mapped[str] = mapped_column(String(255), default="")
+    subject: Mapped[str] = mapped_column(String(255), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    provider_message_id: Mapped[str] = mapped_column(String(255), default="", index=True)
+    raw_payload: Mapped[str] = mapped_column(Text, default="")
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transaction_requests.id"), nullable=True, index=True)
+    is_processed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    user: Mapped[User | None] = relationship(back_populates="email_replies")
+    transaction: Mapped[TransactionRequest | None] = relationship(back_populates="email_replies")

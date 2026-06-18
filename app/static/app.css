@@ -284,6 +284,20 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
 .inline-form { display: grid; grid-template-columns: 150px minmax(150px, 1fr) auto; gap: 9px; }
 .email-list { margin-top: 26px; color: var(--muted); font-size: 13px; }
 .email-list p { line-height: 1.55; }
+.section-head.inline { align-items: center; margin-bottom: 10px; }
+.section-head.inline h3 { margin: 0; }
+.reply-item {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  background: rgba(255,255,255,.04);
+}
+.reply-item p { margin: 0; }
+.reply-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.reply-head strong { color: #fff; word-break: break-word; }
 .footer {
   position: relative;
   z-index: 1;

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from_email: str = "no-reply@guilua.local"
     smtp_use_tls: bool = True
+    email_webhook_api_key: str | None = None
     admin_notification_email: str | None = "panjiaphu@gmail.com"
     admin_line_id: str = "@827sxbki"
     admin_phone: str = "0906938893"

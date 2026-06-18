@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.security import require_admin, verify_csrf
 from app.core.templates import context, templates
 from app.db.session import get_db
-from app.models import EmailNotification, TransactionRequest, TransactionStatus
-from app.services.email import queue_email
+from app.models import EmailNotification, EmailReply, TransactionRequest, TransactionStatus
+from app.services.email import flush_email_queue, mark_reply_processed, queue_email
 from app.services.rates import latest_rates, update_manual_rate
 
 
@@ -20,6 +20,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     admin = require_admin(request, db)
     requests = db.query(TransactionRequest).order_by(TransactionRequest.created_at.desc()).limit(50).all()
     emails = db.query(EmailNotification).order_by(EmailNotification.created_at.desc()).limit(20).all()
+    replies = db.query(EmailReply).order_by(EmailReply.created_at.desc()).limit(20).all()
     return templates.TemplateResponse(
         request=request,
         name="admin/dashboard.html",
@@ -29,6 +30,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             requests=requests,
             rates=latest_rates(db),
             emails=emails,
+            replies=replies,
             statuses=list(TransactionStatus),
         ),
     )
@@ -56,7 +58,7 @@ def update_request(
         db,
         item.user.email,
         f"Guilua - cập nhật yêu cầu {item.reference_code}",
-        f"Trạng thái yêu cầu hiện tại: {item.status.value}. Ghi chú admin: {item.admin_note or '-'}",
+        f"Trạng thái yêu cầu hiện tại: {item.status.value}. Ghi chú quản trị: {item.admin_note or '-'}",
         "member_transaction_status",
         user=item.user,
         transaction=item,
@@ -85,3 +87,28 @@ def update_rate(
         return RedirectResponse("/admin?error=invalid_rate", status_code=303)
     update_manual_rate(db, pair=pair, buy_rate=parsed_buy, sell_rate=parsed_sell, note=note.strip())
     return RedirectResponse("/admin?rate_updated=1", status_code=303)
+
+
+@router.post("/email/flush")
+def flush_emails(
+    request: Request,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+):
+    verify_csrf(request, csrf_token)
+    require_admin(request, db)
+    sent = flush_email_queue(db)
+    return RedirectResponse(f"/admin?email_flush={len(sent)}", status_code=303)
+
+
+@router.post("/email-replies/{reply_id}/processed")
+def process_email_reply(
+    request: Request,
+    reply_id: int,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+):
+    verify_csrf(request, csrf_token)
+    require_admin(request, db)
+    mark_reply_processed(db, reply_id)
+    return RedirectResponse("/admin?reply_processed=1", status_code=303)

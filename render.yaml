@@ -45,5 +45,7 @@ services:
         sync: false
       - key: SMTP_USE_TLS
         value: true
+      - key: EMAIL_WEBHOOK_API_KEY
+        sync: false
       - key: EXCHANGE_RATE_PROVIDER_URL
         sync: false

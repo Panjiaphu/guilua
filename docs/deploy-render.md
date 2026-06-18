@@ -26,6 +26,7 @@ ADMIN_LINE_ID=@827sxbki
 ADMIN_PHONE=0906938893
 ADMIN_SEED_EMAIL=panjiaphu@gmail.com
 ADMIN_SEED_PASSWORD=<mật khẩu admin tạm thời tối thiểu 14 ký tự>
+EMAIL_WEBHOOK_API_KEY=<secret riêng cho inbound email webhook>
 ```
 
 Với cấu hình trên, app chạy SQLite để smoke UI nhanh. Với production thật nên
@@ -54,8 +55,27 @@ SMTP_FROM_EMAIL=<email gửi đi>
 SMTP_USE_TLS=true
 ```
 
-Hiện app có email queue và SMTP sender. Email hai chiều đầy đủ vẫn cần thêm
-mailbox inbound hoặc webhook để nhận email reply từ member.
+App có email queue, SMTP sender và inbound webhook để nhận email reply từ member.
+Provider email cần forward inbound mail về:
+
+```text
+POST /webhooks/email-reply
+Header: X-Guilua-Webhook-Key: <EMAIL_WEBHOOK_API_KEY>
+Content-Type: application/json
+```
+
+Payload tối thiểu:
+
+```json
+{
+  "from": "member@example.com",
+  "to": "support@guilua.example",
+  "subject": "Re: GL202606180001",
+  "text": "Nội dung phản hồi của member"
+}
+```
+
+Nếu subject hoặc body có mã yêu cầu `GL...`, app sẽ tự gắn reply vào giao dịch tương ứng.
 
 ## Live exchange rate
 

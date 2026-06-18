@@ -13,6 +13,7 @@ lại để không xóa lịch sử, nhưng entrypoint deploy hiện tại là F
 - Đăng ký, đăng nhập, đăng xuất bằng signed session cookie và CSRF token.
 - Password hashing bằng PBKDF2.
 - Email verification token và email queue.
+- Email reply webhook để nhận phản hồi member và hiển thị trong admin dashboard.
 - Member dashboard: tạo request `send_home`, `buy_usdt`, `sell_usdt`.
 - Admin dashboard: cập nhật trạng thái request, ghi chú nội bộ, cập nhật manual rate.
 - Admin contact: `panjiaphu@gmail.com`, LINE `@827sxbki`, phone `0906938893`.
@@ -75,5 +76,5 @@ Xem chi tiết trong `docs/deploy-render.md`.
 
 - Email đã có queue và SMTP sender, nhưng cần cấu hình SMTP env thật trên Render.
 - Live exchange provider là optional qua `EXCHANGE_RATE_PROVIDER_URL`; nếu chưa có provider, app dùng manual fallback rate.
-- Two-way email hiện mới ở mức dữ liệu email queue và thông tin admin; cần mailbox inbound/webhook thật để xử lý email member reply.
+- Two-way email đã có queue outbound, SMTP sender, inbound webhook và màn hình xử lý reply. Vẫn cần cấu hình provider email thật trỏ webhook về app.
 - Admin seed đã có env password, nhưng nên thay bằng flow tạo admin riêng trước production.

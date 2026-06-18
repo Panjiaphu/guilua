@@ -69,11 +69,41 @@
         <button class="button primary" type="submit">{{ t("admin.update") }}</button>
       </form>
       <div class="email-list">
-        <h3>{{ t("admin.email_queue") }}</h3>
+        <div class="section-head inline">
+          <h3>{{ t("admin.email_queue") }}</h3>
+          <form method="post" action="/admin/email/flush">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="button small" type="submit">{{ t("admin.flush_email") }}</button>
+          </form>
+        </div>
         {% for email in emails %}
           <p><strong>{{ email_status_label(email.status) }}</strong> · {{ email.recipient }} · {{ event_label(email.event_type) }}</p>
         {% else %}
           <p class="empty">{{ t("admin.no_email") }}</p>
+        {% endfor %}
+      </div>
+      <div class="email-list">
+        <h3>{{ t("admin.email_replies") }}</h3>
+        {% for reply in replies %}
+          <article class="reply-item">
+            <div class="reply-head">
+              <strong>{{ reply.sender }}</strong>
+              <span class="status">{% if reply.is_processed %}{{ t("admin.reply_processed") }}{% else %}{{ t("admin.reply_unprocessed") }}{% endif %}</span>
+            </div>
+            <p>{{ reply.subject or "-" }}</p>
+            <p class="muted">{{ reply.body[:180] }}{% if reply.body|length > 180 %}...{% endif %}</p>
+            {% if reply.transaction %}
+              <p class="muted">{{ t("table.ref") }}: {{ reply.transaction.reference_code }}</p>
+            {% endif %}
+            {% if not reply.is_processed %}
+              <form method="post" action="/admin/email-replies/{{ reply.id }}/processed">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="button small" type="submit">{{ t("admin.mark_processed") }}</button>
+              </form>
+            {% endif %}
+          </article>
+        {% else %}
+          <p class="empty">{{ t("admin.no_replies") }}</p>
         {% endfor %}
       </div>
     </aside>
