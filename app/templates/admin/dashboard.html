@@ -108,5 +108,51 @@
       </div>
     </aside>
   </div>
+
+  <section class="panel">
+    <div class="section-head"><h2>{{ t("admin.service_requests") }}</h2><span>{{ service_requests|length }}</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t("table.ref") }}</th>
+            <th>{{ t("table.member") }}</th>
+            <th>{{ t("table.service") }}</th>
+            <th>{{ t("table.region") }}</th>
+            <th>{{ t("table.protocol") }}</th>
+            <th>{{ t("table.status") }}</th>
+            <th>{{ t("table.action") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in service_requests %}
+            <tr>
+              <td>{{ item.reference_code }}</td>
+              <td>{{ item.user.email }}</td>
+              <td>{{ service_type_label(item.service_type) }}</td>
+              <td>{{ service_region_label(item.target_region) }}</td>
+              <td>{{ service_protocol_label(item.protocol) }}</td>
+              <td><span class="status">{{ status_label(item.status) }}</span></td>
+              <td>
+                <form method="post" action="/admin/services/{{ item.id }}" class="inline-form service-admin-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <select name="status">
+                    {% for status in statuses %}
+                      <option value="{{ status.value }}" {% if status.value == item.status %}selected{% endif %}>{{ status_label(status) }}</option>
+                    {% endfor %}
+                  </select>
+                  <input type="text" name="assigned_endpoint" value="{{ item.assigned_endpoint }}" placeholder="{{ t('admin.assigned_endpoint') }}">
+                  <input type="text" name="admin_note" value="{{ item.admin_note }}" placeholder="{{ t('admin.note') }}">
+                  <button class="button small" type="submit">{{ t("admin.save") }}</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="empty">{{ t("admin.no_service_requests") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </section>
 {% endblock %}

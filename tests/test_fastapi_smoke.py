@@ -6,8 +6,9 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.session import Base
 from app.main import app
-from app.models import EmailNotification, EmailReply
+from app.models import EmailNotification, EmailReply, ServiceRequest, User
 from app.services.email import record_email_reply
+from app.services.member_services import create_ip_service_request
 
 
 class FastApiSmokeTest(unittest.TestCase):
@@ -38,6 +39,11 @@ class FastApiSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 503)
 
+    def test_member_services_requires_login(self):
+        response = self.client.get("/member/services?lang=vi", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/login")
+
     def test_record_email_reply_queues_admin_notification(self):
         engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
         Base.metadata.create_all(engine)
@@ -55,6 +61,40 @@ class FastApiSmokeTest(unittest.TestCase):
             self.assertEqual(reply.sender, "member@example.com")
             self.assertEqual(db.query(EmailReply).count(), 1)
             self.assertEqual(db.query(EmailNotification).filter_by(event_type="inbound_email_reply").count(), 1)
+
+    def test_create_ip_service_request_queues_notifications(self):
+        engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
+        Base.metadata.create_all(engine)
+        TestingSession = sessionmaker(bind=engine)
+
+        with TestingSession() as db:
+            user = User(
+                email="service-member@example.com",
+                password_hash="hash",
+                full_name="Service Member",
+                locale="vi",
+                is_active=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+            item = create_ip_service_request(
+                db,
+                user=user,
+                target_region="japan",
+                protocol="vpn",
+                duration_hours=48,
+                device_label="Laptop",
+                current_ip="203.0.113.10",
+                member_note="Cần IP ổn định",
+            )
+
+            self.assertTrue(item.reference_code.startswith("GS"))
+            self.assertEqual(item.target_region, "japan")
+            self.assertEqual(db.query(ServiceRequest).count(), 1)
+            self.assertEqual(db.query(EmailNotification).filter_by(event_type="member_service_created").count(), 1)
+            self.assertEqual(db.query(EmailNotification).filter_by(event_type="admin_service_created").count(), 1)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import require_admin, verify_csrf
 from app.core.templates import context, templates
 from app.db.session import get_db
-from app.models import EmailNotification, EmailReply, TransactionRequest, TransactionStatus
+from app.models import EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionStatus
 from app.services.email import flush_email_queue, mark_reply_processed, queue_email
 from app.services.rates import latest_rates, update_manual_rate
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/admin")
 def dashboard(request: Request, db: Session = Depends(get_db)):
     admin = require_admin(request, db)
     requests = db.query(TransactionRequest).order_by(TransactionRequest.created_at.desc()).limit(50).all()
+    service_requests = db.query(ServiceRequest).order_by(ServiceRequest.created_at.desc()).limit(50).all()
     emails = db.query(EmailNotification).order_by(EmailNotification.created_at.desc()).limit(20).all()
     replies = db.query(EmailReply).order_by(EmailReply.created_at.desc()).limit(20).all()
     return templates.TemplateResponse(
@@ -28,6 +29,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             request,
             admin=admin,
             requests=requests,
+            service_requests=service_requests,
             rates=latest_rates(db),
             emails=emails,
             replies=replies,
@@ -87,6 +89,43 @@ def update_rate(
         return RedirectResponse("/admin?error=invalid_rate", status_code=303)
     update_manual_rate(db, pair=pair, buy_rate=parsed_buy, sell_rate=parsed_sell, note=note.strip())
     return RedirectResponse("/admin?rate_updated=1", status_code=303)
+
+
+@router.post("/services/{service_id}")
+def update_service_request(
+    request: Request,
+    service_id: int,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+    status: str = Form(...),
+    assigned_endpoint: str = Form(""),
+    admin_note: str = Form(""),
+):
+    verify_csrf(request, csrf_token)
+    require_admin(request, db)
+    item = db.get(ServiceRequest, service_id)
+    if not item:
+        return RedirectResponse("/admin?error=service_not_found", status_code=303)
+    if status not in {state.value for state in TransactionStatus}:
+        return RedirectResponse("/admin?error=invalid_service_status", status_code=303)
+    item.status = status
+    item.assigned_endpoint = assigned_endpoint.strip()
+    item.admin_note = admin_note.strip()
+    db.commit()
+    db.refresh(item)
+    queue_email(
+        db,
+        item.user.email,
+        f"Guilua - cập nhật dịch vụ {item.reference_code}",
+        (
+            f"Trạng thái dịch vụ chuyển IP hiện tại: {item.status}. "
+            f"Endpoint: {item.assigned_endpoint or '-'}. "
+            f"Ghi chú quản trị: {item.admin_note or '-'}"
+        ),
+        "member_service_status",
+        user=item.user,
+    )
+    return RedirectResponse("/admin?service_updated=1", status_code=303)
 
 
 @router.post("/email/flush")

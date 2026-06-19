@@ -49,6 +49,7 @@ class User(Base):
 
     transactions: Mapped[list["TransactionRequest"]] = relationship(back_populates="user")
     email_replies: Mapped[list["EmailReply"]] = relationship(back_populates="user")
+    service_requests: Mapped[list["ServiceRequest"]] = relationship(back_populates="user")
 
 
 class ExchangeRate(Base):
@@ -127,3 +128,25 @@ class EmailReply(Base):
 
     user: Mapped[User | None] = relationship(back_populates="email_replies")
     transaction: Mapped[TransactionRequest | None] = relationship(back_populates="email_replies")
+
+
+class ServiceRequest(Base):
+    __tablename__ = "service_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reference_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    service_type: Mapped[str] = mapped_column(String(64), default="ip_switch", index=True)
+    status: Mapped[str] = mapped_column(String(32), default=TransactionStatus.PENDING.value, index=True)
+    target_region: Mapped[str] = mapped_column(String(64), default="")
+    protocol: Mapped[str] = mapped_column(String(64), default="")
+    duration_hours: Mapped[int] = mapped_column(Integer, default=24)
+    device_label: Mapped[str] = mapped_column(String(120), default="")
+    current_ip: Mapped[str] = mapped_column(String(80), default="")
+    member_note: Mapped[str] = mapped_column(Text, default="")
+    assigned_endpoint: Mapped[str] = mapped_column(String(255), default="")
+    admin_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="service_requests")

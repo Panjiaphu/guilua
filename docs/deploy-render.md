@@ -95,3 +95,10 @@ Provider JSON kỳ vọng format:
 ```
 
 Không commit secret thật vào repo.
+
+## Dịch vụ chuyển IP
+
+App đã có member service page, bảng `service_requests`, admin review, endpoint cấp
+cho member và email notification. Phần tự động cấp VPN/proxy/IP thật chưa được
+kết nối; khi có provider, nên thêm worker/service riêng để gọi API provider và
+ghi `assigned_endpoint` sau khi admin duyệt.

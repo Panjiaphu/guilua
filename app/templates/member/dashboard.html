@@ -51,6 +51,18 @@
     </aside>
   </div>
 
+  <section class="panel service-strip">
+    <div>
+      <span class="icon">{{ icons.icon("network") }}</span>
+      <h2>{{ t("services.ip.title") }}</h2>
+      <p class="muted">{{ t("services.ip.desc") }}</p>
+    </div>
+    <div class="service-strip-actions">
+      <span class="badge ok">{{ service_requests|length }}</span>
+      <a class="button primary" href="/member/services?lang={{ locale }}">{{ t("services.ip.open") }}</a>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="section-head">
       <h2>{{ t("member.requests") }}</h2>

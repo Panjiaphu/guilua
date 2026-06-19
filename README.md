@@ -15,7 +15,9 @@ lại để không xóa lịch sử, nhưng entrypoint deploy hiện tại là F
 - Email verification token và email queue.
 - Email reply webhook để nhận phản hồi member và hiển thị trong admin dashboard.
 - Member dashboard: tạo request `send_home`, `buy_usdt`, `sell_usdt`.
+- Member services: tạo yêu cầu chuyển IP theo khu vực/giao thức/thời lượng.
 - Admin dashboard: cập nhật trạng thái request, ghi chú nội bộ, cập nhật manual rate.
+- Admin service review: xử lý yêu cầu chuyển IP, cấp endpoint và gửi email cập nhật.
 - Admin contact: `panjiaphu@gmail.com`, LINE `@827sxbki`, phone `0906938893`.
 - Exchange rates: manual fallback cho `TWD_VND` và `USDT_TWD`, sẵn sàng gắn live provider qua env.
 - Alembic migration cho PostgreSQL/SQLite.
@@ -77,4 +79,5 @@ Xem chi tiết trong `docs/deploy-render.md`.
 - Email đã có queue và SMTP sender, nhưng cần cấu hình SMTP env thật trên Render.
 - Live exchange provider là optional qua `EXCHANGE_RATE_PROVIDER_URL`; nếu chưa có provider, app dùng manual fallback rate.
 - Two-way email đã có queue outbound, SMTP sender, inbound webhook và màn hình xử lý reply. Vẫn cần cấu hình provider email thật trỏ webhook về app.
+- Dịch vụ chuyển IP hiện là request/review/email workflow; cần hạ tầng VPN/proxy/provider thật để tự động cấp và xoay IP.
 - Admin seed đã có env password, nhưng nên thay bằng flow tạo admin riêng trước production.

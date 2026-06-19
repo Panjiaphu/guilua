@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% block content %}
+<section class="dashboard service-page">
+  <div class="service-hero panel">
+    <div>
+      <span class="icon">{{ icons.icon("network") }}</span>
+      <h1>{{ t("services.title") }}</h1>
+      <p class="muted">{{ t("services.subtitle") }}</p>
+    </div>
+    <div class="ip-orbit" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <h2>{{ t("services.ip.form_title") }}</h2>
+          <p class="muted">{{ t("services.ip.desc") }}</p>
+        </div>
+      </div>
+      <form method="post" action="/member/services/ip-switch" class="form split">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>{{ t("services.ip.region") }}
+          <select name="target_region" required>
+            <option value="taiwan">{{ service_region_label("taiwan") }}</option>
+            <option value="japan">{{ service_region_label("japan") }}</option>
+            <option value="singapore">{{ service_region_label("singapore") }}</option>
+            <option value="united_states">{{ service_region_label("united_states") }}</option>
+            <option value="vietnam">{{ service_region_label("vietnam") }}</option>
+          </select>
+        </label>
+        <label>{{ t("services.ip.protocol") }}
+          <select name="protocol">
+            <option value="recommended">{{ service_protocol_label("recommended") }}</option>
+            <option value="vpn">{{ service_protocol_label("vpn") }}</option>
+            <option value="proxy">{{ service_protocol_label("proxy") }}</option>
+            <option value="residential">{{ service_protocol_label("residential") }}</option>
+          </select>
+        </label>
+        <label>{{ t("services.ip.duration") }}<input type="number" name="duration_hours" min="1" max="720" step="1" value="24"></label>
+        <label>{{ t("services.ip.device") }}<input type="text" name="device_label" maxlength="120" placeholder="{{ t('services.ip.device_placeholder') }}"></label>
+        <label>{{ t("services.ip.current_ip") }}<input type="text" name="current_ip" maxlength="80" placeholder="203.0.113.10"></label>
+        <label class="wide">{{ t("services.ip.note") }}<textarea name="member_note" rows="3"></textarea></label>
+        <button class="button primary wide" type="submit">{{ t("services.ip.submit") }}</button>
+      </form>
+    </section>
+
+    <aside class="account-card service-card">
+      <span class="icon">{{ icons.icon("shield") }}</span>
+      <h2>{{ t("services.ip.title") }}</h2>
+      <p>{{ t("services.ip.pending_copy") }}</p>
+      <div class="service-points">
+        <span>{{ service_region_label("taiwan") }}</span>
+        <span>{{ service_region_label("japan") }}</span>
+        <span>{{ service_region_label("singapore") }}</span>
+        <span>{{ service_region_label("united_states") }}</span>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel">
+    <div class="section-head">
+      <h2>{{ t("services.ip.history") }}</h2>
+      <span>{{ service_requests|length }}</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>{{ t("table.ref") }}</th>
+            <th>{{ t("table.region") }}</th>
+            <th>{{ t("table.protocol") }}</th>
+            <th>{{ t("table.duration") }}</th>
+            <th>{{ t("table.status") }}</th>
+            <th>{{ t("services.ip.endpoint") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in service_requests %}
+            <tr>
+              <td>{{ item.reference_code }}</td>
+              <td>{{ service_region_label(item.target_region) }}</td>
+              <td>{{ service_protocol_label(item.protocol) }}</td>
+              <td>{{ item.duration_hours }}</td>
+              <td><span class="status">{{ status_label(item.status) }}</span></td>
+              <td>{{ item.assigned_endpoint or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="empty">{{ t("services.ip.empty") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

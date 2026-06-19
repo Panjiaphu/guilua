@@ -21,6 +21,9 @@ def context(request: Request, **extra):
         "type_label": lambda request_type: t(
             locale, f"type.{request_type.value if hasattr(request_type, 'value') else request_type}"
         ),
+        "service_type_label": lambda service_type: t(locale, f"service.type.{service_type}"),
+        "service_region_label": lambda region: t(locale, f"service.region.{region}"),
+        "service_protocol_label": lambda protocol: t(locale, f"service.protocol.{protocol}"),
         "event_label": lambda event_type: t(locale, f"event.{event_type}"),
         "email_status_label": lambda status: t(locale, f"email.status.{status.value if hasattr(status, 'value') else status}"),
         "source_label": lambda source: t(locale, f"rates.source.{source}") if source == "manual" else source,

@@ -269,6 +269,60 @@ textarea { resize: vertical; }
 .account-card { color: #fff; }
 .account-card h2 { margin: 14px 0 16px; }
 .account-line { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid rgba(255,255,255,.14); position: relative; z-index: 1; }
+.service-page { display: grid; gap: 22px; }
+.service-hero {
+  min-height: 260px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 26px;
+  align-items: center;
+  overflow: hidden;
+}
+.service-hero h1 { margin: 18px 0 10px; font-size: clamp(34px, 5vw, 56px); line-height: 1.05; }
+.ip-orbit {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  justify-self: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(0,208,156,.28), transparent 38%),
+    radial-gradient(circle at 65% 28%, rgba(0,163,255,.34), transparent 24%);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: inset 0 0 80px rgba(0,0,0,.24), 0 28px 80px rgba(0,208,156,.12);
+  animation: floatCard 7s ease-in-out infinite;
+}
+.ip-orbit span {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7df7d4;
+  box-shadow: 0 0 24px rgba(125,247,212,.72);
+}
+.ip-orbit span:nth-child(1) { left: 48%; top: 8%; }
+.ip-orbit span:nth-child(2) { right: 14%; bottom: 28%; background: #7dd3fc; }
+.ip-orbit span:nth-child(3) { left: 18%; bottom: 18%; background: #e0aeff; }
+.service-card p { position: relative; z-index: 1; color: var(--muted); line-height: 1.65; }
+.service-points { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.service-points span {
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  padding: 8px 11px;
+  color: #dbe8e7;
+  background: rgba(255,255,255,.05);
+  font-size: 13px;
+}
+.service-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 22px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.service-strip h2 { margin: 14px 0 8px; }
+.service-strip p { max-width: 680px; margin: 0; }
+.service-strip-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .support-box { position: relative; z-index: 1; margin-top: 18px; display: grid; gap: 8px; color: var(--muted); font-size: 13px; }
 .support-box h3 { margin: 0; color: #fff; }
 .support-box p { margin: 0 0 4px; line-height: 1.6; }
@@ -282,6 +336,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
 .status { color: var(--ok); font-weight: 850; }
 .empty { color: var(--muted); text-align: center; padding: 22px; }
 .inline-form { display: grid; grid-template-columns: 150px minmax(150px, 1fr) auto; gap: 9px; }
+.service-admin-form { grid-template-columns: 130px minmax(180px, 1fr) minmax(180px, 1fr) auto; }
 .email-list { margin-top: 26px; color: var(--muted); font-size: 13px; }
 .email-list p { line-height: 1.55; }
 .section-head.inline { align-items: center; margin-bottom: 10px; }
@@ -332,6 +387,9 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   .brand { font-size: 24px; }
   .nav { order: 3; width: 100%; overflow-x: auto; margin-left: 0; padding-bottom: 4px; }
   .hero, .layout, .grid.three, .rate-grid, .form.split { grid-template-columns: 1fr; }
+  .service-hero { grid-template-columns: 1fr; }
+  .ip-orbit { width: 190px; height: 190px; }
+  .service-strip { flex-direction: column; align-items: flex-start; }
   .hero { min-height: auto; gap: 28px; padding: 42px 0 28px; }
   .hero h1 { font-size: 42px; line-height: 1.08; }
   .hero-console, .account-card { border-radius: 28px; padding: 22px; }
@@ -339,7 +397,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   .hero-actions { flex-direction: column; }
   .feature-card, .feature-inner { min-height: 260px; }
   .section-head, .welcome { flex-direction: column; }
-  .inline-form { grid-template-columns: 1fr; }
+  .inline-form, .service-admin-form { grid-template-columns: 1fr; }
   main { width: min(100% - 20px, 1180px); }
   .panel, .auth-card { padding: 20px; }
 }
