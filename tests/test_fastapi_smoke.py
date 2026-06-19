@@ -1,13 +1,18 @@
+import os
+import subprocess
+import sys
 import unittest
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.core.config import get_settings
 from app.db.session import Base
 from app.main import app
 from app.models import EmailNotification, EmailReply, ServiceRequest, User
 from app.services.email import record_email_reply
+from app.services.ip_provider import provision_ip_service
 from app.services.member_services import create_ip_service_request
 
 
@@ -95,6 +100,50 @@ class FastApiSmokeTest(unittest.TestCase):
             self.assertEqual(db.query(ServiceRequest).count(), 1)
             self.assertEqual(db.query(EmailNotification).filter_by(event_type="member_service_created").count(), 1)
             self.assertEqual(db.query(EmailNotification).filter_by(event_type="admin_service_created").count(), 1)
+
+    def test_ip_provider_returns_not_configured_without_env(self):
+        old_url = os.environ.pop("IP_SERVICE_PROVIDER_URL", None)
+        old_key = os.environ.pop("IP_SERVICE_PROVIDER_API_KEY", None)
+        get_settings.cache_clear()
+        item = ServiceRequest(
+            reference_code="GSDEMO",
+            service_type="ip_switch",
+            target_region="taiwan",
+            protocol="vpn",
+            duration_hours=24,
+            device_label="Laptop",
+            current_ip="203.0.113.10",
+            member_note="",
+        )
+        try:
+            result = provision_ip_service(item)
+            self.assertFalse(result.configured)
+            self.assertFalse(result.success)
+        finally:
+            if old_url is not None:
+                os.environ["IP_SERVICE_PROVIDER_URL"] = old_url
+            if old_key is not None:
+                os.environ["IP_SERVICE_PROVIDER_API_KEY"] = old_key
+            get_settings.cache_clear()
+
+    def test_runtime_env_check_rejects_weak_admin_seed_password(self):
+        env = {
+            **os.environ,
+            "APP_ENV": "production",
+            "DEBUG": "false",
+            "SECRET_KEY": "x" * 40,
+            "USE_SQLITE": "true",
+            "ADMIN_SEED_PASSWORD": "pp11223344",
+        }
+        result = subprocess.run(
+            [sys.executable, "scripts/check_env.py", "--phase", "runtime"],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("ADMIN_SEED_PASSWORD must be at least 14 characters", result.stderr)
 
 
 if __name__ == "__main__":

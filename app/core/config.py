@@ -40,6 +40,9 @@ class Settings(BaseSettings):
 
     exchange_rate_provider_url: str | None = None
     live_rate_timeout_seconds: float = 2.5
+    ip_service_provider_url: str | None = None
+    ip_service_provider_api_key: str | None = None
+    ip_service_provider_timeout_seconds: float = 5.0
 
     @field_validator("allowed_hosts", "supported_locales", mode="before")
     @classmethod
@@ -62,8 +65,6 @@ class Settings(BaseSettings):
     def validate_production_defaults(self):
         if self.is_production and self.secret_key in {"", "change-me", "dev-only-change-me"}:
             raise ValueError("SECRET_KEY must be set to a strong value when DEBUG=false or APP_ENV=production")
-        if self.is_production and self.admin_seed_password and len(self.admin_seed_password) < 14:
-            raise ValueError("ADMIN_SEED_PASSWORD must be at least 14 characters in production")
         if self.use_sqlite:
             self.database_url = "sqlite:///./guilua.db"
         elif self.database_url.startswith("postgres://"):

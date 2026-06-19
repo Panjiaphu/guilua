@@ -9,6 +9,7 @@ from app.core.templates import context, templates
 from app.db.session import get_db
 from app.models import EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionStatus
 from app.services.email import flush_email_queue, mark_reply_processed, queue_email
+from app.services.ip_provider import provision_ip_service
 from app.services.rates import latest_rates, update_manual_rate
 
 
@@ -111,6 +112,13 @@ def update_service_request(
     item.status = status
     item.assigned_endpoint = assigned_endpoint.strip()
     item.admin_note = admin_note.strip()
+    if item.status in {TransactionStatus.APPROVED.value, TransactionStatus.COMPLETED.value} and not item.assigned_endpoint:
+        provision = provision_ip_service(item)
+        if provision.success:
+            item.assigned_endpoint = provision.endpoint
+        elif provision.configured:
+            provider_note = "Không thể cấp endpoint tự động, vui lòng kiểm tra provider và cấp thủ công."
+            item.admin_note = f"{item.admin_note}\n{provider_note}".strip()
     db.commit()
     db.refresh(item)
     queue_email(

@@ -16,6 +16,7 @@ from app.models import User
 settings = get_settings()
 serializer = URLSafeTimedSerializer(settings.secret_key, salt="guilua-session")
 email_serializer = URLSafeTimedSerializer(settings.secret_key, salt="guilua-email")
+MIN_ADMIN_SEED_PASSWORD_LENGTH = 14
 
 
 def hash_password(password: str) -> str:
@@ -112,7 +113,15 @@ def ensure_admin_seed() -> None:
         existing = db.query(User).filter(User.is_admin.is_(True)).first()
         if existing:
             return
-        password = settings.admin_seed_password or secrets.token_urlsafe(18)
+        password = settings.admin_seed_password
+        if settings.is_production:
+            if not password:
+                raise RuntimeError("ADMIN_SEED_PASSWORD is required before seeding the first production admin.")
+            if len(password) < MIN_ADMIN_SEED_PASSWORD_LENGTH:
+                raise RuntimeError(
+                    "ADMIN_SEED_PASSWORD must be at least 14 characters before seeding the first production admin."
+                )
+        password = password or secrets.token_urlsafe(18)
         admin = User(
             email=admin_email,
             password_hash=hash_password(password),

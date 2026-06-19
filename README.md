@@ -80,4 +80,5 @@ Xem chi tiết trong `docs/deploy-render.md`.
 - Live exchange provider là optional qua `EXCHANGE_RATE_PROVIDER_URL`; nếu chưa có provider, app dùng manual fallback rate.
 - Two-way email đã có queue outbound, SMTP sender, inbound webhook và màn hình xử lý reply. Vẫn cần cấu hình provider email thật trỏ webhook về app.
 - Dịch vụ chuyển IP hiện là request/review/email workflow; cần hạ tầng VPN/proxy/provider thật để tự động cấp và xoay IP.
+- IP provider hook đã có qua `IP_SERVICE_PROVIDER_URL` và `IP_SERVICE_PROVIDER_API_KEY`; nếu chưa cấu hình, admin vẫn cấp endpoint thủ công.
 - Admin seed đã có env password, nhưng nên thay bằng flow tạo admin riêng trước production.

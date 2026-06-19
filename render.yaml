@@ -49,3 +49,9 @@ services:
         sync: false
       - key: EXCHANGE_RATE_PROVIDER_URL
         sync: false
+      - key: IP_SERVICE_PROVIDER_URL
+        sync: false
+      - key: IP_SERVICE_PROVIDER_API_KEY
+        sync: false
+      - key: IP_SERVICE_PROVIDER_TIMEOUT_SECONDS
+        value: 5
