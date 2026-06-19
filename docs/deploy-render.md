@@ -26,6 +26,11 @@ ADMIN_SEED_EMAIL=panjiaphu@gmail.com
 ADMIN_SEED_PASSWORD=<mật khẩu admin mạnh tối thiểu 14 ký tự>
 MEMBER_REGISTRATION_ENABLED=false
 MEMBER_PORTAL_ENABLED=false
+CRYPTO_MARKET_LIVE_ENABLED=true
+CRYPTO_MARKET_CACHE_SECONDS=180
+CRYPTO_MARKET_TIMEOUT_SECONDS=2.5
+COINGECKO_API_URL=https://api.coingecko.com/api/v3/simple/price
+BINANCE_API_URL=https://api.binance.com/api/v3/ticker/24hr
 ```
 
 Nếu Render báo lỗi `ADMIN_SEED_PASSWORD must be at least 14 characters in production`,
@@ -38,6 +43,36 @@ Nếu Render báo lỗi `ADMIN_SEED_PASSWORD must be at least 14 characters in p
 - Đăng ký thành viên đang tạm khóa.
 - Member portal đang tạm khóa.
 - Admin dashboard vẫn dùng để cập nhật `Giá mua` và `Giá bán`.
+- Trang `/crypto` hiển thị TradingView, macro filter và bảng coin realtime.
+
+## Crypto API
+
+Coin data lấy từ CoinGecko và Binance public endpoints. Nếu một API lỗi, trang
+vẫn render bằng nguồn còn lại hoặc fallback.
+
+Optional CoinGecko demo key:
+
+```text
+COINGECKO_API_KEY=<demo api key nếu có>
+```
+
+## Google AdSense
+
+Tạo hoặc đăng nhập tài khoản tại `https://adsense.google.com/`, thêm site Render
+của bạn và lấy publisher ID/slot ID. Sau đó set:
+
+```text
+GOOGLE_ADSENSE_CLIENT=ca-pub-xxxxxxxxxxxxxxxx
+GOOGLE_ADSENSE_SLOT=<ad slot id>
+GOOGLE_ADSENSE_PUBLISHER_ID=pub-xxxxxxxxxxxxxxxx
+```
+
+App sẽ:
+- chèn AdSense script khi có `GOOGLE_ADSENSE_CLIENT`
+- render ad slot trên `/crypto` khi có `GOOGLE_ADSENSE_SLOT`
+- render `/ads.txt` từ `GOOGLE_ADSENSE_PUBLISHER_ID`
+
+Google vẫn cần duyệt site trước khi quảng cáo thật hiển thị.
 
 ## Database
 

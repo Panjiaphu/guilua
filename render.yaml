@@ -31,6 +31,16 @@ services:
         value: false
       - key: MEMBER_PORTAL_ENABLED
         value: false
+      - key: CRYPTO_MARKET_LIVE_ENABLED
+        value: true
+      - key: CRYPTO_MARKET_CACHE_SECONDS
+        value: 180
+      - key: CRYPTO_MARKET_TIMEOUT_SECONDS
+        value: 2.5
+      - key: COINGECKO_API_URL
+        value: https://api.coingecko.com/api/v3/simple/price
+      - key: BINANCE_API_URL
+        value: https://api.binance.com/api/v3/ticker/24hr
       - key: SECRET_KEY
         sync: false
       - key: ADMIN_SEED_PASSWORD
@@ -50,6 +60,14 @@ services:
       - key: SMTP_USE_TLS
         value: true
       - key: EMAIL_WEBHOOK_API_KEY
+        sync: false
+      - key: COINGECKO_API_KEY
+        sync: false
+      - key: GOOGLE_ADSENSE_CLIENT
+        sync: false
+      - key: GOOGLE_ADSENSE_SLOT
+        sync: false
+      - key: GOOGLE_ADSENSE_PUBLISHER_ID
         sync: false
       - key: EXCHANGE_RATE_PROVIDER_URL
         sync: false

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="crypto-page">
+  <section class="crypto-hero panel">
+    <div>
+      <p class="eyebrow">{{ t("crypto.kicker") }}</p>
+      <h1>{{ t("crypto.title") }}</h1>
+      <p class="muted">{{ t("crypto.subtitle") }}</p>
+      <div class="proof-row">
+        <span>{% if market.source_status.is_live %}{{ market.source_status.label }}{% else %}{{ t("crypto.source_fallback") }}{% endif %}</span>
+        <span>{{ t("crypto.updated") }} {{ market.updated_at.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+        <span>{% if market.source_status.is_live %}{{ t("crypto.live") }}{% else %}{{ t("crypto.fallback") }}{% endif %}</span>
+      </div>
+    </div>
+    <div class="crypto-hero-stats">
+      {% for coin in market.coins[:4] %}
+        <article>
+          <span>{{ coin.symbol }}</span>
+          <strong>${{ format_price(coin.price) }}</strong>
+          <small class="{{ trend_class(coin.change_24h) }}">{{ format_percent(coin.change_24h) }}</small>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel tradingview-panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("crypto.chart_title") }}</h2>
+        <span>{{ t("crypto.chart_desc") }}</span>
+      </div>
+      <a class="button small" href="https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT" target="_blank" rel="noopener">{{ t("crypto.open_chart") }}</a>
+    </div>
+    <div class="tradingview-widget-wrap">
+      <div class="tradingview-widget-container">
+        <div class="tradingview-widget-container__widget"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+{{ chart_config | tojson }}
+        </script>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel market-ticker-panel">
+    <div class="tradingview-widget-container ticker-widget">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+{{ ticker_config | tojson }}
+      </script>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("crypto.macro_title") }}</h2>
+        <span>{{ t("crypto.macro_desc") }}</span>
+      </div>
+    </div>
+    <div class="macro-grid">
+      {% for item in market.macro %}
+        <a class="macro-card" href="https://www.tradingview.com/chart/?symbol={{ item.symbol | urlencode }}" target="_blank" rel="noopener">
+          <span>{{ item.name_vi if locale == "vi" else item.name_zh }}</span>
+          <strong>{{ item.symbol }}</strong>
+          <small>{{ item.role_vi if locale == "vi" else item.role_zh }}</small>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("crypto.groups_title") }}</h2>
+        <span>{{ t("crypto.groups_desc") }}</span>
+      </div>
+    </div>
+    <div class="group-grid">
+      {% for group in market.groups %}
+        <article class="group-card">
+          <div class="group-card-head">
+            <span>{{ t("crypto.group") }}</span>
+            <strong>{{ group.name_vi if locale == "vi" else group.name_zh }}</strong>
+          </div>
+          <div class="group-score {{ trend_class(group.avg_change_24h) }}">{{ format_percent(group.avg_change_24h) }}</div>
+          <small>{{ t("crypto.leaders") }}</small>
+          <div class="coin-chip-row">
+            {% for coin in group.leaders %}
+              <span>{{ coin.symbol }} {{ format_percent(coin.change_24h) }}</span>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("crypto.coin_table") }}</h2>
+        <span>CoinGecko + Binance</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead>
+          <tr>
+            <th>{{ t("crypto.symbol") }}</th>
+            <th>{{ t("crypto.price") }}</th>
+            <th>{{ t("crypto.change") }}</th>
+            <th>{{ t("crypto.market_cap") }}</th>
+            <th>{{ t("crypto.volume") }}</th>
+            <th>{{ t("crypto.source") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for coin in market.coins %}
+            <tr>
+              <td><strong>{{ coin.symbol }}</strong><br><span class="muted">{{ coin.name }}</span></td>
+              <td>${{ format_price(coin.price) }}</td>
+              <td><span class="{{ trend_class(coin.change_24h) }}">{{ format_percent(coin.change_24h) }}</span></td>
+              <td>{{ format_compact(coin.market_cap) }}</td>
+              <td>{{ format_compact(coin.volume_24h) }}</td>
+              <td>{% if coin.source == "fallback" %}{{ t("crypto.source_fallback") }}{% else %}{{ coin.source }}{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="ad-panel panel">
+    <div>
+      <h2>{{ t("crypto.ads_title") }}</h2>
+      <p class="muted">{{ t("crypto.ads_desc") }}</p>
+    </div>
+    {% if settings.google_adsense_client and settings.google_adsense_slot %}
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="{{ settings.google_adsense_client }}"
+           data-ad-slot="{{ settings.google_adsense_slot }}"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+    {% else %}
+      <div class="ad-placeholder">{{ t("crypto.ads_placeholder") }}</div>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

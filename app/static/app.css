@@ -408,6 +408,109 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
 .reply-item p { margin: 0; }
 .reply-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .reply-head strong { color: #fff; word-break: break-word; }
+.crypto-page { display: grid; gap: 22px; padding-top: 38px; }
+.crypto-page > * { min-width: 0; }
+.crypto-hero {
+  min-height: 420px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, .64fr);
+  gap: 32px;
+  align-items: center;
+  overflow: hidden;
+}
+.crypto-hero h1 { margin: 0 0 18px; font-size: clamp(38px, 5vw, 64px); line-height: 1.04; }
+.crypto-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.crypto-hero-stats article {
+  min-height: 126px;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(255,255,255,.055);
+}
+.crypto-hero-stats span, .crypto-hero-stats small { color: var(--muted); }
+.crypto-hero-stats strong { font-size: 26px; }
+.tradingview-widget-wrap {
+  height: 560px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 22px;
+  background: rgba(7,8,10,.68);
+}
+.tradingview-widget-container, .tradingview-widget-container__widget { width: 100%; height: 100%; }
+.ticker-widget { min-height: 72px; }
+.macro-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.macro-card {
+  display: grid;
+  gap: 10px;
+  min-height: 156px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(255,255,255,.045);
+  transition: transform .22s ease, border-color .22s ease, background .22s ease;
+}
+.macro-card:hover { transform: translateY(-4px); border-color: rgba(0,208,156,.42); background: rgba(255,255,255,.07); }
+.macro-card span, .macro-card small { color: var(--muted); line-height: 1.5; }
+.macro-card strong { font-size: 18px; word-break: break-word; }
+.group-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.group-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(255,255,255,.045);
+}
+.group-card-head { display: grid; gap: 5px; }
+.group-card-head span, .group-card small { color: var(--muted); }
+.group-card-head strong { font-size: 18px; }
+.group-score { font-size: 32px; font-weight: 850; }
+.coin-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.coin-chip-row span {
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #dbe8e7;
+  background: rgba(255,255,255,.05);
+  font-size: 12px;
+}
+.coin-table td:nth-child(2), .coin-table td:nth-child(3), .coin-table td:nth-child(4), .coin-table td:nth-child(5) {
+  white-space: nowrap;
+}
+.up { color: var(--ok); }
+.down { color: var(--danger); }
+.ad-panel {
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(280px, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+.ad-placeholder {
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255,255,255,.22);
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(255,255,255,.035);
+  text-align: center;
+}
 .footer {
   position: relative;
   z-index: 1;
@@ -441,7 +544,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   .topbar { min-height: auto; flex-wrap: wrap; padding: 14px 16px; gap: 12px; }
   .brand { font-size: 24px; }
   .nav { order: 3; width: 100%; overflow-x: auto; margin-left: 0; padding-bottom: 4px; }
-  .hero, .layout, .grid.three, .rate-grid, .form.split, .transaction-actions, .ip-tools { grid-template-columns: 1fr; }
+  .hero, .layout, .grid.three, .rate-grid, .form.split, .transaction-actions, .ip-tools, .crypto-hero, .macro-grid, .group-grid, .ad-panel { grid-template-columns: 1fr; }
   .service-hero { grid-template-columns: 1fr; }
   .transaction-hero { grid-template-columns: 1fr; }
   .ip-orbit { width: 190px; height: 190px; }
@@ -456,6 +559,8 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   .inline-form, .service-admin-form { grid-template-columns: 1fr; }
   main { width: min(100% - 20px, 1180px); }
   .panel, .auth-card { padding: 20px; }
+  .tradingview-widget-wrap { height: 460px; }
+  .crypto-hero-stats { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 420px) {

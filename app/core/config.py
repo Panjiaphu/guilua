@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     member_registration_enabled: bool = False
     member_portal_enabled: bool = False
 
+    crypto_market_live_enabled: bool = True
+    crypto_market_cache_seconds: int = 180
+    crypto_market_timeout_seconds: float = 2.5
+    coingecko_api_url: str = "https://api.coingecko.com/api/v3/simple/price"
+    coingecko_api_key: str | None = None
+    binance_api_url: str = "https://api.binance.com/api/v3/ticker/24hr"
+    google_adsense_client: str | None = None
+    google_adsense_slot: str | None = None
+    google_adsense_publisher_id: str | None = None
+
     exchange_rate_provider_url: str | None = None
     live_rate_timeout_seconds: float = 2.5
     ip_service_provider_url: str | None = None

@@ -4,6 +4,7 @@ FastAPI webapp cho Guilua trong giai đoạn rà soát pháp lý.
 
 Trạng thái hiện tại:
 - Public UI chỉ hiển thị bảng tham khảo tỷ giá `TWD/VND` và `USDT/TWD`.
+- Public `/crypto` hiển thị TradingView, macro filter, bảng giá coin và 12 nhóm coin.
 - Admin dashboard dùng để cập nhật giá mua, giá bán và thông tin liên hệ.
 - Đăng ký thành viên và member portal đang tạm khóa bằng env mặc định.
 - UI hỗ trợ tiếng Việt có dấu và tiếng Trung phồn thể.
@@ -12,6 +13,9 @@ Trạng thái hiện tại:
 ## Tính năng đang mở
 
 - Public rate board song ngữ.
+- Crypto dashboard tham khảo giá với TradingView widgets.
+- Coin price merge từ CoinGecko và Binance, có cache/fallback để trang vẫn render khi API lỗi.
+- AdSense hook qua env, kèm `/ads.txt`.
 - Admin login bằng signed session cookie và CSRF token.
 - Password hashing bằng PBKDF2.
 - Admin rate settings cho `TWD_VND` và `USDT_TWD`.
@@ -25,6 +29,14 @@ Các module member, service request, email queue và IP connector vẫn còn tro
 ```text
 MEMBER_REGISTRATION_ENABLED=false
 MEMBER_PORTAL_ENABLED=false
+CRYPTO_MARKET_LIVE_ENABLED=true
+CRYPTO_MARKET_CACHE_SECONDS=180
+CRYPTO_MARKET_TIMEOUT_SECONDS=2.5
+COINGECKO_API_URL=https://api.coingecko.com/api/v3/simple/price
+BINANCE_API_URL=https://api.binance.com/api/v3/ticker/24hr
+GOOGLE_ADSENSE_CLIENT=<ca-pub-...>
+GOOGLE_ADSENSE_SLOT=<slot id>
+GOOGLE_ADSENSE_PUBLISHER_ID=<pub-...>
 ```
 
 Khi pháp lý hoàn tất mới bật lại hai biến này.

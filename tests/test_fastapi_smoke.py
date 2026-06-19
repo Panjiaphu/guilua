@@ -13,6 +13,7 @@ from app.db.session import Base
 from app.main import app
 from app.models import EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
 from app.services.email import record_email_reply
+from app.services.crypto_market import clear_crypto_market_cache
 from app.services.ip_provider import provision_ip_service
 from app.services.member_services import create_ip_service_request
 from app.services.rates import ensure_default_rates
@@ -55,6 +56,34 @@ class FastApiSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Đăng ký thành viên đang tạm khóa", response.text)
         self.assertNotIn('action="/register"', response.text)
+
+    def test_crypto_dashboard_renders_with_fallback_data(self):
+        old_live = os.environ.get("CRYPTO_MARKET_LIVE_ENABLED")
+        os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = "false"
+        get_settings.cache_clear()
+        clear_crypto_market_cache()
+        try:
+            response = self.client.get("/crypto?lang=vi")
+        finally:
+            if old_live is None:
+                os.environ.pop("CRYPTO_MARKET_LIVE_ENABLED", None)
+            else:
+                os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = old_live
+            get_settings.cache_clear()
+            clear_crypto_market_cache()
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Bảng tham khảo crypto", response.text)
+        self.assertIn("Bảng chỉ số vĩ mô", response.text)
+        self.assertIn("Bảng 12 nhóm coin", response.text)
+        self.assertIn("TradingView", response.text)
+        self.assertIn("CRYPTOCAP:BTC.D", response.text)
+        self.assertIn("CoinGecko + Binance", response.text)
+        self.assertIn("Google AdSense chưa được cấu hình", response.text)
+
+    def test_ads_txt_without_adsense_configuration(self):
+        response = self.client.get("/ads.txt")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Google AdSense is not configured", response.text)
 
     def test_email_webhook_requires_configuration(self):
         response = self.client.post(
