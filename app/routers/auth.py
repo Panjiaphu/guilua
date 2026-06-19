@@ -26,6 +26,12 @@ def _message(request: Request, key: str) -> str:
     return t(resolve_locale(request), key)
 
 
+def _safe_next(value: str | None) -> str:
+    if not value or not value.startswith("/") or value.startswith("//"):
+        return "/member"
+    return value
+
+
 @router.get("/register")
 def register_form(request: Request):
     return templates.TemplateResponse(request=request, name="auth/register.html", context=context(request, error=""))
@@ -79,9 +85,14 @@ def register(
 
 @router.get("/login")
 def login_form(request: Request, db: Session = Depends(get_db)):
+    next_url = _safe_next(request.query_params.get("next"))
     if get_current_user(request, db):
-        return RedirectResponse("/member", status_code=303)
-    return templates.TemplateResponse(request=request, name="auth/login.html", context=context(request, error=""))
+        return RedirectResponse(next_url, status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="auth/login.html",
+        context=context(request, error="", next_url=next_url),
+    )
 
 
 @router.post("/login")
@@ -91,19 +102,25 @@ def login(
     csrf_token: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    next_url: str = Form("/member"),
 ):
     verify_csrf(request, csrf_token)
+    redirect_to = _safe_next(next_url)
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if not user or not verify_password(password, user.password_hash):
         return templates.TemplateResponse(
-            request=request, name="auth/login.html", context=context(request, error=_message(request, "error.invalid_login"))
+            request=request,
+            name="auth/login.html",
+            context=context(request, error=_message(request, "error.invalid_login"), next_url=redirect_to),
         )
     if not user.is_active:
         return templates.TemplateResponse(
-            request=request, name="auth/login.html", context=context(request, error=_message(request, "error.account_disabled"))
+            request=request,
+            name="auth/login.html",
+            context=context(request, error=_message(request, "error.account_disabled"), next_url=redirect_to),
         )
     login_user(request, user)
-    return RedirectResponse("/member", status_code=303)
+    return RedirectResponse(redirect_to, status_code=303)
 
 
 @router.post("/logout")

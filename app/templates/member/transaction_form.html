@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% set type_value = selected_type.value %}
+{% block content %}
+<section class="dashboard transaction-page">
+  <div class="transaction-hero panel">
+    <div>
+      <span class="icon">
+        {% if type_value == "send_home" %}{{ icons.icon("send") }}{% elif type_value == "buy_usdt" %}{{ icons.icon("usdt") }}{% else %}{{ icons.icon("sell") }}{% endif %}
+      </span>
+      <h1>{{ t("transaction." ~ type_value ~ ".title") }}</h1>
+      <p class="muted">{{ t("transaction." ~ type_value ~ ".desc") }}</p>
+    </div>
+    <div class="quote-panel">
+      <span>{{ t("transaction.current_rate") }}</span>
+      {% if type_value == "send_home" %}
+        <strong>{{ rates["TWD_VND"].buy_rate }}</strong>
+        <small>TWD -> VND</small>
+      {% elif type_value == "buy_usdt" %}
+        <strong>{{ rates["USDT_TWD"].buy_rate }}</strong>
+        <small>USDT -> TWD</small>
+      {% else %}
+        <strong>{{ rates["USDT_TWD"].sell_rate }}</strong>
+        <small>USDT -> TWD</small>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <h2>{{ t("transaction.form_title") }}</h2>
+          <p class="muted">{{ t("transaction.form_help") }}</p>
+        </div>
+      </div>
+      <form method="post" action="/member/transactions/{{ transaction_slug }}" class="form split">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {% if type_value in ["send_home", "buy_usdt"] %}
+          <label>{{ t("transaction.form.amount_twd") }}<input type="number" name="amount_twd" min="1" step="0.01" required placeholder="10000"></label>
+        {% endif %}
+        {% if type_value == "sell_usdt" %}
+          <label>{{ t("transaction.form.amount_usdt") }}<input type="number" name="amount_usdt" min="0.000001" step="0.000001" required placeholder="300"></label>
+        {% endif %}
+
+        {% if type_value == "send_home" %}
+          <label>{{ t("transaction.form.vn_recipient") }}<input type="text" name="recipient_name" maxlength="120" required></label>
+          <label>{{ t("transaction.form.vn_bank") }}<input type="text" name="recipient_bank" maxlength="120" required></label>
+          <label>{{ t("transaction.form.vn_account") }}<input type="text" name="recipient_account" maxlength="120" required></label>
+        {% endif %}
+
+        {% if type_value == "buy_usdt" %}
+          <label>{{ t("transaction.form.usdt_network") }}
+            <select name="usdt_network" required>
+              <option value="TRC20">TRC20</option>
+              <option value="ERC20">ERC20</option>
+              <option value="BEP20">BEP20</option>
+            </select>
+          </label>
+          <label class="wide">{{ t("transaction.form.wallet_address") }}<input type="text" name="wallet_address" maxlength="255" required></label>
+        {% endif %}
+
+        {% if type_value == "sell_usdt" %}
+          <label>{{ t("transaction.form.usdt_network") }}
+            <select name="usdt_network" required>
+              <option value="TRC20">TRC20</option>
+              <option value="ERC20">ERC20</option>
+              <option value="BEP20">BEP20</option>
+            </select>
+          </label>
+          <label class="wide">{{ t("transaction.form.wallet_address_optional") }}<input type="text" name="wallet_address" maxlength="255"></label>
+          <label>{{ t("transaction.form.twd_payout_name") }}<input type="text" name="recipient_name" maxlength="120" required></label>
+          <label>{{ t("transaction.form.twd_payout_bank") }}<input type="text" name="recipient_bank" maxlength="120" required></label>
+          <label>{{ t("transaction.form.twd_payout_account") }}<input type="text" name="recipient_account" maxlength="120" required></label>
+        {% endif %}
+
+        <label>{{ t("transaction.form.contact_phone") }}<input type="tel" name="contact_phone" maxlength="64" required></label>
+        <label>{{ t("transaction.form.contact_line") }}<input type="text" name="contact_line" maxlength="120" placeholder="@827sxbki"></label>
+        <label class="wide">{{ t("transaction.form.note") }}<textarea name="member_note" rows="3"></textarea></label>
+        <button class="button primary wide" type="submit">{{ t("transaction.form.submit") }}</button>
+      </form>
+    </section>
+
+    <aside class="account-card">
+      <span class="icon">{{ icons.icon("shield") }}</span>
+      <h2>{{ t("transaction.admin_review") }}</h2>
+      <p class="muted">{{ t("transaction.admin_review_desc") }}</p>
+      <div class="support-box">
+        <span>{{ t("admin.contact.email") }}: {{ admin_contact.email }}</span>
+        <span>{{ t("admin.contact.line") }}: {{ admin_contact.line }}</span>
+        <span>{{ t("admin.contact.phone") }}: {{ admin_contact.phone }}</span>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

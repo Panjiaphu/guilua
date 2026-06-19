@@ -22,6 +22,10 @@ def create_transaction(
     recipient_name: str = "",
     recipient_bank: str = "",
     recipient_account: str = "",
+    contact_phone: str = "",
+    contact_line: str = "",
+    usdt_network: str = "",
+    wallet_address: str = "",
     member_note: str = "",
 ) -> TransactionRequest:
     rates = latest_rates(db)
@@ -47,6 +51,10 @@ def create_transaction(
         recipient_name=recipient_name,
         recipient_bank=recipient_bank,
         recipient_account=recipient_account,
+        contact_phone=contact_phone,
+        contact_line=contact_line,
+        usdt_network=usdt_network,
+        wallet_address=wallet_address,
         member_note=member_note,
     )
     db.add(item)
@@ -57,7 +65,7 @@ def create_transaction(
         db,
         user.email,
         f"Guilua - đã nhận yêu cầu {item.reference_code}",
-        f"Yêu cầu {item.reference_code} của bạn đang chờ admin kiểm tra.",
+        f"Yêu cầu {item.reference_code} của bạn đang chờ quản trị viên kiểm tra.",
         "member_transaction_created",
         user=user,
         transaction=item,
@@ -68,7 +76,7 @@ def create_transaction(
             db,
             admin_email,
             f"Guilua - yêu cầu mới {item.reference_code}",
-            f"Thành viên {user.email} vừa tạo yêu cầu {item.request_type.value}.",
+            f"Thành viên {user.email} vừa tạo yêu cầu {item.request_type.value}. Mã: {item.reference_code}.",
             "admin_transaction_created",
             user=user,
             transaction=item,

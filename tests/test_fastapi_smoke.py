@@ -1,19 +1,25 @@
+from decimal import Decimal
+from io import BytesIO
 import os
 import subprocess
 import sys
 import unittest
+from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
-from app.db.session import Base
+from app.core.security import serializer
+from app.db.session import Base, SessionLocal, engine
 from app.main import app
-from app.models import EmailNotification, EmailReply, ServiceRequest, User
+from app.models import EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
 from app.services.email import record_email_reply
 from app.services.ip_provider import provision_ip_service
 from app.services.member_services import create_ip_service_request
+from app.services.rates import ensure_default_rates
+from app.services.transactions import create_transaction
 
 
 class FastApiSmokeTest(unittest.TestCase):
@@ -36,6 +42,7 @@ class FastApiSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Gửi tiền", response.text)
         self.assertIn("Tỷ giá", response.text)
+        self.assertIn("/member/transactions/send-home", response.text)
 
     def test_email_webhook_requires_configuration(self):
         response = self.client.post(
@@ -47,7 +54,45 @@ class FastApiSmokeTest(unittest.TestCase):
     def test_member_services_requires_login(self):
         response = self.client.get("/member/services?lang=vi", follow_redirects=False)
         self.assertEqual(response.status_code, 303)
-        self.assertEqual(response.headers["location"], "/login")
+        self.assertTrue(response.headers["location"].startswith("/login?next="))
+
+    def test_transaction_form_requires_login(self):
+        response = self.client.get("/member/transactions/send-home?lang=vi", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertTrue(response.headers["location"].startswith("/login?next="))
+
+    def test_ip_connector_download_returns_zip_for_member(self):
+        Base.metadata.create_all(bind=engine)
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "download-member@example.com").first()
+            if not user:
+                user = User(
+                    email="download-member@example.com",
+                    password_hash="hash",
+                    full_name="Download Member",
+                    locale="vi",
+                    is_active=True,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            user_id = user.id
+
+        settings = get_settings()
+        self.client.cookies.set(
+            settings.session_cookie_name,
+            serializer.dumps({"user_id": user_id, "csrf_token": "test-token"}),
+        )
+        response = self.client.get("/member/services/ip-switch/download")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "application/zip")
+        self.assertIn("guilua-ip-connector.zip", response.headers["content-disposition"])
+
+        with ZipFile(BytesIO(response.content)) as archive:
+            self.assertIn("guilua-ip-connector.ps1", archive.namelist())
+            self.assertIn("README.txt", archive.namelist())
+            readme = archive.read("README.txt").decode("utf-8")
+            self.assertIn("Guilua IP Connector", readme)
 
     def test_record_email_reply_queues_admin_notification(self):
         engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
@@ -87,7 +132,7 @@ class FastApiSmokeTest(unittest.TestCase):
             item = create_ip_service_request(
                 db,
                 user=user,
-                target_region="japan",
+                target_region="random",
                 protocol="vpn",
                 duration_hours=48,
                 device_label="Laptop",
@@ -96,10 +141,47 @@ class FastApiSmokeTest(unittest.TestCase):
             )
 
             self.assertTrue(item.reference_code.startswith("GS"))
-            self.assertEqual(item.target_region, "japan")
+            self.assertEqual(item.target_region, "random")
             self.assertEqual(db.query(ServiceRequest).count(), 1)
             self.assertEqual(db.query(EmailNotification).filter_by(event_type="member_service_created").count(), 1)
             self.assertEqual(db.query(EmailNotification).filter_by(event_type="admin_service_created").count(), 1)
+
+    def test_create_transaction_stores_admin_details(self):
+        engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
+        Base.metadata.create_all(engine)
+        TestingSession = sessionmaker(bind=engine)
+
+        with TestingSession() as db:
+            ensure_default_rates(db)
+            user = User(
+                email="trade-member@example.com",
+                password_hash="hash",
+                full_name="Trade Member",
+                locale="vi",
+                is_active=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+            item = create_transaction(
+                db,
+                user=user,
+                request_type=TransactionType.BUY_USDT,
+                amount_twd=Decimal("10000"),
+                amount_usdt=None,
+                contact_phone="0900000000",
+                contact_line="@member",
+                usdt_network="TRC20",
+                wallet_address="TXYZ123",
+                member_note="Cần xử lý nhanh",
+            )
+
+            self.assertTrue(item.reference_code.startswith("GL"))
+            self.assertEqual(item.usdt_network, "TRC20")
+            self.assertEqual(item.wallet_address, "TXYZ123")
+            self.assertEqual(item.contact_phone, "0900000000")
+            self.assertEqual(db.query(TransactionRequest).count(), 1)
 
     def test_ip_provider_returns_not_configured_without_env(self):
         old_url = os.environ.pop("IP_SERVICE_PROVIDER_URL", None)

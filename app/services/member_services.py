@@ -7,7 +7,7 @@ from app.models import ServiceRequest, TransactionStatus, User
 from app.services.email import queue_email
 
 
-ALLOWED_IP_REGIONS = {"taiwan", "japan", "singapore", "united_states", "vietnam"}
+ALLOWED_IP_REGIONS = {"random", "taiwan", "japan", "singapore", "united_states", "vietnam"}
 ALLOWED_IP_PROTOCOLS = {"recommended", "vpn", "proxy", "residential"}
 
 

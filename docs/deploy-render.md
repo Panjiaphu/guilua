@@ -119,3 +119,16 @@ IP_SERVICE_PROVIDER_TIMEOUT_SECONDS=5
 Khi admin chuyển yêu cầu dịch vụ sang `Đã duyệt` hoặc `Đã hoàn thành` mà chưa
 nhập endpoint thủ công, app sẽ gọi provider URL. Provider nên trả JSON có một
 trong các field: `endpoint`, `assigned_endpoint`, `proxy_url`, `vpn_profile_url`.
+
+Cách lấy key:
+
+1. Đăng ký hoặc đăng nhập dashboard nhà cung cấp VPN/proxy/IP rotation bạn dùng.
+2. Tạo API key hoặc service token trong phần Developer/API.
+3. Lấy endpoint cấp IP/proxy từ tài liệu provider, ví dụ endpoint provision line.
+4. Set trên Render:
+   - `IP_SERVICE_PROVIDER_URL=<endpoint cấp IP/proxy>`
+   - `IP_SERVICE_PROVIDER_API_KEY=<API key/service token>`
+5. Không đưa provider key vào GitHub hoặc gửi cho member.
+
+Nếu chưa có provider, để trống hai biến này. Admin vẫn có thể cấp endpoint thủ
+công trong dashboard.

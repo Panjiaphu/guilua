@@ -23,7 +23,19 @@
                 <td>{{ item.reference_code }}</td>
                 <td>{{ item.user.email }}</td>
                 <td>{{ type_label(item.request_type) }}</td>
-                <td>{% if item.amount_twd %}{{ item.amount_twd }} TWD{% endif %}{% if item.amount_usdt %}<br>{{ item.amount_usdt }} USDT{% endif %}</td>
+                <td>
+                  {% if item.amount_twd %}{{ item.amount_twd }} TWD{% endif %}{% if item.amount_usdt %}<br>{{ item.amount_usdt }} USDT{% endif %}{% if item.amount_vnd %}<br>{{ item.amount_vnd }} VND{% endif %}
+                  <div class="request-meta">
+                    {% if item.recipient_name %}<span>{{ t("transaction.form.vn_recipient") }}: {{ item.recipient_name }}</span>{% endif %}
+                    {% if item.recipient_bank %}<span>{{ t("member.form.bank") }}: {{ item.recipient_bank }}</span>{% endif %}
+                    {% if item.recipient_account %}<span>{{ t("member.form.account") }}: {{ item.recipient_account }}</span>{% endif %}
+                    {% if item.usdt_network %}<span>{{ t("transaction.form.usdt_network") }}: {{ item.usdt_network }}</span>{% endif %}
+                    {% if item.wallet_address %}<span>{{ t("transaction.form.wallet_address") }}: {{ item.wallet_address }}</span>{% endif %}
+                    {% if item.contact_phone %}<span>{{ t("transaction.form.contact_phone") }}: {{ item.contact_phone }}</span>{% endif %}
+                    {% if item.contact_line %}<span>{{ t("transaction.form.contact_line") }}: {{ item.contact_line }}</span>{% endif %}
+                    {% if item.member_note %}<span>{{ t("member.form.note") }}: {{ item.member_note }}</span>{% endif %}
+                  </div>
+                </td>
                 <td><span class="status">{{ status_label(item.status) }}</span></td>
                 <td>
                   <form method="post" action="/admin/requests/{{ item.id }}" class="inline-form">

@@ -6,6 +6,7 @@
   {% if error %}<p class="alert">{{ error }}</p>{% endif %}
   <form method="post" action="/login" class="form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="next_url" value="{{ next_url or '/member' }}">
     <label>{{ t("auth.email") }}<input type="email" name="email" required autocomplete="email"></label>
     <label>{{ t("auth.password") }}<input type="password" name="password" required autocomplete="current-password"></label>
     <button class="button primary" type="submit">{{ t("auth.login") }}</button>

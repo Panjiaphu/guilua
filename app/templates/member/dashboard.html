@@ -16,23 +16,23 @@
         <h2>{{ t("member.new_request") }}</h2>
         <span>{{ t("nav.rates") }}</span>
       </div>
-      <form method="post" action="/member/requests" class="form split">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label>{{ t("member.form.type") }}
-          <select name="request_type" required>
-            <option value="send_home">{{ t("nav.send_home") }}</option>
-            <option value="buy_usdt">{{ t("nav.buy_usdt") }}</option>
-            <option value="sell_usdt">{{ t("nav.sell_usdt") }}</option>
-          </select>
-        </label>
-        <label>{{ t("member.form.amount_twd") }}<input type="number" name="amount_twd" min="0" step="0.01" placeholder="10000"></label>
-        <label>{{ t("member.form.amount_usdt") }}<input type="number" name="amount_usdt" min="0" step="0.000001" placeholder="300"></label>
-        <label>{{ t("member.form.recipient") }}<input type="text" name="recipient_name" placeholder="Nguyễn Văn A"></label>
-        <label>{{ t("member.form.bank") }}<input type="text" name="recipient_bank" placeholder="VCB"></label>
-        <label>{{ t("member.form.account") }}<input type="text" name="recipient_account" placeholder="0123456789"></label>
-        <label class="wide">{{ t("member.form.note") }}<textarea name="member_note" rows="3"></textarea></label>
-        <button class="button primary wide" type="submit">{{ t("member.form.submit") }}</button>
-      </form>
+      <div class="transaction-actions">
+        <a class="action-card" href="/member/transactions/send-home?lang={{ locale }}">
+          <span class="icon">{{ icons.icon("send") }}</span>
+          <strong>{{ t("home.card.send.title") }}</strong>
+          <small>{{ t("transaction.send_home.desc") }}</small>
+        </a>
+        <a class="action-card" href="/member/transactions/buy-usdt?lang={{ locale }}">
+          <span class="icon">{{ icons.icon("usdt") }}</span>
+          <strong>{{ t("home.card.buy.title") }}</strong>
+          <small>{{ t("transaction.buy_usdt.desc") }}</small>
+        </a>
+        <a class="action-card" href="/member/transactions/sell-usdt?lang={{ locale }}">
+          <span class="icon">{{ icons.icon("sell") }}</span>
+          <strong>{{ t("home.card.sell.title") }}</strong>
+          <small>{{ t("transaction.sell_usdt.desc") }}</small>
+        </a>
+      </div>
     </section>
 
     <aside class="account-card">

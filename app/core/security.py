@@ -1,6 +1,7 @@
 import secrets
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request, Response, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -95,7 +96,13 @@ def get_current_user(request: Request, db: Session) -> User | None:
 def require_user(request: Request, db: Session) -> User:
     user = get_current_user(request, db)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
+        path = request.url.path
+        if request.url.query:
+            path = f"{path}?{request.url.query}"
+        raise HTTPException(
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": f"/login?next={quote(path, safe='/?=&-_%.')}"},
+        )
     return user
 
 
