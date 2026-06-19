@@ -11,6 +11,6 @@
     <label>{{ t("auth.password") }}<input type="password" name="password" required autocomplete="current-password"></label>
     <button class="button primary" type="submit">{{ t("auth.login") }}</button>
   </form>
-  <p><a href="/register?lang={{ locale }}">{{ t("auth.register") }}</a></p>
+  <p class="form-help">{{ t("auth.register_hint") }}</p>
 </section>
 {% endblock %}

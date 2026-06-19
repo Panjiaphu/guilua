@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.security import (
     create_email_token,
     get_current_user,
@@ -34,6 +35,13 @@ def _safe_next(value: str | None) -> str:
 
 @router.get("/register")
 def register_form(request: Request):
+    if not get_settings().member_registration_enabled:
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/register_closed.html",
+            context=context(request, error=""),
+            status_code=200,
+        )
     return templates.TemplateResponse(request=request, name="auth/register.html", context=context(request, error=""))
 
 
@@ -47,6 +55,13 @@ def register(
     full_name: str = Form(""),
     locale: str = Form("vi"),
 ):
+    if not get_settings().member_registration_enabled:
+        return templates.TemplateResponse(
+            request=request,
+            name="auth/register_closed.html",
+            context=context(request, error=""),
+            status_code=403,
+        )
     verify_csrf(request, csrf_token)
     normalized_email = email.strip().lower()
     if len(password) < 10:

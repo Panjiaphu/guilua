@@ -27,6 +27,10 @@ services:
         value: "0906938893"
       - key: ADMIN_SEED_EMAIL
         value: panjiaphu@gmail.com
+      - key: MEMBER_REGISTRATION_ENABLED
+        value: false
+      - key: MEMBER_PORTAL_ENABLED
+        value: false
       - key: SECRET_KEY
         sync: false
       - key: ADMIN_SEED_PASSWORD

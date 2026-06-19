@@ -1,18 +1,15 @@
 from decimal import Decimal
-from io import BytesIO
 import os
 import subprocess
 import sys
 import unittest
-from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
-from app.core.security import serializer
-from app.db.session import Base, SessionLocal, engine
+from app.db.session import Base
 from app.main import app
 from app.models import EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
 from app.services.email import record_email_reply
@@ -34,15 +31,30 @@ class FastApiSmokeTest(unittest.TestCase):
     def test_home_renders_bilingual_shell(self):
         response = self.client.get("/?lang=zh-TW")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("以安全儀表板處理台幣匯款到越南", response.text)
-        self.assertIn("會員中心", response.text)
+        self.assertIn("企業客戶 TWD/VND", response.text)
+        self.assertIn("會員註冊暫停", response.text)
+        self.assertNotIn("/member/transactions", response.text)
+        self.assertNotIn("手動", response.text)
+        self.assertNotIn("交易", response.text)
 
-    def test_home_renders_vietnamese_with_accents(self):
+    def test_home_renders_rate_reference_mode(self):
         response = self.client.get("/?lang=vi")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Gửi tiền", response.text)
-        self.assertIn("Tỷ giá", response.text)
-        self.assertIn("/member/transactions/send-home", response.text)
+        self.assertIn("Bảng tham khảo tỷ giá", response.text)
+        self.assertIn("Giá mua", response.text)
+        self.assertIn("Giá bán", response.text)
+        self.assertIn("Đăng nhập quản trị", response.text)
+        self.assertNotIn("/member/transactions", response.text)
+        self.assertNotIn("/register", response.text)
+        self.assertNotIn("Gửi tiền", response.text)
+        self.assertNotIn("giao dịch", response.text)
+        self.assertNotIn("thủ công", response.text)
+
+    def test_register_is_paused(self):
+        response = self.client.get("/register?lang=vi")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Đăng ký thành viên đang tạm khóa", response.text)
+        self.assertNotIn('action="/register"', response.text)
 
     def test_email_webhook_requires_configuration(self):
         response = self.client.post(
@@ -51,48 +63,19 @@ class FastApiSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 503)
 
-    def test_member_services_requires_login(self):
+    def test_member_services_are_paused(self):
         response = self.client.get("/member/services?lang=vi", follow_redirects=False)
-        self.assertEqual(response.status_code, 303)
-        self.assertTrue(response.headers["location"].startswith("/login?next="))
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("Khu vực thành viên đang tạm khóa", response.text)
 
-    def test_transaction_form_requires_login(self):
+    def test_transaction_form_is_paused(self):
         response = self.client.get("/member/transactions/send-home?lang=vi", follow_redirects=False)
-        self.assertEqual(response.status_code, 303)
-        self.assertTrue(response.headers["location"].startswith("/login?next="))
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("Khu vực thành viên đang tạm khóa", response.text)
 
-    def test_ip_connector_download_returns_zip_for_member(self):
-        Base.metadata.create_all(bind=engine)
-        with SessionLocal() as db:
-            user = db.query(User).filter(User.email == "download-member@example.com").first()
-            if not user:
-                user = User(
-                    email="download-member@example.com",
-                    password_hash="hash",
-                    full_name="Download Member",
-                    locale="vi",
-                    is_active=True,
-                )
-                db.add(user)
-                db.commit()
-                db.refresh(user)
-            user_id = user.id
-
-        settings = get_settings()
-        self.client.cookies.set(
-            settings.session_cookie_name,
-            serializer.dumps({"user_id": user_id, "csrf_token": "test-token"}),
-        )
+    def test_ip_connector_download_is_paused(self):
         response = self.client.get("/member/services/ip-switch/download")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["content-type"], "application/zip")
-        self.assertIn("guilua-ip-connector.zip", response.headers["content-disposition"])
-
-        with ZipFile(BytesIO(response.content)) as archive:
-            self.assertIn("guilua-ip-connector.ps1", archive.namelist())
-            self.assertIn("README.txt", archive.namelist())
-            readme = archive.read("README.txt").decode("utf-8")
-            self.assertIn("Guilua IP Connector", readme)
+        self.assertEqual(response.status_code, 403)
 
     def test_record_email_reply_queues_admin_notification(self):
         engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})

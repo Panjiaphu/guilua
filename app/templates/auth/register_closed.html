@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-card pause-card">
+  <p class="eyebrow">{{ t("meta.product") }}</p>
+  <h1>{{ t("auth.register_closed_title") }}</h1>
+  <p class="muted">{{ t("auth.register_closed_desc") }}</p>
+  <div class="hero-actions">
+    <a class="button primary" href="/?lang={{ locale }}">{{ t("auth.back_home") }}</a>
+    <a class="button" href="/login?lang={{ locale }}">{{ t("auth.admin_login") }}</a>
+  </div>
+</section>
+{% endblock %}

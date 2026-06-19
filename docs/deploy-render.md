@@ -1,6 +1,6 @@
 # Deploy Render cho Guilua
 
-App hiện tại deploy bằng FastAPI + Gunicorn/Uvicorn.
+App deploy bằng FastAPI + Gunicorn/Uvicorn.
 
 ## Render Commands
 
@@ -10,9 +10,7 @@ Start Command: bash scripts/start_render.sh
 Health Check Path: /healthz/
 ```
 
-## Biến môi trường tối thiểu
-
-Set các biến sau trong Render service:
+## Env tối thiểu
 
 ```text
 APP_ENV=production
@@ -25,17 +23,31 @@ ADMIN_NOTIFICATION_EMAIL=panjiaphu@gmail.com
 ADMIN_LINE_ID=@827sxbki
 ADMIN_PHONE=0906938893
 ADMIN_SEED_EMAIL=panjiaphu@gmail.com
-ADMIN_SEED_PASSWORD=<mật khẩu admin tạm thời tối thiểu 14 ký tự>
-EMAIL_WEBHOOK_API_KEY=<secret riêng cho inbound email webhook>
+ADMIN_SEED_PASSWORD=<mật khẩu admin mạnh tối thiểu 14 ký tự>
+MEMBER_REGISTRATION_ENABLED=false
+MEMBER_PORTAL_ENABLED=false
 ```
 
 Nếu Render báo lỗi `ADMIN_SEED_PASSWORD must be at least 14 characters in production`,
-hãy đổi biến `ADMIN_SEED_PASSWORD` trong Render Environment sang mật khẩu mạnh hơn.
-Ví dụ format hợp lệ: chữ hoa, chữ thường, số, ký tự đặc biệt và dài tối thiểu
-14 ký tự. Không dùng lại mật khẩu ngắn như `pp11223344`.
+đổi `ADMIN_SEED_PASSWORD` sang mật khẩu mạnh dài tối thiểu 14 ký tự. Không dùng
+`pp11223344`.
 
-Với cấu hình trên, app chạy SQLite để smoke UI nhanh. Với production thật nên
-dùng PostgreSQL để dữ liệu không phụ thuộc vào filesystem của web service:
+## Trạng thái public hiện tại
+
+- Trang chủ chỉ hiển thị bảng tham khảo tỷ giá.
+- Đăng ký thành viên đang tạm khóa.
+- Member portal đang tạm khóa.
+- Admin dashboard vẫn dùng để cập nhật `Giá mua` và `Giá bán`.
+
+## Database
+
+SQLite phù hợp để smoke UI nhanh:
+
+```text
+USE_SQLITE=true
+```
+
+Production lâu dài nên dùng PostgreSQL:
 
 ```text
 USE_SQLITE=false
@@ -43,13 +55,11 @@ DATABASE_URL=<PostgreSQL URL hợp lệ>
 RUN_MIGRATIONS_DURING_BUILD=true
 ```
 
-`scripts/start_render.sh` sẽ chạy `alembic upgrade head` lúc runtime rồi mới bật
-Gunicorn. Như vậy build không chết vì database host lỗi, nhưng app vẫn có bảng
-database khi start.
+`scripts/start_render.sh` luôn chạy `alembic upgrade head` khi service start.
 
-## Email notification
+## SMTP và webhook email
 
-Set SMTP khi muốn gửi email thật:
+Các biến này chỉ cần khi bật email thật:
 
 ```text
 SMTP_HOST=<smtp host>
@@ -58,57 +68,13 @@ SMTP_USERNAME=<smtp username>
 SMTP_PASSWORD=<smtp password>
 SMTP_FROM_EMAIL=<email gửi đi>
 SMTP_USE_TLS=true
+EMAIL_WEBHOOK_API_KEY=<secret riêng cho inbound email webhook>
 ```
 
-App có email queue, SMTP sender và inbound webhook để nhận email reply từ member.
-Provider email cần forward inbound mail về:
+## Provider IP
 
-```text
-POST /webhooks/email-reply
-Header: X-Guilua-Webhook-Key: <EMAIL_WEBHOOK_API_KEY>
-Content-Type: application/json
-```
-
-Payload tối thiểu:
-
-```json
-{
-  "from": "member@example.com",
-  "to": "support@guilua.example",
-  "subject": "Re: GL202606180001",
-  "text": "Nội dung phản hồi của member"
-}
-```
-
-Nếu subject hoặc body có mã yêu cầu `GL...`, app sẽ tự gắn reply vào giao dịch tương ứng.
-
-## Live exchange rate
-
-Optional:
-
-```text
-EXCHANGE_RATE_PROVIDER_URL=https://example.com/rates.json
-```
-
-Provider JSON kỳ vọng format:
-
-```json
-{
-  "TWD_VND": {"buy_rate": 805.5, "sell_rate": 805.5},
-  "USDT_TWD": {"buy_rate": 32.1, "sell_rate": 32.45}
-}
-```
-
-Không commit secret thật vào repo.
-
-## Dịch vụ chuyển IP
-
-App đã có member service page, bảng `service_requests`, admin review, endpoint cấp
-cho member và email notification. Phần tự động cấp VPN/proxy/IP thật chưa được
-kết nối; khi có provider, nên thêm worker/service riêng để gọi API provider và
-ghi `assigned_endpoint` sau khi admin duyệt.
-
-Provider API có thể cấu hình bằng:
+Module IP vẫn còn trong codebase nhưng member portal đang tạm khóa. Khi pháp lý
+cho phép bật lại, cấu hình provider bằng:
 
 ```text
 IP_SERVICE_PROVIDER_URL=https://provider.example.com/provision
@@ -116,19 +82,5 @@ IP_SERVICE_PROVIDER_API_KEY=<provider api key>
 IP_SERVICE_PROVIDER_TIMEOUT_SECONDS=5
 ```
 
-Khi admin chuyển yêu cầu dịch vụ sang `Đã duyệt` hoặc `Đã hoàn thành` mà chưa
-nhập endpoint thủ công, app sẽ gọi provider URL. Provider nên trả JSON có một
-trong các field: `endpoint`, `assigned_endpoint`, `proxy_url`, `vpn_profile_url`.
-
-Cách lấy key:
-
-1. Đăng ký hoặc đăng nhập dashboard nhà cung cấp VPN/proxy/IP rotation bạn dùng.
-2. Tạo API key hoặc service token trong phần Developer/API.
-3. Lấy endpoint cấp IP/proxy từ tài liệu provider, ví dụ endpoint provision line.
-4. Set trên Render:
-   - `IP_SERVICE_PROVIDER_URL=<endpoint cấp IP/proxy>`
-   - `IP_SERVICE_PROVIDER_API_KEY=<API key/service token>`
-5. Không đưa provider key vào GitHub hoặc gửi cho member.
-
-Nếu chưa có provider, để trống hai biến này. Admin vẫn có thể cấp endpoint thủ
-công trong dashboard.
+Key provider phải lấy từ dashboard nhà cung cấp VPN/proxy/IP rotation. Không commit
+key vào GitHub và không gửi key cho member.

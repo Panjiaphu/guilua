@@ -12,8 +12,8 @@
       <span>{{ t("home.proof.admin") }}</span>
     </div>
     <div class="hero-actions">
-      <a class="button primary" href="/register?lang={{ locale }}">{{ t("home.primary") }}</a>
-      <a class="button" href="/login?lang={{ locale }}">{{ t("home.secondary") }}</a>
+      <a class="button primary" href="/login?lang={{ locale }}">{{ t("home.primary") }}</a>
+      <a class="button" href="mailto:{{ admin_contact.email }}">{{ t("home.secondary") }}</a>
     </div>
   </div>
   <div class="hero-console motion-card">
@@ -23,11 +23,12 @@
     </div>
     <div class="console-balance">
       <small>{{ t("home.hero_rate") }}</small>
-      <strong>{{ rates["TWD_VND"].buy_rate }} VND</strong>
+      <strong>{{ t("rates.buy") }} {{ rates["TWD_VND"].buy_rate }} VND</strong>
+      <small>{{ t("rates.sell") }} {{ rates["TWD_VND"].sell_rate }} VND</small>
     </div>
     <div class="console-grid">
-      <div><small>{{ t("nav.buy_usdt") }}</small><strong>{{ rates["USDT_TWD"].buy_rate }}</strong></div>
-      <div><small>{{ t("nav.sell_usdt") }}</small><strong>{{ rates["USDT_TWD"].sell_rate }}</strong></div>
+      <div><small>USDT -> TWD · {{ t("rates.buy") }}</small><strong>{{ rates["USDT_TWD"].buy_rate }}</strong></div>
+      <div><small>USDT -> TWD · {{ t("rates.sell") }}</small><strong>{{ rates["USDT_TWD"].sell_rate }}</strong></div>
     </div>
     <div class="console-flow">
       <span>{{ t("home.ops.one") }}</span>
@@ -38,33 +39,33 @@
 </section>
 
 <section class="grid three">
-  <a class="feature-card gradient-pink" href="/member/transactions/send-home?lang={{ locale }}">
+  <article class="feature-card gradient-pink">
     <div class="card-glow"></div>
     <div class="feature-inner">
       <span class="icon">{{ icons.icon("send") }}</span>
       <h2>{{ t("home.card.send.title") }}</h2>
       <p>{{ t("home.card.send.desc") }}</p>
-      <strong class="card-cta">{{ t("home.card.cta") }}</strong>
+      <strong class="card-cta">{{ t("rates.buy") }} {{ rates["TWD_VND"].buy_rate }} · {{ t("rates.sell") }} {{ rates["TWD_VND"].sell_rate }}</strong>
     </div>
-  </a>
-  <a class="feature-card gradient-cyan delay-1" href="/member/transactions/buy-usdt?lang={{ locale }}">
+  </article>
+  <article class="feature-card gradient-cyan delay-1">
     <div class="card-glow"></div>
     <div class="feature-inner">
       <span class="icon">{{ icons.icon("usdt") }}</span>
       <h2>{{ t("home.card.buy.title") }}</h2>
       <p>{{ t("home.card.buy.desc") }}</p>
-      <strong class="card-cta">{{ t("home.card.cta") }}</strong>
+      <strong class="card-cta">{{ t("rates.buy") }} {{ rates["USDT_TWD"].buy_rate }} · {{ t("rates.sell") }} {{ rates["USDT_TWD"].sell_rate }}</strong>
     </div>
-  </a>
-  <a class="feature-card gradient-violet delay-2" href="/member/transactions/sell-usdt?lang={{ locale }}">
+  </article>
+  <article class="feature-card gradient-violet delay-2">
     <div class="card-glow"></div>
     <div class="feature-inner">
-      <span class="icon">{{ icons.icon("sell") }}</span>
+      <span class="icon">{{ icons.icon("shield") }}</span>
       <h2>{{ t("home.card.sell.title") }}</h2>
       <p>{{ t("home.card.sell.desc") }}</p>
-      <strong class="card-cta">{{ t("home.card.cta") }}</strong>
+      <strong class="card-cta">{{ admin_contact.line }} · {{ admin_contact.phone }}</strong>
     </div>
-  </a>
+  </article>
 </section>
 
 <section class="panel">
@@ -76,7 +77,7 @@
     {% for pair, rate in rates.items() %}
       <div class="rate-card">
         <span>{{ pair_label(pair) }}</span>
-        <strong>{{ rate.buy_rate }}</strong>
+        <strong>{{ t("rates.buy") }} {{ rate.buy_rate }}</strong>
         <small>{{ t("rates.sell") }} {{ rate.sell_rate }} · {{ source_label(rate.source) }}</small>
       </div>
     {% endfor %}

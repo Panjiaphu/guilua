@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     admin_phone: str = "0906938893"
     admin_seed_email: str = "panjiaphu@gmail.com"
     admin_seed_password: str | None = None
+    member_registration_enabled: bool = False
+    member_portal_enabled: bool = False
 
     exchange_rate_provider_url: str | None = None
     live_rate_timeout_seconds: float = 2.5

@@ -9,8 +9,8 @@ from app.models import ExchangeRate
 
 
 DEFAULT_RATES = {
-    "TWD_VND": (Decimal("805.50"), Decimal("805.50")),
-    "USDT_TWD": (Decimal("32.10"), Decimal("32.45")),
+    "TWD_VND": (Decimal("824.00"), Decimal("818.00")),
+    "USDT_TWD": (Decimal("31.92"), Decimal("31.52")),
 }
 
 
@@ -26,7 +26,7 @@ def ensure_default_rates(db: Session) -> None:
                 sell_rate=sell_rate,
                 source="manual",
                 is_manual=True,
-                note="Manual fallback",
+                note="Admin rate board",
             )
         )
     db.commit()

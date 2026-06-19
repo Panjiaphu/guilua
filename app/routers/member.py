@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.security import require_user, verify_csrf
 from app.core.templates import context, templates
 from app.db.session import get_db
@@ -31,8 +32,19 @@ def _slug_for_type(request_type: TransactionType) -> str:
     return "send-home"
 
 
+def _portal_closed(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="member/paused.html",
+        context=context(request, error=""),
+        status_code=403,
+    )
+
+
 @router.get("")
 def dashboard(request: Request, db: Session = Depends(get_db)):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     user = require_user(request, db)
     requests = (
         db.query(TransactionRequest)
@@ -79,6 +91,8 @@ def create_request(
     wallet_address: str = Form(""),
     member_note: str = Form(""),
 ):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     verify_csrf(request, csrf_token)
     user = require_user(request, db)
     try:
@@ -111,6 +125,8 @@ def create_request(
 
 @router.get("/transactions/{transaction_slug}")
 def transaction_form(transaction_slug: str, request: Request, db: Session = Depends(get_db)):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     user = require_user(request, db)
     request_type = TRANSACTION_SLUGS.get(transaction_slug)
     if not request_type:
@@ -146,6 +162,8 @@ def create_typed_request(
     wallet_address: str = Form(""),
     member_note: str = Form(""),
 ):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     verify_csrf(request, csrf_token)
     user = require_user(request, db)
     request_type = TRANSACTION_SLUGS.get(transaction_slug)
@@ -181,6 +199,8 @@ def create_typed_request(
 
 @router.get("/services")
 def services_page(request: Request, db: Session = Depends(get_db)):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     user = require_user(request, db)
     service_requests = (
         db.query(ServiceRequest)
@@ -208,6 +228,8 @@ def create_ip_switch_service(
     current_ip: str = Form(""),
     member_note: str = Form(""),
 ):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     verify_csrf(request, csrf_token)
     user = require_user(request, db)
     try:
@@ -229,6 +251,8 @@ def create_ip_switch_service(
 
 @router.get("/services/ip-switch/download")
 def download_ip_connector(request: Request, db: Session = Depends(get_db)):
+    if not get_settings().member_portal_enabled:
+        return _portal_closed(request)
     user = require_user(request, db)
     dashboard_url = str(request.url_for("services_page"))
     script = f"""# Guilua IP Connector for Windows

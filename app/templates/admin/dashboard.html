@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_icons.html" as icons %}
 {% block content %}
-<section class="dashboard">
+<section class="dashboard admin-rate-dashboard">
   <div class="welcome">
     <div>
       <p class="eyebrow">{{ t("admin.dashboard") }}</p>
@@ -13,48 +13,27 @@
 
   <div class="layout">
     <section class="panel">
-      <div class="section-head"><h2>{{ t("admin.requests") }}</h2><span>{{ requests|length }}</span></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>{{ t("table.ref") }}</th><th>{{ t("table.member") }}</th><th>{{ t("table.type") }}</th><th>{{ t("table.amount") }}</th><th>{{ t("table.status") }}</th><th>{{ t("table.action") }}</th></tr></thead>
-          <tbody>
-            {% for item in requests %}
-              <tr>
-                <td>{{ item.reference_code }}</td>
-                <td>{{ item.user.email }}</td>
-                <td>{{ type_label(item.request_type) }}</td>
-                <td>
-                  {% if item.amount_twd %}{{ item.amount_twd }} TWD{% endif %}{% if item.amount_usdt %}<br>{{ item.amount_usdt }} USDT{% endif %}{% if item.amount_vnd %}<br>{{ item.amount_vnd }} VND{% endif %}
-                  <div class="request-meta">
-                    {% if item.recipient_name %}<span>{{ t("transaction.form.vn_recipient") }}: {{ item.recipient_name }}</span>{% endif %}
-                    {% if item.recipient_bank %}<span>{{ t("member.form.bank") }}: {{ item.recipient_bank }}</span>{% endif %}
-                    {% if item.recipient_account %}<span>{{ t("member.form.account") }}: {{ item.recipient_account }}</span>{% endif %}
-                    {% if item.usdt_network %}<span>{{ t("transaction.form.usdt_network") }}: {{ item.usdt_network }}</span>{% endif %}
-                    {% if item.wallet_address %}<span>{{ t("transaction.form.wallet_address") }}: {{ item.wallet_address }}</span>{% endif %}
-                    {% if item.contact_phone %}<span>{{ t("transaction.form.contact_phone") }}: {{ item.contact_phone }}</span>{% endif %}
-                    {% if item.contact_line %}<span>{{ t("transaction.form.contact_line") }}: {{ item.contact_line }}</span>{% endif %}
-                    {% if item.member_note %}<span>{{ t("member.form.note") }}: {{ item.member_note }}</span>{% endif %}
-                  </div>
-                </td>
-                <td><span class="status">{{ status_label(item.status) }}</span></td>
-                <td>
-                  <form method="post" action="/admin/requests/{{ item.id }}" class="inline-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <select name="status">
-                      {% for status in statuses %}
-                        <option value="{{ status.value }}" {% if status == item.status %}selected{% endif %}>{{ status_label(status) }}</option>
-                      {% endfor %}
-                    </select>
-                    <input type="text" name="admin_note" value="{{ item.admin_note }}" placeholder="{{ t('admin.note') }}">
-                    <button class="button small" type="submit">{{ t("admin.save") }}</button>
-                  </form>
-                </td>
-              </tr>
-            {% else %}
-              <tr><td colspan="6" class="empty">{{ t("admin.no_requests") }}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="section-head">
+        <div>
+          <h2>{{ t("rates.manual") }}</h2>
+          <span>{{ t("admin.rate_help") }}</span>
+        </div>
+        <span class="badge warn">{{ t("admin.member_paused_badge") }}</span>
+      </div>
+      <div class="rate-grid">
+        {% for pair, rate in rates.items() %}
+          <article class="rate-card admin-rate-card">
+            <span>{{ pair_label(pair) }}</span>
+            <form method="post" action="/admin/rates" class="form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="pair" value="{{ pair }}">
+              <label>{{ t("rates.buy") }}<input type="number" name="buy_rate" step="0.000001" value="{{ rate.buy_rate }}" required></label>
+              <label>{{ t("rates.sell") }}<input type="number" name="sell_rate" step="0.000001" value="{{ rate.sell_rate }}" required></label>
+              <label>{{ t("rates.note") }}<input type="text" name="note" value="{{ rate.note }}"></label>
+              <button class="button primary" type="submit">{{ t("admin.update") }}</button>
+            </form>
+          </article>
+        {% endfor %}
       </div>
     </section>
 
@@ -66,105 +45,11 @@
         <span>{{ t("admin.contact.line") }}<strong>{{ admin_contact.line }}</strong></span>
         <span>{{ t("admin.contact.phone") }}<strong>{{ admin_contact.phone }}</strong></span>
       </div>
-      <h2>{{ t("rates.manual") }}</h2>
-      <form method="post" action="/admin/rates" class="form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <label>{{ t("rates.pair") }}
-          <select name="pair">
-            <option value="TWD_VND">TWD -> VND</option>
-            <option value="USDT_TWD">USDT -> TWD</option>
-          </select>
-        </label>
-        <label>{{ t("rates.buy") }}<input type="number" name="buy_rate" step="0.000001" required></label>
-        <label>{{ t("rates.sell") }}<input type="number" name="sell_rate" step="0.000001" required></label>
-        <label>{{ t("rates.note") }}<input type="text" name="note"></label>
-        <button class="button primary" type="submit">{{ t("admin.update") }}</button>
-      </form>
-      <div class="email-list">
-        <div class="section-head inline">
-          <h3>{{ t("admin.email_queue") }}</h3>
-          <form method="post" action="/admin/email/flush">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <button class="button small" type="submit">{{ t("admin.flush_email") }}</button>
-          </form>
-        </div>
-        {% for email in emails %}
-          <p><strong>{{ email_status_label(email.status) }}</strong> · {{ email.recipient }} · {{ event_label(email.event_type) }}</p>
-        {% else %}
-          <p class="empty">{{ t("admin.no_email") }}</p>
-        {% endfor %}
-      </div>
-      <div class="email-list">
-        <h3>{{ t("admin.email_replies") }}</h3>
-        {% for reply in replies %}
-          <article class="reply-item">
-            <div class="reply-head">
-              <strong>{{ reply.sender }}</strong>
-              <span class="status">{% if reply.is_processed %}{{ t("admin.reply_processed") }}{% else %}{{ t("admin.reply_unprocessed") }}{% endif %}</span>
-            </div>
-            <p>{{ reply.subject or "-" }}</p>
-            <p class="muted">{{ reply.body[:180] }}{% if reply.body|length > 180 %}...{% endif %}</p>
-            {% if reply.transaction %}
-              <p class="muted">{{ t("table.ref") }}: {{ reply.transaction.reference_code }}</p>
-            {% endif %}
-            {% if not reply.is_processed %}
-              <form method="post" action="/admin/email-replies/{{ reply.id }}/processed">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button class="button small" type="submit">{{ t("admin.mark_processed") }}</button>
-              </form>
-            {% endif %}
-          </article>
-        {% else %}
-          <p class="empty">{{ t("admin.no_replies") }}</p>
-        {% endfor %}
+      <div class="support-box">
+        <h3>{{ t("admin.portal_status") }}</h3>
+        <p>{{ t("admin.portal_status_desc") }}</p>
       </div>
     </aside>
   </div>
-
-  <section class="panel">
-    <div class="section-head"><h2>{{ t("admin.service_requests") }}</h2><span>{{ service_requests|length }}</span></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>{{ t("table.ref") }}</th>
-            <th>{{ t("table.member") }}</th>
-            <th>{{ t("table.service") }}</th>
-            <th>{{ t("table.region") }}</th>
-            <th>{{ t("table.protocol") }}</th>
-            <th>{{ t("table.status") }}</th>
-            <th>{{ t("table.action") }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in service_requests %}
-            <tr>
-              <td>{{ item.reference_code }}</td>
-              <td>{{ item.user.email }}</td>
-              <td>{{ service_type_label(item.service_type) }}</td>
-              <td>{{ service_region_label(item.target_region) }}</td>
-              <td>{{ service_protocol_label(item.protocol) }}</td>
-              <td><span class="status">{{ status_label(item.status) }}</span></td>
-              <td>
-                <form method="post" action="/admin/services/{{ item.id }}" class="inline-form service-admin-form">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                  <select name="status">
-                    {% for status in statuses %}
-                      <option value="{{ status.value }}" {% if status.value == item.status %}selected{% endif %}>{{ status_label(status) }}</option>
-                    {% endfor %}
-                  </select>
-                  <input type="text" name="assigned_endpoint" value="{{ item.assigned_endpoint }}" placeholder="{{ t('admin.assigned_endpoint') }}">
-                  <input type="text" name="admin_note" value="{{ item.admin_note }}" placeholder="{{ t('admin.note') }}">
-                  <button class="button small" type="submit">{{ t("admin.save") }}</button>
-                </form>
-              </td>
-            </tr>
-          {% else %}
-            <tr><td colspan="7" class="empty">{{ t("admin.no_service_requests") }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
 </section>
 {% endblock %}
