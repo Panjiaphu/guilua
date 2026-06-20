@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 from fastapi import Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -18,7 +19,7 @@ from starlette.responses import PlainTextResponse
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
-from app.models import SecurityEvent, SecurityIncident, SecurityPlaybook, SecurityRule, User
+from app.models import IpReputationCache, SecurityEvent, SecurityIncident, SecurityPlaybook, SecurityRule, User
 from app.services.email import queue_email
 
 
@@ -71,7 +72,7 @@ def _match_cidr(ip_address: str, cidr: str) -> bool:
         return False
 
 
-def _matches_rule(rule: SecurityRule, ip_address: str, path: str, user_agent: str) -> bool:
+def _matches_rule(rule: SecurityRule, ip_address: str, path: str, user_agent: str, country_code: str = "") -> bool:
     value = rule.value.strip()
     if not value:
         return False
@@ -81,6 +82,8 @@ def _matches_rule(rule: SecurityRule, ip_address: str, path: str, user_agent: st
         return _match_cidr(ip_address, value)
     if rule.rule_type == "user_agent_block":
         return value.lower() in user_agent.lower()
+    if rule.rule_type in {"country_allow", "country_block"}:
+        return country_code.upper() == value.upper()
     if rule.rule_type in {"path_protect", "route_rate_limit"}:
         return path.startswith(value)
     return False
@@ -129,11 +132,19 @@ def evaluate_request(db: Session, request: Request) -> SecurityDecision:
     ip_address = client_ip(request)
     path = request.url.path
     user_agent = request.headers.get("user-agent", "")
+    geo = get_ip_reputation(db, ip_address)
+    request.state.security_geo = geo
 
     if ip_address in settings.security_ip_allowlist:
         return SecurityDecision(True, "request_allowed", "info", 0, "Environment allowlist")
     if ip_address in settings.security_ip_blocklist:
         return SecurityDecision(False, "request_blocked", "high", 80, "Environment blocklist")
+    country_code = str(geo.get("country_code") or "").upper()
+    if country_code and settings.security_country_allowlist:
+        if country_code not in {item.upper() for item in settings.security_country_allowlist}:
+            return SecurityDecision(False, "request_blocked", "high", 72, "Environment country allowlist")
+    if country_code and country_code in {item.upper() for item in settings.security_country_blocklist}:
+        return SecurityDecision(False, "request_blocked", "high", 72, "Environment country blocklist")
     if settings.security_admin_ip_restriction_enabled and path.startswith("/admin"):
         if ip_address not in settings.security_admin_ip_allowlist:
             return SecurityDecision(False, "request_blocked", "high", 75, "Admin IP restriction")
@@ -148,7 +159,7 @@ def evaluate_request(db: Session, request: Request) -> SecurityDecision:
     for rule in active_rules:
         if rule.expires_at and rule.expires_at < now:
             continue
-        if not _matches_rule(rule, ip_address, path, user_agent):
+        if not _matches_rule(rule, ip_address, path, user_agent, country_code):
             continue
         if rule.action == "allow":
             return SecurityDecision(True, "request_allowed", rule.severity, 0, rule.name, rule)
@@ -173,6 +184,108 @@ def evaluate_request(db: Session, request: Request) -> SecurityDecision:
     return SecurityDecision(True, "request_allowed", "info", 0, "Allowed")
 
 
+def get_ip_reputation(db: Session, ip_address: str) -> dict[str, Any]:
+    settings = get_settings()
+    if not settings.security_geoip_enabled or not ip_address or settings.security_geoip_provider == "none":
+        return {}
+    now = utcnow()
+    cached = db.query(IpReputationCache).filter(IpReputationCache.ip_address == ip_address).first()
+    if cached and cached.expires_at > now:
+        return {
+            "country_code": cached.country_code,
+            "country_name": cached.country_name,
+            "region": cached.region,
+            "city": cached.city,
+            "asn": cached.asn,
+            "isp": cached.isp,
+            "risk_score": cached.risk_score,
+        }
+    if not settings.security_geoip_api_url:
+        return {}
+    raw = _fetch_geoip(ip_address)
+    if not raw:
+        return {}
+    normalized = _normalize_geoip_payload(raw)
+    expires_at = now + timedelta(hours=max(settings.security_geoip_cache_hours, 1))
+    if not cached:
+        cached = IpReputationCache(ip_address=ip_address, expires_at=expires_at)
+        db.add(cached)
+    cached.ip_version = ip_version(ip_address)
+    cached.country_code = normalized["country_code"]
+    cached.country_name = normalized["country_name"]
+    cached.region = normalized["region"]
+    cached.city = normalized["city"]
+    cached.asn = normalized["asn"]
+    cached.isp = normalized["isp"]
+    cached.organization = normalized["organization"]
+    cached.is_proxy = normalized["is_proxy"]
+    cached.is_vpn = normalized["is_vpn"]
+    cached.is_tor = normalized["is_tor"]
+    cached.is_hosting = normalized["is_hosting"]
+    cached.risk_score = normalized["risk_score"]
+    cached.provider = settings.security_geoip_provider
+    cached.raw_json = json.dumps(raw, ensure_ascii=False)
+    cached.checked_at = now
+    cached.expires_at = expires_at
+    db.commit()
+    return normalized
+
+
+def _fetch_geoip(ip_address: str) -> dict[str, Any]:
+    settings = get_settings()
+    api_url = settings.security_geoip_api_url or ""
+    api_key = settings.security_geoip_api_key or ""
+    url = api_url.replace("{ip}", ip_address).replace("{key}", api_key)
+    if "{ip}" not in api_url and not api_url.rstrip("/").endswith(ip_address):
+        url = f"{api_url.rstrip('/')}/{ip_address}"
+    headers = {"Accept": "application/json"}
+    if api_key and "{key}" not in api_url:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        with httpx.Client(timeout=2.5) as client:
+            response = client.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _normalize_geoip_payload(data: dict[str, Any]) -> dict[str, Any]:
+    country_code = data.get("country_code") or data.get("countryCode") or data.get("country") or ""
+    country_name = data.get("country_name") or data.get("countryName") or data.get("country") or ""
+    asn_value = data.get("asn") or data.get("as") or ""
+    threat = data.get("threat") if isinstance(data.get("threat"), dict) else {}
+    security = data.get("security") if isinstance(data.get("security"), dict) else {}
+    is_proxy = bool(data.get("proxy") or threat.get("is_proxy") or security.get("is_proxy"))
+    is_vpn = bool(data.get("vpn") or threat.get("is_vpn") or security.get("is_vpn"))
+    is_tor = bool(data.get("tor") or threat.get("is_tor") or security.get("is_tor"))
+    is_hosting = bool(data.get("hosting") or threat.get("is_datacenter") or security.get("is_datacenter"))
+    risk_score = 0
+    if is_proxy:
+        risk_score += 15
+    if is_vpn:
+        risk_score += 15
+    if is_tor:
+        risk_score += 35
+    if is_hosting:
+        risk_score += 10
+    return {
+        "country_code": str(country_code).upper()[:8],
+        "country_name": str(country_name)[:120],
+        "region": str(data.get("region") or data.get("regionName") or "")[:120],
+        "city": str(data.get("city") or "")[:120],
+        "asn": str(asn_value)[:80],
+        "isp": str(data.get("isp") or data.get("org") or data.get("organization") or "")[:160],
+        "organization": str(data.get("organization") or data.get("org") or "")[:160],
+        "is_proxy": is_proxy,
+        "is_vpn": is_vpn,
+        "is_tor": is_tor,
+        "is_hosting": is_hosting,
+        "risk_score": risk_score,
+    }
+
+
 def log_security_event(
     db: Session,
     *,
@@ -194,6 +307,7 @@ def log_security_event(
     method = request.method if request else ""
     user_agent = request.headers.get("user-agent", "") if request else ""
     referer = request.headers.get("referer", "") if request else ""
+    geo = getattr(request.state, "security_geo", {}) if request else {}
     request_id = request.headers.get("x-request-id", "") if request else ""
     request_id = request_id or secrets.token_urlsafe(10)
     event = SecurityEvent(
@@ -202,6 +316,12 @@ def log_security_event(
         risk_score=risk_score,
         ip_address=ip_address,
         ip_version=ip_version(ip_address),
+        country_code=str(geo.get("country_code") or ""),
+        country_name=str(geo.get("country_name") or ""),
+        region=str(geo.get("region") or ""),
+        city=str(geo.get("city") or ""),
+        asn=str(geo.get("asn") or ""),
+        isp=str(geo.get("isp") or ""),
         path=path,
         method=method,
         status_code=status_code,

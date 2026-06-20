@@ -154,4 +154,18 @@ SECURITY_ADMIN_IP_RESTRICTION_ENABLED=false
 SECURITY_ADMIN_IP_ALLOWLIST=
 ```
 
-GeoIP/IP reputation provider là optional. Khi chưa có provider thật, để `SECURITY_GEOIP_PROVIDER=none`; firewall vẫn ghi log, rate-limit và rule block/allow bình thường.
+GeoIP/IP reputation provider là optional. Khi chưa có provider thật, để `SECURITY_GEOIP_PROVIDER=none`; firewall vẫn ghi log, rate-limit và rule block/allow bình thường. Khi cần lookup quốc gia/ISP thật, dùng một trong các dạng sau:
+
+```text
+SECURITY_GEOIP_PROVIDER=ipinfo
+SECURITY_GEOIP_API_URL=https://ipinfo.io/{ip}/json?token={key}
+SECURITY_GEOIP_API_KEY=<ipinfo-token>
+
+SECURITY_GEOIP_PROVIDER=ipapi
+SECURITY_GEOIP_API_URL=https://ipapi.co/{ip}/json/
+SECURITY_GEOIP_API_KEY=
+
+SECURITY_GEOIP_PROVIDER=ipgeolocation
+SECURITY_GEOIP_API_URL=https://api.ipgeolocation.io/ipgeo?apiKey={key}&ip={ip}
+SECURITY_GEOIP_API_KEY=<ipgeolocation-key>
+```

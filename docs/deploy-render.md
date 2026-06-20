@@ -207,6 +207,25 @@ SECURITY_ADMIN_IP_ALLOWLIST=
 
 `SECURITY_GEOIP_PROVIDER=none` là cấu hình mặc định. Nếu muốn IP intelligence thật, dùng provider như IPinfo, ipapi, MaxMind web service hoặc IP2Location web service rồi set `SECURITY_GEOIP_API_URL` và `SECURITY_GEOIP_API_KEY` theo tài khoản provider. Không commit API key vào GitHub.
 
+Ví dụ URL provider:
+
+```text
+# IPinfo
+SECURITY_GEOIP_PROVIDER=ipinfo
+SECURITY_GEOIP_API_URL=https://ipinfo.io/{ip}/json?token={key}
+SECURITY_GEOIP_API_KEY=<ipinfo-token>
+
+# ipapi, gói free thường không cần key
+SECURITY_GEOIP_PROVIDER=ipapi
+SECURITY_GEOIP_API_URL=https://ipapi.co/{ip}/json/
+SECURITY_GEOIP_API_KEY=
+
+# IPGeolocation
+SECURITY_GEOIP_PROVIDER=ipgeolocation
+SECURITY_GEOIP_API_URL=https://api.ipgeolocation.io/ipgeo?apiKey={key}&ip={ip}
+SECURITY_GEOIP_API_KEY=<ipgeolocation-key>
+```
+
 AI Agent hỗ trợ thêm:
 
 ```text
