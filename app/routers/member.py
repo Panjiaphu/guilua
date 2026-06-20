@@ -10,7 +10,7 @@ from app.core.config import get_settings
 from app.core.security import require_user, verify_csrf
 from app.core.templates import context, templates
 from app.db.session import get_db
-from app.models import ServiceRequest, TransactionRequest, TransactionType
+from app.models import MemberUtilityUsage, ServiceRequest, TransactionRequest, TransactionType, UtilityItem
 from app.services.member_services import create_ip_service_request
 from app.services.rates import latest_rates
 from app.services.transactions import create_transaction
@@ -60,6 +60,19 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         .limit(5)
         .all()
     )
+    utilities = (
+        db.query(UtilityItem)
+        .filter(UtilityItem.is_active.is_(True))
+        .order_by(UtilityItem.sort_order.asc(), UtilityItem.created_at.asc())
+        .all()
+    )
+    utility_usage = (
+        db.query(MemberUtilityUsage)
+        .filter(MemberUtilityUsage.user_id == user.id)
+        .order_by(MemberUtilityUsage.updated_at.desc())
+        .limit(20)
+        .all()
+    )
     return templates.TemplateResponse(
         request=request,
         name="member/dashboard.html",
@@ -68,6 +81,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             user=user,
             requests=requests,
             service_requests=service_requests,
+            utilities=utilities,
+            utility_usage=utility_usage,
             rates=latest_rates(db),
             error="",
         ),

@@ -12,8 +12,8 @@
       <span>{{ t("home.proof.admin") }}</span>
     </div>
     <div class="hero-actions">
-      <a class="button primary" href="/login?lang={{ locale }}">{{ t("home.primary") }}</a>
-      <a class="button" href="mailto:{{ admin_contact.email }}">{{ t("home.secondary") }}</a>
+      <a class="button primary" href="/register?lang={{ locale }}">{{ t("home.primary") }}</a>
+      <a class="button" href="/login?lang={{ locale }}">{{ t("home.secondary") }}</a>
     </div>
   </div>
   <div class="hero-console motion-card">
@@ -84,6 +84,8 @@
     </div>
   </article>
 </section>
+
+{% include "_ad_slot.html" %}
 
 <section class="panel">
   <div class="section-head">

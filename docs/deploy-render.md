@@ -24,8 +24,8 @@ ADMIN_LINE_ID=@827sxbki
 ADMIN_PHONE=0906938893
 ADMIN_SEED_EMAIL=panjiaphu@gmail.com
 ADMIN_SEED_PASSWORD=<mật khẩu admin mạnh tối thiểu 14 ký tự>
-MEMBER_REGISTRATION_ENABLED=false
-MEMBER_PORTAL_ENABLED=false
+MEMBER_REGISTRATION_ENABLED=true
+MEMBER_PORTAL_ENABLED=true
 CRYPTO_MARKET_LIVE_ENABLED=true
 CRYPTO_MARKET_CACHE_SECONDS=180
 CRYPTO_MARKET_TIMEOUT_SECONDS=2.5
@@ -46,9 +46,9 @@ Nếu Render báo lỗi `ADMIN_SEED_PASSWORD must be at least 14 characters in p
 
 ## Trạng thái public hiện tại
 
-- Trang chủ chỉ hiển thị bảng tham khảo tỷ giá.
-- Đăng ký thành viên đang tạm khóa.
-- Member portal đang tạm khóa.
+- Trang chủ hiển thị bảng tham khảo tỷ giá, crypto, jobs, shop và tiện ích.
+- Đăng ký thành viên đang mở.
+- Member portal đang mở cho tiện ích miễn phí.
 - Admin dashboard vẫn dùng để cập nhật `Giá mua` và `Giá bán`.
 - Trang `/crypto` hiển thị TradingView, macro filter và bảng coin realtime.
 
@@ -77,7 +77,7 @@ GOOGLE_SITE_VERIFICATION=<token nếu Google yêu cầu meta verification>
 
 App sẽ:
 - chèn AdSense script khi có `GOOGLE_ADSENSE_CLIENT`
-- render ad slot trên `/crypto` khi có `GOOGLE_ADSENSE_SLOT`
+- render ad slot trên home, jobs, shop, utilities, tool pages và `/crypto` khi có `GOOGLE_ADSENSE_SLOT`
 - render `/ads.txt` từ `GOOGLE_ADSENSE_PUBLISHER_ID`
 - chèn meta `google-site-verification` khi có `GOOGLE_SITE_VERIFICATION`
 
@@ -115,6 +115,9 @@ VPN_DOWNLOAD_URL=
 VPN_SETUP_GUIDE_URL=
 ```
 
+Shortlink hỗ trợ tự tạo mã hoặc nhập custom alias, ví dụ `guilua.com`
+sẽ tạo đường dẫn `/s/guilua.com` trên domain đang deploy.
+
 Google vẫn cần duyệt site trước khi quảng cáo thật hiển thị.
 
 ## Database
@@ -151,8 +154,7 @@ EMAIL_WEBHOOK_API_KEY=<secret riêng cho inbound email webhook>
 
 ## Provider IP
 
-Module IP vẫn còn trong codebase nhưng member portal đang tạm khóa. Khi pháp lý
-cho phép bật lại, cấu hình provider bằng:
+Module IP/VPN page hiện là MVP download/config link. Khi có provider thật, cấu hình bằng:
 
 ```text
 IP_SERVICE_PROVIDER_URL=https://provider.example.com/provision

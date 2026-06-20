@@ -1,0 +1,17 @@
+<section class="ad-panel panel">
+  <div>
+    <h2>{{ t("crypto.ads_title") }}</h2>
+    <p class="muted">{{ t("crypto.ads_desc") }}</p>
+  </div>
+  {% if settings.google_adsense_client and settings.google_adsense_slot %}
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="{{ settings.google_adsense_client }}"
+         data-ad-slot="{{ settings.google_adsense_slot }}"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  {% else %}
+    <div class="ad-placeholder">{{ t("crypto.ads_placeholder") }}</div>
+  {% endif %}
+</section>

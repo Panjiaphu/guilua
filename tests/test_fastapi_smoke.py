@@ -15,6 +15,7 @@ from app.main import app
 from app.models import ContentPost, EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
 from app.services.commercial import create_agent_key
 from app.services.email import record_email_reply
+from app.services import crypto_market
 from app.services.crypto_market import clear_crypto_market_cache
 from app.services.ip_provider import provision_ip_service
 from app.services.member_services import create_ip_service_request
@@ -35,7 +36,7 @@ class FastApiSmokeTest(unittest.TestCase):
         response = self.client.get("/?lang=zh-TW")
         self.assertEqual(response.status_code, 200)
         self.assertIn("企業客戶 TWD/VND", response.text)
-        self.assertIn("會員註冊暫停", response.text)
+        self.assertIn("會員免費工具", response.text)
         self.assertNotIn("/member/transactions", response.text)
         self.assertNotIn("手動", response.text)
         self.assertNotIn("交易", response.text)
@@ -46,18 +47,18 @@ class FastApiSmokeTest(unittest.TestCase):
         self.assertIn("Bảng tham khảo tỷ giá", response.text)
         self.assertIn("Giá mua", response.text)
         self.assertIn("Giá bán", response.text)
-        self.assertIn("Đăng nhập quản trị", response.text)
+        self.assertIn("Đăng ký thành viên", response.text)
         self.assertNotIn("/member/transactions", response.text)
-        self.assertNotIn("/register", response.text)
+        self.assertNotIn("Quản trị", response.text)
         self.assertNotIn("Gửi tiền", response.text)
         self.assertNotIn("giao dịch", response.text)
         self.assertNotIn("thủ công", response.text)
 
-    def test_register_is_paused(self):
+    def test_register_is_open(self):
         response = self.client.get("/register?lang=vi")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Đăng ký thành viên đang tạm khóa", response.text)
-        self.assertNotIn('action="/register"', response.text)
+        self.assertIn("Đăng ký", response.text)
+        self.assertIn('action="/register"', response.text)
 
     def test_crypto_dashboard_renders_with_fallback_data(self):
         old_live = os.environ.get("CRYPTO_MARKET_LIVE_ENABLED")
@@ -87,6 +88,56 @@ class FastApiSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Google AdSense is not configured", response.text)
 
+    def test_crypto_market_keeps_binance_when_coingecko_fails(self):
+        old_live = os.environ.get("CRYPTO_MARKET_LIVE_ENABLED")
+        os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = "true"
+        get_settings.cache_clear()
+        clear_crypto_market_cache()
+        original_coingecko = crypto_market._fetch_coingecko
+        original_binance = crypto_market._fetch_binance
+        crypto_market._fetch_coingecko = lambda settings: (_ for _ in ()).throw(RuntimeError("down"))
+        crypto_market._fetch_binance = lambda settings: {
+            "BTCUSDT": {"lastPrice": "70000", "priceChangePercent": "1.25", "quoteVolume": "999"}
+        }
+        try:
+            snapshot = crypto_market.get_crypto_market_snapshot(force_refresh=True)
+        finally:
+            crypto_market._fetch_coingecko = original_coingecko
+            crypto_market._fetch_binance = original_binance
+            if old_live is None:
+                os.environ.pop("CRYPTO_MARKET_LIVE_ENABLED", None)
+            else:
+                os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = old_live
+            get_settings.cache_clear()
+            clear_crypto_market_cache()
+        self.assertEqual(snapshot["coin_map"]["BTC"]["price"], 70000.0)
+        self.assertEqual(snapshot["coin_map"]["BTC"]["source"], "Binance")
+
+    def test_crypto_market_keeps_coingecko_when_binance_fails(self):
+        old_live = os.environ.get("CRYPTO_MARKET_LIVE_ENABLED")
+        os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = "true"
+        get_settings.cache_clear()
+        clear_crypto_market_cache()
+        original_coingecko = crypto_market._fetch_coingecko
+        original_binance = crypto_market._fetch_binance
+        crypto_market._fetch_coingecko = lambda settings: {
+            "bitcoin": {"usd": 71000, "usd_24h_change": 2.5, "usd_market_cap": 1, "usd_24h_vol": 2}
+        }
+        crypto_market._fetch_binance = lambda settings: (_ for _ in ()).throw(RuntimeError("down"))
+        try:
+            snapshot = crypto_market.get_crypto_market_snapshot(force_refresh=True)
+        finally:
+            crypto_market._fetch_coingecko = original_coingecko
+            crypto_market._fetch_binance = original_binance
+            if old_live is None:
+                os.environ.pop("CRYPTO_MARKET_LIVE_ENABLED", None)
+            else:
+                os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = old_live
+            get_settings.cache_clear()
+            clear_crypto_market_cache()
+        self.assertEqual(snapshot["coin_map"]["BTC"]["price"], 71000.0)
+        self.assertEqual(snapshot["coin_map"]["BTC"]["source"], "CoinGecko")
+
     def test_commercial_public_pages_render(self):
         for path, marker in [
             ("/jobs?lang=vi", "Tìm việc làm"),
@@ -110,6 +161,15 @@ class FastApiSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("not allowed", response.text)
+
+    def test_shortlink_accepts_custom_code(self):
+        custom_code = f"guilua-test-{os.getpid()}"
+        response = self.client.post(
+            "/utilities/shortlink?lang=vi",
+            data={"target_url": "https://example.com", "custom_code": custom_code},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f"/s/{custom_code}", response.text)
 
     def test_qr_generator_returns_svg_data_url(self):
         response = self.client.post("/utilities/qr?lang=vi", data={"payload": "https://example.com"})
@@ -158,19 +218,20 @@ class FastApiSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 503)
 
-    def test_member_services_are_paused(self):
+    def test_member_services_requires_login_when_open(self):
         response = self.client.get("/member/services?lang=vi", follow_redirects=False)
-        self.assertEqual(response.status_code, 403)
-        self.assertIn("Khu vực thành viên đang tạm khóa", response.text)
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("/login", response.headers["location"])
 
-    def test_transaction_form_is_paused(self):
+    def test_transaction_form_requires_login_when_open(self):
         response = self.client.get("/member/transactions/send-home?lang=vi", follow_redirects=False)
-        self.assertEqual(response.status_code, 403)
-        self.assertIn("Khu vực thành viên đang tạm khóa", response.text)
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("/login", response.headers["location"])
 
-    def test_ip_connector_download_is_paused(self):
-        response = self.client.get("/member/services/ip-switch/download")
-        self.assertEqual(response.status_code, 403)
+    def test_ip_connector_download_requires_login_when_open(self):
+        response = self.client.get("/member/services/ip-switch/download", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("/login", response.headers["location"])
 
     def test_record_email_reply_queues_admin_notification(self):
         engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})

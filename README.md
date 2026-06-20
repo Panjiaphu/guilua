@@ -3,12 +3,12 @@
 FastAPI webapp cho Guilua trong giai đoạn rà soát pháp lý.
 
 Trạng thái hiện tại:
-- Public UI chỉ hiển thị bảng tham khảo tỷ giá `TWD/VND` và `USDT/TWD`.
+- Public UI hiển thị bảng tham khảo tỷ giá `TWD/VND`, `USDT/TWD`, crypto, tìm việc, shop và tiện ích.
 - Public `/crypto` hiển thị TradingView, macro filter, bảng giá coin và 12 nhóm coin.
 - Public `/jobs`, `/shop`, `/utilities`, `/advertising`, `/build-idea` cho webapp thương mại tham khảo.
 - AI Agent API có API key hash để tạo bài job/shop vào trạng thái draft cho admin duyệt.
-- Admin dashboard dùng để cập nhật giá mua, giá bán và thông tin liên hệ.
-- Đăng ký thành viên và member portal đang tạm khóa bằng env mặc định.
+- Admin dashboard dùng để cập nhật giá, quản lý member, bài viết, tiện ích và AI Agent API.
+- Đăng ký thành viên và member portal đang mở bằng env mặc định.
 - UI hỗ trợ tiếng Việt có dấu và tiếng Trung phồn thể.
 - Render deploy sẵn qua Gunicorn/Uvicorn, Alembic và health check `/healthz/`.
 
@@ -16,23 +16,23 @@ Trạng thái hiện tại:
 
 - Public rate board song ngữ.
 - Crypto dashboard tham khảo giá với TradingView widgets.
-- Coin price merge từ CoinGecko và Binance, có cache/fallback để trang vẫn render khi API lỗi.
-- AdSense hook qua env, kèm `/ads.txt`.
+- Coin price merge song song từ CoinGecko và Binance, có cache/fallback để một nguồn lỗi vẫn còn dữ liệu.
+- AdSense hook qua env, kèm `/ads.txt`, ad slot trên các trang public chính.
 - Jobs/shop content posts: `draft`, `published`, `archived`; source `admin` hoặc `ai_agent`.
-- Utilities MVP: QR generator, shortlink, ping website, free VPN/download page.
+- Utilities MVP: QR generator, shortlink tự động hoặc custom alias, ping website, free VPN/download page.
 - Admin login bằng signed session cookie và CSRF token.
 - Password hashing bằng PBKDF2.
 - Admin rate settings cho `TWD_VND` và `USDT_TWD`.
 - Admin contact: `panjiaphu@gmail.com`, LINE `@827sxbki`, phone `0906938893`.
 - Alembic migrations cho SQLite/PostgreSQL.
 
-## Tính năng đang khóa
+## Env chức năng chính
 
-Các module member, service request, email queue và IP connector vẫn còn trong codebase để bật lại sau, nhưng mặc định bị khóa bằng:
+Member registration và portal đang mở bằng:
 
 ```text
-MEMBER_REGISTRATION_ENABLED=false
-MEMBER_PORTAL_ENABLED=false
+MEMBER_REGISTRATION_ENABLED=true
+MEMBER_PORTAL_ENABLED=true
 CRYPTO_MARKET_LIVE_ENABLED=true
 CRYPTO_MARKET_CACHE_SECONDS=180
 CRYPTO_MARKET_TIMEOUT_SECONDS=2.5
@@ -52,8 +52,6 @@ VPN_DOWNLOAD_URL=
 VPN_SETUP_GUIDE_URL=
 SHOPEE_AFFILIATE_DISCLOSURE_ENABLED=true
 ```
-
-Khi pháp lý hoàn tất mới bật lại hai biến này.
 
 ## Chạy local
 
@@ -103,8 +101,8 @@ ADMIN_LINE_ID=@827sxbki
 ADMIN_PHONE=0906938893
 ADMIN_SEED_EMAIL=panjiaphu@gmail.com
 ADMIN_SEED_PASSWORD=<mat khau admin manh toi thieu 14 ky tu>
-MEMBER_REGISTRATION_ENABLED=false
-MEMBER_PORTAL_ENABLED=false
+MEMBER_REGISTRATION_ENABLED=true
+MEMBER_PORTAL_ENABLED=true
 AI_AGENT_API_ENABLED=true
 AI_AGENT_DEFAULT_POST_STATUS=draft
 AI_AGENT_ALLOW_AUTOPUBLISH=false

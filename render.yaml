@@ -28,9 +28,9 @@ services:
       - key: ADMIN_SEED_EMAIL
         value: panjiaphu@gmail.com
       - key: MEMBER_REGISTRATION_ENABLED
-        value: false
+        value: true
       - key: MEMBER_PORTAL_ENABLED
-        value: false
+        value: true
       - key: AI_AGENT_API_ENABLED
         value: true
       - key: AI_AGENT_DEFAULT_POST_STATUS

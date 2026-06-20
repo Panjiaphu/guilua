@@ -216,14 +216,19 @@ def shortlink_get(request: Request):
 
 
 @router.post("/utilities/shortlink")
-def shortlink_post(request: Request, db: Session = Depends(get_db), target_url: str = Form(...)):
+def shortlink_post(
+    request: Request,
+    db: Session = Depends(get_db),
+    target_url: str = Form(...),
+    custom_code: str = Form(""),
+):
     try:
-        item = create_shortlink(db, target_url, get_current_user(request, db))
+        item = create_shortlink(db, target_url, get_current_user(request, db), custom_code=custom_code)
     except ValueError as exc:
         return templates.TemplateResponse(
             request=request,
             name="utility_shortlink.html",
-            context=context(request, error=str(exc), target_url=target_url),
+            context=context(request, error=str(exc), target_url=target_url, custom_code=custom_code),
         )
     settings = get_settings()
     short_url = f"{settings.public_base_url.rstrip('/')}/s/{item.code}"

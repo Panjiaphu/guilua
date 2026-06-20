@@ -101,8 +101,9 @@ def register(
 @router.get("/login")
 def login_form(request: Request, db: Session = Depends(get_db)):
     next_url = _safe_next(request.query_params.get("next"))
-    if get_current_user(request, db):
-        return RedirectResponse(next_url, status_code=303)
+    current_user = get_current_user(request, db)
+    if current_user:
+        return RedirectResponse("/admin" if current_user.is_admin else next_url, status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="auth/login.html",
@@ -135,6 +136,8 @@ def login(
             context=context(request, error=_message(request, "error.account_disabled"), next_url=redirect_to),
         )
     login_user(request, user)
+    if user.is_admin:
+        return RedirectResponse("/admin", status_code=303)
     return RedirectResponse(redirect_to, status_code=303)
 
 

@@ -6,7 +6,9 @@
     <p class="muted">{{ t("shortlink.subtitle") }}</p>
   </div>
   <form class="stack-form" method="post">
-    <input name="target_url" type="url" required placeholder="https://example.com" value="{{ target_url or '' }}">
+    <label>{{ t("shortlink.input_url") }}<input name="target_url" type="url" required placeholder="https://example.com" value="{{ target_url or '' }}"></label>
+    <label>{{ t("shortlink.custom_code") }}<input name="custom_code" placeholder="guilua.com" value="{{ custom_code or '' }}"></label>
+    <small class="muted">{{ t("shortlink.custom_hint") }}</small>
     <button class="button" type="submit">{{ t("shortlink.create") }}</button>
   </form>
   {% if error %}<div class="notice-panel danger">{{ error }}</div>{% endif %}
@@ -18,4 +20,5 @@
     </div>
   {% endif %}
 </section>
+{% include "_ad_slot.html" %}
 {% endblock %}

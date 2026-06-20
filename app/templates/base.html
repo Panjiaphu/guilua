@@ -27,12 +27,12 @@
         <a href="/shop?lang={{ locale }}">{{ t("nav.shop") }}</a>
         <a href="/utilities?lang={{ locale }}">{{ t("nav.utilities") }}</a>
         <a href="/crypto?lang={{ locale }}">{{ t("nav.crypto") }}</a>
-        <a href="/admin?lang={{ locale }}">{{ t("nav.admin") }}</a>
         <a href="/?lang=vi">VI</a>
         <a href="/?lang=zh-TW">中文</a>
       </nav>
       <div class="auth-actions">
         {% if user or admin %}
+          <a class="button ghost" href="{% if admin or (user and user.is_admin) %}/admin?lang={{ locale }}{% else %}/member?lang={{ locale }}{% endif %}">{{ t("nav.dashboard") }}</a>
           <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="button ghost" type="submit">{{ t("nav.logout") }}</button>

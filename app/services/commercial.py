@@ -208,12 +208,32 @@ def record_utility_usage(db: Session, user: User | None, utility_key: str) -> No
     db.commit()
 
 
-def create_shortlink(db: Session, target_url: str, user: User | None = None) -> ShortLink:
+def normalize_short_code(raw_code: str) -> str:
+    code = raw_code.strip().strip("/")
+    if not code:
+        return ""
+    if code.startswith("http://") or code.startswith("https://"):
+        parsed = urlparse(code)
+        code = parsed.netloc + parsed.path
+    code = code.strip("/")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{2,39}", code):
+        raise ValueError("Custom shortlink name must be 3-40 characters and use letters, numbers, dot, dash or underscore")
+    if code.lower() in {"admin", "login", "register", "api", "static", "member", "crypto", "jobs", "shop", "utilities"}:
+        raise ValueError("This shortlink name is reserved")
+    return code
+
+
+def create_shortlink(db: Session, target_url: str, user: User | None = None, custom_code: str = "") -> ShortLink:
     cleaned = ensure_not_private_target(target_url)
-    while True:
-        code = secrets.token_urlsafe(5).replace("-", "").replace("_", "")[:7]
-        if not db.query(ShortLink).filter(ShortLink.code == code).first():
-            break
+    code = normalize_short_code(custom_code)
+    if code:
+        if db.query(ShortLink).filter(ShortLink.code == code).first():
+            raise ValueError("This shortlink name is already used")
+    else:
+        while True:
+            code = secrets.token_urlsafe(5).replace("-", "").replace("_", "")[:7]
+            if not db.query(ShortLink).filter(ShortLink.code == code).first():
+                break
     item = ShortLink(code=code, target_url=cleaned, user_id=user.id if user else None)
     db.add(item)
     db.commit()

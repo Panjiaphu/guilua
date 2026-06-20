@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import monotonic
 from typing import Any
 
@@ -154,14 +155,20 @@ def get_crypto_market_snapshot(force_refresh: bool = False) -> dict[str, Any]:
     errors: list[str] = []
 
     if settings.crypto_market_live_enabled:
-        try:
-            coingecko_data = _fetch_coingecko(settings)
-        except Exception as exc:  # noqa: BLE001 - public dashboard must keep rendering
-            errors.append(f"CoinGecko: {exc}")
-        try:
-            binance_data = _fetch_binance(settings)
-        except Exception as exc:  # noqa: BLE001 - public dashboard must keep rendering
-            errors.append(f"Binance: {exc}")
+        fetchers = {"CoinGecko": _fetch_coingecko, "Binance": _fetch_binance}
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {executor.submit(fetcher, settings): source for source, fetcher in fetchers.items()}
+            for future in as_completed(futures):
+                source = futures[future]
+                try:
+                    data = future.result()
+                except Exception as exc:  # noqa: BLE001 - public dashboard must keep rendering
+                    errors.append(f"{source}: {exc}")
+                    continue
+                if source == "CoinGecko":
+                    coingecko_data = data
+                else:
+                    binance_data = data
 
     coins = _build_coin_rows(coingecko_data, binance_data)
     coin_map = {item["symbol"]: item for item in coins}

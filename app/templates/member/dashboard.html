@@ -13,25 +13,17 @@
   <div class="layout">
     <section class="panel">
       <div class="section-head">
-        <h2>{{ t("member.new_request") }}</h2>
-        <span>{{ t("nav.rates") }}</span>
+        <h2>{{ t("utilities.title") }}</h2>
+        <span>{{ t("utilities.free") }}</span>
       </div>
       <div class="transaction-actions">
-        <a class="action-card" href="/member/transactions/send-home?lang={{ locale }}">
-          <span class="icon">{{ icons.icon("send") }}</span>
-          <strong>{{ t("home.card.send.title") }}</strong>
-          <small>{{ t("transaction.send_home.desc") }}</small>
-        </a>
-        <a class="action-card" href="/member/transactions/buy-usdt?lang={{ locale }}">
-          <span class="icon">{{ icons.icon("usdt") }}</span>
-          <strong>{{ t("home.card.buy.title") }}</strong>
-          <small>{{ t("transaction.buy_usdt.desc") }}</small>
-        </a>
-        <a class="action-card" href="/member/transactions/sell-usdt?lang={{ locale }}">
-          <span class="icon">{{ icons.icon("sell") }}</span>
-          <strong>{{ t("home.card.sell.title") }}</strong>
-          <small>{{ t("transaction.sell_usdt.desc") }}</small>
-        </a>
+        {% for item in utilities %}
+          <a class="action-card" href="{{ item.route_path }}?lang={{ locale }}">
+            <span class="icon">{{ icons.icon("network") }}</span>
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.description }}</small>
+          </a>
+        {% endfor %}
       </div>
     </section>
 
@@ -65,27 +57,21 @@
 
   <section class="panel">
     <div class="section-head">
-      <h2>{{ t("member.requests") }}</h2>
-      <span>{{ requests|length }}</span>
+      <h2>{{ t("member.utility_usage") }}</h2>
+      <span>{{ utility_usage|length }}</span>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>{{ t("table.ref") }}</th><th>{{ t("table.type") }}</th><th>{{ t("table.amount") }}</th><th>{{ t("table.status") }}</th><th>{{ t("table.updated") }}</th></tr></thead>
+        <thead><tr><th>{{ t("member.utility") }}</th><th>{{ t("member.usage_count") }}</th><th>{{ t("table.updated") }}</th></tr></thead>
         <tbody>
-          {% for item in requests %}
+          {% for item in utility_usage %}
             <tr>
-              <td>{{ item.reference_code }}</td>
-              <td>{{ type_label(item.request_type) }}</td>
-              <td>
-                {% if item.amount_twd %}{{ item.amount_twd }} TWD{% endif %}
-                {% if item.amount_usdt %}<br>{{ item.amount_usdt }} USDT{% endif %}
-                {% if item.amount_vnd %}<br>{{ item.amount_vnd }} VND{% endif %}
-              </td>
-              <td><span class="status">{{ status_label(item.status) }}</span></td>
-              <td>{{ item.updated_at.strftime("%Y-%m-%d %H:%M") }}</td>
+              <td>{{ item.utility_key }}</td>
+              <td>{{ item.usage_count }}</td>
+              <td>{% if item.last_used_at %}{{ item.last_used_at.strftime("%Y-%m-%d %H:%M") }}{% else %}-{% endif %}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="empty">{{ t("member.empty") }}</td></tr>
+            <tr><td colspan="3" class="empty">{{ t("member.utility_empty") }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
