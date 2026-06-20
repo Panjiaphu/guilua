@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% set is_shop = page_kind == "shop" %}
+{% block content %}
+<article class="content-detail panel">
+  <a class="muted-link" href="/{{ 'shop' if is_shop else 'jobs' }}?lang={{ locale }}">{{ t("commerce.back") }}</a>
+  {% if post.image_url %}
+    <img class="detail-image" src="{{ post.image_url }}" alt="{{ post.title }}" loading="lazy">
+  {% endif %}
+  <div class="badge-row">
+    <span>{{ "Shopee" if is_shop else t("jobs.badge") }}</span>
+    <span>{{ post.platform }}</span>
+    <span>{{ post.locale }}</span>
+  </div>
+  <h1>{{ post.title }}</h1>
+  <p class="lead">{{ post.summary }}</p>
+  <div class="content-body">{{ post.content | replace("\n", "<br>") | safe }}</div>
+  {% if post.target_url %}
+    <a class="button" href="{{ post.target_url }}" target="_blank" rel="noopener noreferrer">
+      {{ t("shop.buy") if is_shop else t("jobs.apply") }}
+    </a>
+  {% endif %}
+</article>
+{% endblock %}

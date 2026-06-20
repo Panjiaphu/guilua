@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="admin-shell">
+  <div class="admin-nav panel">
+    <a href="/admin?lang={{ locale }}">Dashboard</a>
+    <a href="/admin/posts/jobs?lang={{ locale }}">Job Posts</a>
+    <a href="/admin/posts/shop?lang={{ locale }}">Shop Posts</a>
+    <a href="/admin/ai-agents?lang={{ locale }}">AI Agents</a>
+    <a href="/admin/utilities?lang={{ locale }}">Utilities</a>
+    <a href="/admin/members?lang={{ locale }}">Members</a>
+  </div>
+  <section class="panel">
+    <h1>Members</h1>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>Email</th><th>Name</th><th>Admin</th><th>Active</th><th>Created</th></tr></thead>
+        <tbody>
+          {% for member in members %}
+            <tr><td>{{ member.email }}</td><td>{{ member.full_name }}</td><td>{{ member.is_admin }}</td><td>{{ member.is_active }}</td><td>{{ member.created_at }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Utility usage</h2>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>User ID</th><th>Utility</th><th>Count</th><th>Last used</th></tr></thead>
+        <tbody>
+          {% for item in usage %}
+            <tr><td>{{ item.user_id }}</td><td>{{ item.utility_key }}</td><td>{{ item.usage_count }}</td><td>{{ item.last_used_at }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

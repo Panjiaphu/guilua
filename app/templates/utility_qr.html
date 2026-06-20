@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="tool-shell panel">
+  <div>
+    <h1>{{ t("qr.title") }}</h1>
+    <p class="muted">{{ t("qr.subtitle") }}</p>
+  </div>
+  <form class="stack-form" method="post">
+    <textarea name="payload" rows="5" maxlength="1200" placeholder="https://example.com">{{ payload or '' }}</textarea>
+    <button class="button" type="submit">{{ t("qr.generate") }}</button>
+  </form>
+  {% if qr_data_url %}
+    <div class="qr-result">
+      <img src="{{ qr_data_url }}" alt="QR code">
+      <a class="button ghost" download="guilua-qr.svg" href="{{ qr_data_url }}">{{ t("qr.download") }}</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

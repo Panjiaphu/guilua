@@ -31,6 +31,20 @@ services:
         value: false
       - key: MEMBER_PORTAL_ENABLED
         value: false
+      - key: AI_AGENT_API_ENABLED
+        value: true
+      - key: AI_AGENT_DEFAULT_POST_STATUS
+        value: draft
+      - key: AI_AGENT_ALLOW_AUTOPUBLISH
+        value: false
+      - key: UPLOAD_MAX_MB
+        value: 5
+      - key: UPLOAD_STORAGE_BACKEND
+        value: local
+      - key: PUBLIC_BASE_URL
+        value: https://fumap-line-webhook.onrender.com
+      - key: SHOPEE_AFFILIATE_DISCLOSURE_ENABLED
+        value: true
       - key: CRYPTO_MARKET_LIVE_ENABLED
         value: true
       - key: CRYPTO_MARKET_CACHE_SECONDS
@@ -68,6 +82,12 @@ services:
       - key: GOOGLE_ADSENSE_SLOT
         sync: false
       - key: GOOGLE_ADSENSE_PUBLISHER_ID
+        sync: false
+      - key: GOOGLE_SITE_VERIFICATION
+        sync: false
+      - key: VPN_DOWNLOAD_URL
+        sync: false
+      - key: VPN_SETUP_GUIDE_URL
         sync: false
       - key: EXCHANGE_RATE_PROVIDER_URL
         sync: false

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="commerce-page">
+  <div class="commerce-hero panel">
+    <div>
+      <h1>{{ t("utilities.title") }}</h1>
+      <p class="muted">{{ t("utilities.subtitle") }}</p>
+    </div>
+    <a class="button" href="/member?lang={{ locale }}">{{ t("utilities.member_cta") }}</a>
+  </div>
+  <div class="utility-grid">
+    {% for item in utilities %}
+      <a class="utility-card" href="{{ item.route_path }}?lang={{ locale }}">
+        <span class="utility-icon">{{ item.icon }}</span>
+        <strong>{{ item.title }}</strong>
+        <p>{{ item.description }}</p>
+        <small>{{ t("utilities.free") }}{% if item.is_member_only %} · Member{% endif %}</small>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

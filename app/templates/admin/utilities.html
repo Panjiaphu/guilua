@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="admin-shell">
+  <div class="admin-nav panel">
+    <a href="/admin?lang={{ locale }}">Dashboard</a>
+    <a href="/admin/posts/jobs?lang={{ locale }}">Job Posts</a>
+    <a href="/admin/posts/shop?lang={{ locale }}">Shop Posts</a>
+    <a href="/admin/ai-agents?lang={{ locale }}">AI Agents</a>
+    <a href="/admin/utilities?lang={{ locale }}">Utilities</a>
+    <a href="/admin/members?lang={{ locale }}">Members</a>
+  </div>
+  <section class="panel">
+    <h1>Utilities</h1>
+    <div class="admin-card-list">
+      {% for item in utilities %}
+        <form class="admin-edit-card" method="post" action="/admin/utilities/{{ item.id }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <strong>{{ item.key }}</strong>
+          <input name="title" value="{{ item.title }}">
+          <textarea name="description" rows="3">{{ item.description }}</textarea>
+          <input name="route_path" value="{{ item.route_path }}">
+          <input name="sort_order" type="number" value="{{ item.sort_order }}">
+          <label><input type="checkbox" name="is_active" value="true" {% if item.is_active %}checked{% endif %}> Active</label>
+          <label><input type="checkbox" name="is_member_only" value="true" {% if item.is_member_only %}checked{% endif %}> Member only</label>
+          <label><input type="checkbox" name="is_free" value="true" {% if item.is_free %}checked{% endif %}> Free</label>
+          <button class="button small" type="submit">Save</button>
+        </form>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}

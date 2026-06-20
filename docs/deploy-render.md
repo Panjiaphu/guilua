@@ -31,6 +31,13 @@ CRYPTO_MARKET_CACHE_SECONDS=180
 CRYPTO_MARKET_TIMEOUT_SECONDS=2.5
 COINGECKO_API_URL=https://api.coingecko.com/api/v3/simple/price
 BINANCE_API_URL=https://api.binance.com/api/v3/ticker/24hr
+AI_AGENT_API_ENABLED=true
+AI_AGENT_DEFAULT_POST_STATUS=draft
+AI_AGENT_ALLOW_AUTOPUBLISH=false
+UPLOAD_MAX_MB=5
+UPLOAD_STORAGE_BACKEND=local
+PUBLIC_BASE_URL=https://fumap-line-webhook.onrender.com
+SHOPEE_AFFILIATE_DISCLOSURE_ENABLED=true
 ```
 
 Nếu Render báo lỗi `ADMIN_SEED_PASSWORD must be at least 14 characters in production`,
@@ -65,12 +72,48 @@ của bạn và lấy publisher ID/slot ID. Sau đó set:
 GOOGLE_ADSENSE_CLIENT=ca-pub-xxxxxxxxxxxxxxxx
 GOOGLE_ADSENSE_SLOT=<ad slot id>
 GOOGLE_ADSENSE_PUBLISHER_ID=pub-xxxxxxxxxxxxxxxx
+GOOGLE_SITE_VERIFICATION=<token nếu Google yêu cầu meta verification>
 ```
 
 App sẽ:
 - chèn AdSense script khi có `GOOGLE_ADSENSE_CLIENT`
 - render ad slot trên `/crypto` khi có `GOOGLE_ADSENSE_SLOT`
 - render `/ads.txt` từ `GOOGLE_ADSENSE_PUBLISHER_ID`
+- chèn meta `google-site-verification` khi có `GOOGLE_SITE_VERIFICATION`
+
+## AI Agent / content / utilities
+
+Không set raw AI Agent key trong Render. Tạo key tại:
+
+```text
+/admin/ai-agents
+```
+
+API endpoints:
+
+```text
+GET /api/agent/health
+POST /api/agent/posts/job
+POST /api/agent/posts/shop
+POST /api/agent/media
+```
+
+Auth:
+
+```text
+Authorization: Bearer <AI_AGENT_API_KEY>
+X-AI-Agent-Key: <AI_AGENT_API_KEY>
+```
+
+Local upload trên Render chỉ phù hợp MVP. Nếu cần giữ file sau deploy/rebuild,
+cần Render Disk hoặc storage ngoài như S3/Cloudinary.
+
+VPN page chỉ hiện download/guide link nếu set:
+
+```text
+VPN_DOWNLOAD_URL=
+VPN_SETUP_GUIDE_URL=
+```
 
 Google vẫn cần duyệt site trước khi quảng cáo thật hiển thị.
 

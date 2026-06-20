@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="tool-shell panel">
+  <div>
+    <h1>{{ t("vpn.title") }}</h1>
+    <p class="muted">{{ t("vpn.subtitle") }}</p>
+  </div>
+  <div class="notice-panel">{{ t("vpn.legal") }}</div>
+  <div class="button-row">
+    {% if settings.vpn_download_url %}
+      <a class="button" href="{{ settings.vpn_download_url }}" target="_blank" rel="noopener noreferrer">{{ t("vpn.download") }}</a>
+    {% else %}
+      <span class="button disabled">{{ t("vpn.coming_soon") }}</span>
+    {% endif %}
+    {% if settings.vpn_setup_guide_url %}
+      <a class="button ghost" href="{{ settings.vpn_setup_guide_url }}" target="_blank" rel="noopener noreferrer">{{ t("vpn.guide") }}</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="admin-shell">
+  <div class="admin-nav panel">
+    <a href="/admin?lang={{ locale }}">Dashboard</a>
+    <a href="/admin/posts/jobs?lang={{ locale }}">Job Posts</a>
+    <a href="/admin/posts/shop?lang={{ locale }}">Shop Posts</a>
+    <a href="/admin/ai-agents?lang={{ locale }}">AI Agents</a>
+    <a href="/admin/utilities?lang={{ locale }}">Utilities</a>
+    <a href="/admin/members?lang={{ locale }}">Members</a>
+  </div>
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h1>{{ "Job Posts" if section == "jobs" else "Shopee Shop Posts" }}</h1>
+        <span>Draft, published, archived. AI Agent posts must be reviewed here.</span>
+      </div>
+      <a class="button small" href="/admin/posts/{{ section }}/new?lang={{ locale }}">New post</a>
+    </div>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>Title</th><th>Status</th><th>Source</th><th>Locale</th><th>Platform</th><th></th></tr></thead>
+        <tbody>
+          {% for post in posts %}
+            <tr>
+              <td><strong>{{ post.title }}</strong><br><span class="muted">{{ post.slug }}</span></td>
+              <td>{{ post.status.value }}</td>
+              <td>{{ post.source.value }}</td>
+              <td>{{ post.locale }}</td>
+              <td>{{ post.platform }}</td>
+              <td class="action-cell">
+                <a class="button small ghost" href="/admin/posts/{{ section }}/{{ post.id }}/edit?lang={{ locale }}">Edit</a>
+                <form method="post" action="/admin/posts/{{ section }}/{{ post.id }}/archive">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="button small ghost" type="submit">Archive</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

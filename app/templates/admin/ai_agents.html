@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="admin-shell">
+  <div class="admin-nav panel">
+    <a href="/admin?lang={{ locale }}">Dashboard</a>
+    <a href="/admin/posts/jobs?lang={{ locale }}">Job Posts</a>
+    <a href="/admin/posts/shop?lang={{ locale }}">Shop Posts</a>
+    <a href="/admin/ai-agents?lang={{ locale }}">AI Agents</a>
+    <a href="/admin/utilities?lang={{ locale }}">Utilities</a>
+    <a href="/admin/members?lang={{ locale }}">Members</a>
+  </div>
+  <section class="panel">
+    <h1>AI Agent API</h1>
+    {% if raw_key %}
+      <div class="notice-panel danger">
+        <strong>Copy API key ngay bây giờ. Key chỉ hiển thị một lần.</strong>
+        <code>{{ raw_key }}</code>
+      </div>
+    {% endif %}
+    <form class="admin-inline-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input name="name" placeholder="Agent name" required>
+      <input name="allowed_post_types" value="job,shop">
+      <label><input type="checkbox" name="can_auto_publish" value="true"> Auto publish</label>
+      <button class="button small" type="submit">Create key</button>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Keys</h2>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>Name</th><th>Prefix</th><th>Allowed</th><th>Status</th><th>Last used</th><th></th></tr></thead>
+        <tbody>
+          {% for key in keys %}
+            <tr>
+              <td>{{ key.name }}</td>
+              <td>{{ key.prefix }}</td>
+              <td>{{ key.allowed_post_types }}</td>
+              <td>{{ "Active" if key.is_active else "Off" }}</td>
+              <td>{{ key.last_used_at or "-" }}</td>
+              <td>
+                <form method="post" action="/admin/ai-agents/{{ key.id }}/toggle">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="button small ghost" type="submit">{{ "Disable" if key.is_active else "Enable" }}</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Agent Logs</h2>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>Time</th><th>Endpoint</th><th>Type</th><th>Status</th><th>Error</th></tr></thead>
+        <tbody>
+          {% for log in logs %}
+            <tr><td>{{ log.created_at }}</td><td>{{ log.endpoint }}</td><td>{{ log.post_type }}</td><td>{{ log.status_code }}</td><td>{{ log.error_message }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

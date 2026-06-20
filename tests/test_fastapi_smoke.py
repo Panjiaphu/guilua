@@ -10,8 +10,10 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
 from app.db.session import Base
+from app.db.session import SessionLocal
 from app.main import app
-from app.models import EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
+from app.models import ContentPost, EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
+from app.services.commercial import create_agent_key
 from app.services.email import record_email_reply
 from app.services.crypto_market import clear_crypto_market_cache
 from app.services.ip_provider import provision_ip_service
@@ -84,6 +86,70 @@ class FastApiSmokeTest(unittest.TestCase):
         response = self.client.get("/ads.txt")
         self.assertEqual(response.status_code, 200)
         self.assertIn("Google AdSense is not configured", response.text)
+
+    def test_commercial_public_pages_render(self):
+        for path, marker in [
+            ("/jobs?lang=vi", "Tìm việc làm"),
+            ("/shop?lang=vi", "Shop Shopee"),
+            ("/utilities?lang=vi", "Tiện ích miễn phí"),
+            ("/utilities/qr?lang=vi", "Tạo mã QR"),
+            ("/utilities/shortlink?lang=vi", "Tạo shortlink"),
+            ("/utilities/ping?lang=vi", "Ping website"),
+            ("/utilities/free-vpn?lang=vi", "Free VPN"),
+            ("/advertising?lang=vi", "Liên hệ quảng cáo"),
+            ("/build-idea?lang=vi", "Ý tưởng website"),
+        ]:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200, path)
+            self.assertIn(marker, response.text)
+
+    def test_shortlink_rejects_localhost(self):
+        response = self.client.post(
+            "/utilities/shortlink?lang=vi",
+            data={"target_url": "http://127.0.0.1:8000/admin"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("not allowed", response.text)
+
+    def test_qr_generator_returns_svg_data_url(self):
+        response = self.client.post("/utilities/qr?lang=vi", data={"payload": "https://example.com"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("data:image/svg+xml;base64", response.text)
+
+    def test_ai_agent_requires_key(self):
+        response = self.client.post(
+            "/api/agent/posts/job",
+            json={"title": "Test Job", "summary": "A", "content": "B"},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_ai_agent_creates_draft_job_post(self):
+        with SessionLocal() as db:
+            key, raw_key = create_agent_key(db, "Smoke Agent", ["job"], can_auto_publish=False)
+            key_id = key.id
+        response = self.client.post(
+            "/api/agent/posts/job",
+            headers={"Authorization": f"Bearer {raw_key}"},
+            json={
+                "title": "Taiwan Factory Assistant Smoke",
+                "summary": "Smoke summary",
+                "content": "Smoke content",
+                "target_url": "https://example.com/job",
+                "platform": "website",
+                "status": "published",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "draft")
+        with SessionLocal() as db:
+            post = db.get(ContentPost, payload["post_id"])
+            self.assertIsNotNone(post)
+            self.assertEqual(post.source.value, "ai_agent")
+            db.delete(post)
+            db.delete(db.get(type(key), key_id))
+            db.commit()
 
     def test_email_webhook_requires_configuration(self):
         response = self.client.post(

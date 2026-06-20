@@ -6,7 +6,8 @@ from app.core.config import BASE_DIR, get_settings
 from app.core.i18n import resolve_locale
 from app.core.security import SessionMiddleware, ensure_admin_seed
 from app.db.session import Base, engine
-from app.routers import admin, auth, member, public, webhooks
+from app.routers import admin, agent, auth, member, public, webhooks
+from app.services.commercial import ensure_default_utilities
 from app.services.rates import ensure_default_rates
 from app.db.session import SessionLocal
 
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(member.router)
     app.include_router(admin.router)
+    app.include_router(agent.router)
     app.include_router(webhooks.router)
 
     @app.on_event("startup")
@@ -28,6 +30,7 @@ def create_app() -> FastAPI:
         ensure_admin_seed()
         with SessionLocal() as db:
             ensure_default_rates(db)
+            ensure_default_utilities(db)
 
     @app.middleware("http")
     async def locale_cookie(request: Request, call_next):

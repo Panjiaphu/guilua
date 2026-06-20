@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set is_shop = page_kind == "shop" %}
+{% block content %}
+<section class="commerce-page">
+  <div class="commerce-hero panel">
+    <div>
+      <h1>{{ t("shop.title") if is_shop else t("jobs.title") }}</h1>
+      <p class="muted">{{ t("shop.subtitle") if is_shop else t("jobs.subtitle") }}</p>
+    </div>
+    <a class="button" href="/advertising?lang={{ locale }}">{{ t("commerce.contact_cta") }}</a>
+  </div>
+
+  {% if is_shop and settings.shopee_affiliate_disclosure_enabled %}
+    <div class="notice-panel">{{ t("shop.affiliate_notice") }}</div>
+  {% endif %}
+
+  <div class="commerce-grid">
+    {% for post in posts %}
+      <article class="commerce-card">
+        {% if post.image_url %}
+          <img src="{{ post.image_url }}" alt="{{ post.title }}" loading="lazy">
+        {% else %}
+          <div class="commerce-image-fallback">{{ "Shop" if is_shop else "Job" }}</div>
+        {% endif %}
+        <div class="commerce-card-body">
+          <div class="badge-row">
+            <span>{{ "Shopee" if is_shop else t("jobs.badge") }}</span>
+            <span>{{ post.platform }}</span>
+            {% if post.source.value == "ai_agent" %}<span>AI Agent</span>{% endif %}
+          </div>
+          <h2>{{ post.title }}</h2>
+          <p>{{ post.summary }}</p>
+          <a class="button small" href="/{{ 'shop' if is_shop else 'jobs' }}/{{ post.slug }}?lang={{ locale }}">
+            {{ t("shop.view") if is_shop else t("jobs.view") }}
+          </a>
+        </div>
+      </article>
+    {% else %}
+      <div class="empty-panel panel">
+        <h2>{{ t("commerce.empty_title") }}</h2>
+        <p class="muted">{{ t("commerce.empty_body") }}</p>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

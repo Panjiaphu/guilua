@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     google_adsense_client: str | None = None
     google_adsense_slot: str | None = None
     google_adsense_publisher_id: str | None = None
+    google_site_verification: str | None = None
+
+    ai_agent_api_enabled: bool = True
+    ai_agent_default_post_status: str = "draft"
+    ai_agent_allow_autopublish: bool = False
+    upload_max_mb: int = 5
+    upload_storage_backend: str = "local"
+    public_base_url: str = "http://127.0.0.1:8000"
+    vpn_download_url: str | None = None
+    vpn_setup_guide_url: str | None = None
+    shopee_affiliate_disclosure_enabled: bool = True
 
     exchange_rate_provider_url: str | None = None
     live_rate_timeout_seconds: float = 2.5

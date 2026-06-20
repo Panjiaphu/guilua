@@ -33,6 +33,22 @@ class EmailStatus(StrEnum):
     FAILED = "failed"
 
 
+class ContentPostStatus(StrEnum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class ContentPostSource(StrEnum):
+    ADMIN = "admin"
+    AI_AGENT = "ai_agent"
+
+
+class ContentPostType(StrEnum):
+    JOB = "job"
+    SHOP = "shop"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -50,6 +66,8 @@ class User(Base):
     transactions: Mapped[list["TransactionRequest"]] = relationship(back_populates="user")
     email_replies: Mapped[list["EmailReply"]] = relationship(back_populates="user")
     service_requests: Mapped[list["ServiceRequest"]] = relationship(back_populates="user")
+    content_posts: Mapped[list["ContentPost"]] = relationship(back_populates="created_by")
+    utility_usage: Mapped[list["MemberUtilityUsage"]] = relationship(back_populates="user")
 
 
 class ExchangeRate(Base):
@@ -154,3 +172,116 @@ class ServiceRequest(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     user: Mapped[User] = relationship(back_populates="service_requests")
+
+
+class ContentPost(Base):
+    __tablename__ = "content_posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    post_type: Mapped[ContentPostType] = mapped_column(Enum(ContentPostType), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    image_url: Mapped[str] = mapped_column(String(500), default="")
+    target_url: Mapped[str] = mapped_column(String(500), default="")
+    platform: Mapped[str] = mapped_column(String(64), default="other", index=True)
+    locale: Mapped[str] = mapped_column(String(12), default="vi", index=True)
+    status: Mapped[ContentPostStatus] = mapped_column(
+        Enum(ContentPostStatus), default=ContentPostStatus.DRAFT, index=True
+    )
+    source: Mapped[ContentPostSource] = mapped_column(
+        Enum(ContentPostSource), default=ContentPostSource.ADMIN, index=True
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    ai_agent_name: Mapped[str] = mapped_column(String(120), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    tags: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    created_by: Mapped[User | None] = relationship(back_populates="content_posts")
+
+    __table_args__ = (
+        Index("ix_content_posts_type_status_locale", "post_type", "status", "locale"),
+        Index("ix_content_posts_type_sort", "post_type", "sort_order", "created_at"),
+    )
+
+
+class AiAgentApiKey(Base):
+    __tablename__ = "ai_agent_api_keys"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    key_hash: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    prefix: Mapped[str] = mapped_column(String(16), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    allowed_post_types: Mapped[str] = mapped_column(Text, default='["job","shop"]')
+    can_auto_publish: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    logs: Mapped[list["AiAgentPostLog"]] = relationship(back_populates="agent_key")
+
+
+class AiAgentPostLog(Base):
+    __tablename__ = "ai_agent_post_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    agent_key_id: Mapped[int | None] = mapped_column(ForeignKey("ai_agent_api_keys.id"), nullable=True, index=True)
+    endpoint: Mapped[str] = mapped_column(String(255), default="")
+    post_type: Mapped[str] = mapped_column(String(32), default="", index=True)
+    request_ip: Mapped[str] = mapped_column(String(64), default="")
+    status_code: Mapped[int] = mapped_column(Integer, default=200)
+    error_message: Mapped[str] = mapped_column(Text, default="")
+    created_post_id: Mapped[int | None] = mapped_column(ForeignKey("content_posts.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    agent_key: Mapped[AiAgentApiKey | None] = relationship(back_populates="logs")
+
+
+class UtilityItem(Base):
+    __tablename__ = "utility_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str] = mapped_column(Text, default="")
+    icon: Mapped[str] = mapped_column(String(64), default="spark")
+    route_path: Mapped[str] = mapped_column(String(255), default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    is_member_only: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_free: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class MemberUtilityUsage(Base):
+    __tablename__ = "member_utility_usage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    utility_key: Mapped[str] = mapped_column(String(80), index=True)
+    usage_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User] = relationship(back_populates="utility_usage")
+
+    __table_args__ = (Index("ix_member_utility_usage_user_key", "user_id", "utility_key", unique=True),)
+
+
+class ShortLink(Base):
+    __tablename__ = "short_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(24), unique=True, index=True)
+    target_url: Mapped[str] = mapped_column(String(700))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    click_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

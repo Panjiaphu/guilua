@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="tool-shell panel">
+  <div>
+    <h1>{{ t("ping.title") }}</h1>
+    <p class="muted">{{ t("ping.subtitle") }}</p>
+  </div>
+  <form class="stack-form" method="post">
+    <input name="target_url" type="url" required placeholder="https://example.com">
+    <button class="button" type="submit">{{ t("ping.check") }}</button>
+  </form>
+  {% if result %}
+    <div class="result-box {{ 'ok' if result.ok else 'danger' }}">
+      <span>{{ result.url }}</span>
+      <strong>{% if result.ok %}HTTP {{ result.status_code }} · {{ result.response_time_ms }}ms{% else %}{{ result.error }}{% endif %}</strong>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

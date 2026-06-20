@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% set is_ads = page_kind == "advertising" %}
+{% block content %}
+<section class="tool-shell panel">
+  <div>
+    <h1>{{ t("advertising.title") if is_ads else t("build_idea.title") }}</h1>
+    <p class="muted">{{ t("advertising.subtitle") if is_ads else t("build_idea.subtitle") }}</p>
+  </div>
+  <div class="contact-grid">
+    <div><span>Email</span><strong>{{ admin_contact.email }}</strong></div>
+    <div><span>LINE</span><strong>{{ admin_contact.line }}</strong></div>
+    <div><span>{{ t("admin.contact.phone") }}</span><strong>{{ admin_contact.phone }}</strong></div>
+  </div>
+  <a class="button" href="mailto:{{ admin_contact.email }}">{{ t("commerce.contact_cta") }}</a>
+</section>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="admin-shell">
+  <section class="panel">
+    <a class="muted-link" href="/admin/posts/{{ section }}?lang={{ locale }}">Back</a>
+    <h1>{{ "Edit" if post else "New" }} {{ "job post" if section == "jobs" else "shop post" }}</h1>
+    <form class="stack-form" method="post" action="{% if post %}/admin/posts/{{ section }}/{{ post.id }}{% else %}/admin/posts/{{ section }}{% endif %}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Title<input name="title" required value="{{ post.title if post else '' }}"></label>
+      <label>Summary<textarea name="summary" rows="3">{{ post.summary if post else '' }}</textarea></label>
+      <label>Content<textarea name="content" rows="8">{{ post.content if post else '' }}</textarea></label>
+      <label>Image URL<input name="image_url" value="{{ post.image_url if post else '' }}"></label>
+      <label>Target URL<input name="target_url" value="{{ post.target_url if post else '' }}"></label>
+      <div class="form-grid">
+        <label>Platform<input name="platform" value="{{ post.platform if post else ('shopee' if section == 'shop' else 'website') }}"></label>
+        <label>Locale
+          <select name="locale">
+            <option value="vi" {% if post and post.locale == "vi" %}selected{% endif %}>vi</option>
+            <option value="zh-TW" {% if post and post.locale == "zh-TW" %}selected{% endif %}>zh-TW</option>
+          </select>
+        </label>
+        <label>Status
+          <select name="status">
+            {% for value in ["draft", "published", "archived"] %}
+              <option value="{{ value }}" {% if post and post.status.value == value %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Sort<input name="sort_order" type="number" value="{{ post.sort_order if post else 0 }}"></label>
+      </div>
+      <label>Tags<input name="tags" value="{{ post.tags if post else '' }}"></label>
+      <button class="button" type="submit">Save</button>
+    </form>
+  </section>
+</section>
+{% endblock %}
