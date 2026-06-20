@@ -1,3 +1,5 @@
+import json
+
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
@@ -41,6 +43,16 @@ def _format_percent(value) -> str:
     return f"{float(value):+.2f}%"
 
 
+def _parse_tags(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        data = [item.strip() for item in raw.split(",")]
+    return [str(item).strip() for item in data if str(item).strip()] if isinstance(data, list) else []
+
+
 def context(request: Request, **extra):
     locale = resolve_locale(request)
     settings = get_settings()
@@ -65,6 +77,7 @@ def context(request: Request, **extra):
         "format_compact": _format_compact,
         "format_percent": _format_percent,
         "trend_class": lambda value: "up" if float(value or 0) >= 0 else "down",
+        "parse_tags": _parse_tags,
         "admin_contact": {
             "email": settings.admin_notification_email or settings.admin_seed_email,
             "line": settings.admin_line_id,

@@ -259,7 +259,7 @@ def create_agent_key(
         name=name.strip() or "AI Agent",
         key_hash=hash_agent_key(raw_key),
         prefix=raw_key[:10],
-        allowed_post_types=dump_json_list(allowed_post_types or ["job", "shop"]),
+        allowed_post_types=dump_json_list(allowed_post_types or ["job", "shop", "crypto_analysis"]),
         can_auto_publish=can_auto_publish,
         is_active=True,
     )
@@ -323,6 +323,12 @@ def create_content_post(
     ai_agent_name: str = "",
     tags: list[str] | str | None = None,
     sort_order: int = 0,
+    market_session: str = "",
+    market_bias: str = "",
+    risk_level: str = "",
+    tradingview_symbol: str = "",
+    tradingview_url: str = "",
+    analysis_category: str = "",
 ) -> ContentPost:
     if post_type not in ALLOWED_POST_TYPES:
         raise ValueError("Invalid post type")
@@ -332,6 +338,8 @@ def create_content_post(
         validate_public_url(image_url)
     if target_url:
         validate_public_url(target_url)
+    if tradingview_url:
+        validate_public_url(tradingview_url)
     published_at = datetime.now(timezone.utc) if status == ContentPostStatus.PUBLISHED.value else None
     post = ContentPost(
         post_type=ContentPostType(post_type),
@@ -342,6 +350,12 @@ def create_content_post(
         image_url=image_url.strip(),
         target_url=target_url.strip(),
         platform=platform.strip() or "other",
+        market_session=market_session.strip(),
+        market_bias=market_bias.strip(),
+        risk_level=risk_level.strip(),
+        tradingview_symbol=tradingview_symbol.strip().upper(),
+        tradingview_url=tradingview_url.strip(),
+        analysis_category=analysis_category.strip(),
         locale=locale if locale in {"vi", "zh-TW"} else "vi",
         status=ContentPostStatus(status),
         source=ContentPostSource(source),

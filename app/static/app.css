@@ -259,6 +259,11 @@ input:focus, select:focus, textarea:focus { border-color: rgba(0,208,156,.7); bo
 textarea { resize: vertical; }
 .wide { grid-column: 1 / -1; }
 .alert { color: #ffd7df; background: rgba(255, 85, 112, .12); border: 1px solid rgba(255, 85, 112, .28); padding: 12px; border-radius: 14px; }
+.success { color: #c7ffe9; background: rgba(0, 208, 156, .12); border: 1px solid rgba(0, 208, 156, .28); padding: 12px; border-radius: 14px; }
+.auth-options { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: var(--muted); font-size: 13px; }
+.check-row { display: inline-flex; grid-template-columns: none; gap: 8px; align-items: center; color: var(--muted); }
+.check-row input { width: auto; }
+.button.full { width: 100%; margin-top: 14px; }
 
 .dashboard { padding-top: 38px; }
 .welcome h1 { margin: 0; font-size: clamp(32px, 5vw, 48px); }
@@ -410,6 +415,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
 .reply-head strong { color: #fff; word-break: break-word; }
 .crypto-page { display: grid; gap: 22px; padding-top: 38px; }
 .crypto-page > * { min-width: 0; }
+.compact-hero { min-height: 240px; }
 .crypto-hero {
   min-height: 420px;
   display: grid;
@@ -492,6 +498,57 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
 .coin-table td:nth-child(2), .coin-table td:nth-child(3), .coin-table td:nth-child(4), .coin-table td:nth-child(5) {
   white-space: nowrap;
 }
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.analysis-grid.wide-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.analysis-card {
+  display: grid;
+  gap: 14px;
+  min-height: 250px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(255,255,255,.045);
+  color: var(--ink);
+  transition: transform .22s ease, border-color .22s ease, background .22s ease;
+}
+.analysis-card:hover { transform: translateY(-4px); border-color: rgba(0,208,156,.42); background: rgba(255,255,255,.07); }
+.analysis-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(0,208,156,.16), rgba(67,97,238,.14));
+}
+.analysis-card h2, .analysis-card h3 { margin: 0; line-height: 1.25; }
+.analysis-card p { margin: 0; color: var(--muted); line-height: 1.65; }
+.analysis-detail { margin-top: 34px; display: grid; gap: 20px; }
+.analysis-detail h1 { margin: 0; font-size: clamp(36px, 5vw, 64px); line-height: 1.04; }
+.analysis-hero-image {
+  width: 100%;
+  max-height: 460px;
+  object-fit: cover;
+  border-radius: 24px;
+  border: 1px solid rgba(255,255,255,.12);
+}
+.analysis-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.analysis-meta-grid div, .disclaimer-box, .playbook-card, .security-metric-grid article {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255,255,255,.045);
+}
+.analysis-meta-grid span { color: var(--muted); display: block; margin-bottom: 6px; }
+.embedded-chart { display: grid; gap: 14px; min-height: 430px; }
+.article-body { color: rgba(255,255,255,.84); line-height: 1.85; font-size: 16px; }
+.disclaimer-box { color: #ffe3a4; background: rgba(255,195,90,.08); }
 .up { color: var(--ok); }
 .down { color: var(--danger); }
 .ad-panel {
@@ -512,6 +569,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   text-align: center;
 }
 .commerce-page, .admin-shell { display: grid; gap: 22px; padding-top: 34px; }
+.commerce-page > *, .admin-shell > * { min-width: 0; }
 .commerce-hero {
   min-height: 260px;
   display: flex;
@@ -611,9 +669,41 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   background: rgba(255,255,255,.045);
 }
 .contact-grid span { color: var(--muted); }
-.admin-nav { display: flex; gap: 12px; flex-wrap: wrap; }
+.admin-nav { display: flex; gap: 12px; flex-wrap: wrap; overflow-x: auto; }
 .admin-nav a { color: var(--muted); text-decoration: none; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; padding: 9px 12px; }
 .admin-nav a:hover { color: var(--text); border-color: rgba(32,227,178,.35); }
+.admin-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.hub-card {
+  display: grid;
+  gap: 12px;
+  min-height: 170px;
+  color: var(--ink);
+  transition: transform .22s ease, border-color .22s ease, background .22s ease;
+}
+.hub-card:hover { transform: translateY(-4px); border-color: rgba(0,208,156,.42); background: rgba(255,255,255,.07); }
+.hub-card strong { font-size: 18px; }
+.hub-card small { color: var(--muted); line-height: 1.5; }
+.security-hub-card { background: linear-gradient(145deg, rgba(255,85,112,.12), rgba(255,255,255,.045)); }
+.security-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.security-metric-grid span { color: var(--muted); display: block; margin-bottom: 8px; }
+.security-metric-grid strong { font-size: 32px; }
+.playbook-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.playbook-card { display: grid; gap: 10px; }
+.playbook-card h3, .playbook-card p { margin: 0; }
+.playbook-card p { color: var(--muted); line-height: 1.6; }
 .admin-inline-form { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 12px; align-items: center; }
 .action-cell { display: flex; gap: 8px; flex-wrap: wrap; }
 .admin-card-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -652,7 +742,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 850; letter-spacing: 0; 
   .topbar { min-height: auto; flex-wrap: wrap; padding: 14px 16px; gap: 12px; }
   .brand { font-size: 24px; }
   .nav { order: 3; width: 100%; overflow-x: auto; margin-left: 0; padding-bottom: 4px; }
-  .hero, .layout, .grid.three, .rate-grid, .form.split, .transaction-actions, .ip-tools, .crypto-hero, .macro-grid, .group-grid, .ad-panel, .commerce-grid, .utility-grid, .commerce-link-grid, .form-grid, .contact-grid, .admin-card-list, .admin-inline-form { grid-template-columns: 1fr; }
+  .hero, .layout, .grid.three, .rate-grid, .form.split, .transaction-actions, .ip-tools, .crypto-hero, .macro-grid, .group-grid, .ad-panel, .commerce-grid, .utility-grid, .commerce-link-grid, .form-grid, .contact-grid, .admin-card-list, .admin-inline-form, .analysis-grid, .analysis-grid.wide-grid, .analysis-meta-grid, .admin-hub-grid, .security-metric-grid, .playbook-grid { grid-template-columns: 1fr; }
   .service-hero { grid-template-columns: 1fr; }
   .transaction-hero { grid-template-columns: 1fr; }
   .ip-orbit { width: 190px; height: 190px; }

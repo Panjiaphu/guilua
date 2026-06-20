@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% block content %}
+<section class="admin-shell">
+  <div class="admin-nav panel">
+    <a href="/admin?lang={{ locale }}">Dashboard</a>
+    <a href="/admin/posts/jobs?lang={{ locale }}">Job Posts</a>
+    <a href="/admin/posts/shop?lang={{ locale }}">Shop Posts</a>
+    <a href="/admin/posts/crypto-analysis?lang={{ locale }}">Crypto Analysis</a>
+    <a href="/admin/ai-agents?lang={{ locale }}">AI Agents</a>
+    <a href="/admin/utilities?lang={{ locale }}">Utilities</a>
+    <a href="/admin/members?lang={{ locale }}">Members</a>
+    <a href="/admin/firewall?lang={{ locale }}">Firewall</a>
+  </div>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">{{ t("firewall.kicker") }}</p>
+        <h1>{{ t("firewall.title") }}</h1>
+        <span>{{ t("firewall.subtitle") }}</span>
+      </div>
+      <span class="badge ok">{{ t("firewall.defensive_only") }}</span>
+    </div>
+    <div class="security-metric-grid">
+      <article><span>{{ t("firewall.events_24h") }}</span><strong>{{ security_summary.events_24h }}</strong></article>
+      <article><span>{{ t("firewall.blocked_24h") }}</span><strong>{{ security_summary.blocked_24h }}</strong></article>
+      <article><span>{{ t("firewall.high_risk_24h") }}</span><strong>{{ security_summary.high_risk_24h }}</strong></article>
+      <article><span>{{ t("firewall.open_incidents") }}</span><strong>{{ security_summary.open_incidents }}</strong></article>
+    </div>
+  </section>
+
+  <section class="layout">
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <h2>{{ t("firewall.rules") }}</h2>
+          <span>{{ t("firewall.rules_desc") }}</span>
+        </div>
+      </div>
+      <form class="stack-form" method="post" action="/admin/firewall/rules">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>{{ t("firewall.rule_name") }}<input name="name" required placeholder="Block abusive IP"></label>
+        <div class="form-grid">
+          <label>{{ t("firewall.rule_type") }}
+            <select name="rule_type">
+              {% for value in ["ip_block", "cidr_block", "ip_allow", "cidr_allow", "user_agent_block", "path_protect", "route_rate_limit"] %}
+                <option value="{{ value }}">{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>{{ t("firewall.rule_value") }}<input name="value" required placeholder="1.2.3.4 / 1.2.3.0/24 / curl / /admin"></label>
+          <label>{{ t("firewall.action") }}
+            <select name="action">
+              {% for value in ["block", "allow", "log", "challenge"] %}
+                <option value="{{ value }}">{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>{{ t("firewall.severity") }}
+            <select name="severity">
+              {% for value in ["low", "medium", "high", "critical"] %}
+                <option value="{{ value }}">{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <label>{{ t("firewall.note") }}<textarea name="note" rows="2"></textarea></label>
+        <button class="button primary" type="submit">{{ t("firewall.add_rule") }}</button>
+      </form>
+
+      <div class="table-wrap">
+        <table class="coin-table">
+          <thead><tr><th>{{ t("firewall.rule") }}</th><th>{{ t("firewall.action") }}</th><th>{{ t("firewall.status") }}</th><th></th></tr></thead>
+          <tbody>
+            {% for rule in rules %}
+              <tr>
+                <td><strong>{{ rule.name }}</strong><br><span class="muted">{{ rule.rule_type }}: {{ rule.value }}</span></td>
+                <td>{{ rule.action }} / {{ rule.severity }}</td>
+                <td>{{ "active" if rule.is_active else "inactive" }}</td>
+                <td>
+                  <form method="post" action="/admin/firewall/rules/{{ rule.id }}/toggle">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="button small ghost" type="submit">{{ t("firewall.toggle") }}</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="panel compact">
+      <span class="icon">{{ icons.icon("shield") }}</span>
+      <h2>{{ t("firewall.top_ips") }}</h2>
+      <div class="contact-list">
+        {% for ip, count in security_summary.top_ips %}
+          <span>{{ ip }}<strong>{{ count }}</strong></span>
+        {% else %}
+          <span>{{ t("firewall.no_events") }}</span>
+        {% endfor %}
+      </div>
+      <div class="support-box">
+        <h3>{{ t("firewall.limits") }}</h3>
+        <p>{{ t("firewall.limits_desc") }}</p>
+      </div>
+    </aside>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("firewall.incidents") }}</h2>
+        <span>{{ t("firewall.incidents_desc") }}</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>{{ t("firewall.incident") }}</th><th>{{ t("firewall.severity") }}</th><th>{{ t("firewall.status") }}</th><th>{{ t("firewall.last_seen") }}</th><th></th></tr></thead>
+        <tbody>
+          {% for incident in incidents %}
+            <tr>
+              <td><strong>{{ incident.title }}</strong><br><span class="muted">{{ incident.affected_ip }} · {{ incident.event_count }} events</span></td>
+              <td>{{ incident.severity }}</td>
+              <td>{{ incident.status }}</td>
+              <td>{{ incident.last_seen_at or incident.created_at }}</td>
+              <td>
+                <form method="post" action="/admin/firewall/incidents/{{ incident.id }}" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <select name="status">
+                    {% for value in ["open", "investigating", "contained", "resolved", "false_positive"] %}
+                      <option value="{{ value }}" {% if incident.status == value %}selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                  </select>
+                  <input name="resolution_note" placeholder="{{ t("firewall.resolution_note") }}" value="{{ incident.resolution_note }}">
+                  <button class="button small ghost" type="submit">{{ t("admin.save") }}</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">{{ t("firewall.no_incidents") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("firewall.playbooks") }}</h2>
+        <span>{{ t("firewall.playbooks_desc") }}</span>
+      </div>
+    </div>
+    <div class="playbook-grid">
+      {% for playbook in playbooks %}
+        <article class="playbook-card">
+          <h3>{{ playbook.title }}</h3>
+          <p>{{ playbook.description }}</p>
+          <strong>{{ t("firewall.immediate_steps") }}</strong>
+          <p>{{ playbook.immediate_steps }}</p>
+          <strong>{{ t("firewall.prevention_steps") }}</strong>
+          <p>{{ playbook.prevention_steps }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("firewall.events") }}</h2>
+        <span>{{ t("firewall.events_desc") }}</span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="coin-table">
+        <thead><tr><th>{{ t("firewall.event") }}</th><th>IP</th><th>Path</th><th>{{ t("firewall.risk") }}</th><th>{{ t("crypto.updated") }}</th></tr></thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td><strong>{{ event.event_type }}</strong><br><span class="muted">{{ event.severity }}</span></td>
+              <td>{{ event.ip_address }}</td>
+              <td>{{ event.method }} {{ event.path }}</td>
+              <td>{{ event.risk_score }}</td>
+              <td>{{ event.created_at }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">{{ t("firewall.no_events") }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

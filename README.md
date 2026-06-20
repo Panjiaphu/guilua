@@ -121,3 +121,37 @@ Xem thêm trong `docs/deploy-render.md`.
 - Google AdSense: tạo site trong AdSense, lấy `ca-pub-...` cho `GOOGLE_ADSENSE_CLIENT`, tạo ad unit lấy `GOOGLE_ADSENSE_SLOT`, lấy publisher id `pub-...` cho `GOOGLE_ADSENSE_PUBLISHER_ID`, và nếu Google yêu cầu meta verification thì set `GOOGLE_SITE_VERIFICATION`.
 - AI Agent: tạo key trong `/admin/ai-agents`. Raw key chỉ hiển thị một lần, không lưu raw key trong database.
 - VPN download: set `VPN_DOWNLOAD_URL` và `VPN_SETUP_GUIDE_URL` khi có phần mềm/hướng dẫn thật.
+
+## Bổ sung mới: Crypto analysis, login reset và firewall
+
+- Public `/crypto/analysis` hiển thị bài phân tích crypto do admin hoặc AI Agent tạo.
+- Admin quản lý bài tại `/admin/posts/crypto-analysis`.
+- AI Agent có thể tạo bài bằng `POST /api/agent/posts/crypto_analysis` với các field: `market_session`, `market_bias`, `risk_level`, `tradingview_symbol`, `tradingview_url`, `analysis_category`.
+- Login có `remember_me`, forgot password và reset password bằng email token.
+- Admin Firewall tại `/admin/firewall` có security events, rule block/allow, incident grouping và playbook phòng thủ.
+
+Env bổ sung:
+
+```text
+SESSION_REMEMBER_MAX_AGE_SECONDS=2592000
+PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS=3600
+SECURITY_DASHBOARD_ENABLED=true
+SECURITY_LOGGING_ENABLED=true
+SECURITY_FIREWALL_ENABLED=true
+SECURITY_AUTO_BLOCK_ENABLED=false
+SECURITY_RATE_LIMIT_ENABLED=true
+SECURITY_RATE_LIMIT_WINDOW_SECONDS=60
+SECURITY_RATE_LIMIT_MAX_REQUESTS=120
+SECURITY_LOGIN_RATE_LIMIT_WINDOW_SECONDS=300
+SECURITY_LOGIN_RATE_LIMIT_MAX_ATTEMPTS=10
+SECURITY_ADMIN_RATE_LIMIT_MAX_REQUESTS=80
+SECURITY_AGENT_API_RATE_LIMIT_MAX_REQUESTS=60
+SECURITY_GEOIP_PROVIDER=none
+SECURITY_GEOIP_API_URL=
+SECURITY_GEOIP_API_KEY=
+SECURITY_ALERT_EMAIL=
+SECURITY_ADMIN_IP_RESTRICTION_ENABLED=false
+SECURITY_ADMIN_IP_ALLOWLIST=
+```
+
+GeoIP/IP reputation provider là optional. Khi chưa có provider thật, để `SECURITY_GEOIP_PROVIDER=none`; firewall vẫn ghi log, rate-limit và rule block/allow bình thường.

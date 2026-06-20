@@ -12,7 +12,17 @@ from app.core.config import get_settings
 from app.db.session import Base
 from app.db.session import SessionLocal
 from app.main import app
-from app.models import ContentPost, EmailNotification, EmailReply, ServiceRequest, TransactionRequest, TransactionType, User
+from app.models import (
+    ContentPost,
+    ContentPostType,
+    EmailNotification,
+    EmailReply,
+    SecurityEvent,
+    ServiceRequest,
+    TransactionRequest,
+    TransactionType,
+    User,
+)
 from app.services.commercial import create_agent_key
 from app.services.email import record_email_reply
 from app.services import crypto_market
@@ -60,6 +70,19 @@ class FastApiSmokeTest(unittest.TestCase):
         self.assertIn("Đăng ký", response.text)
         self.assertIn('action="/register"', response.text)
 
+    def test_forgot_password_form_and_generic_response(self):
+        response = self.client.get("/forgot-password?lang=vi")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('action="/forgot-password"', response.text)
+        token_marker = 'name="csrf_token" value="'
+        token = response.text.split(token_marker, 1)[1].split('"', 1)[0]
+        submit = self.client.post(
+            "/forgot-password?lang=vi",
+            data={"csrf_token": token, "email": "nobody@example.com"},
+        )
+        self.assertEqual(submit.status_code, 200)
+        self.assertIn("Nếu email tồn tại", submit.text)
+
     def test_crypto_dashboard_renders_with_fallback_data(self):
         old_live = os.environ.get("CRYPTO_MARKET_LIVE_ENABLED")
         os.environ["CRYPTO_MARKET_LIVE_ENABLED"] = "false"
@@ -82,6 +105,11 @@ class FastApiSmokeTest(unittest.TestCase):
         self.assertIn("CRYPTOCAP:BTC.D", response.text)
         self.assertIn("CoinGecko + Binance", response.text)
         self.assertIn("Google AdSense chưa được cấu hình", response.text)
+
+    def test_crypto_analysis_public_empty_page_renders(self):
+        response = self.client.get("/crypto/analysis?lang=vi")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Phân tích crypto", response.text)
 
     def test_ads_txt_without_adsense_configuration(self):
         response = self.client.get("/ads.txt")
@@ -210,6 +238,63 @@ class FastApiSmokeTest(unittest.TestCase):
             db.delete(post)
             db.delete(db.get(type(key), key_id))
             db.commit()
+
+    def test_ai_agent_creates_crypto_analysis_post(self):
+        with SessionLocal() as db:
+            key, raw_key = create_agent_key(db, "Crypto Agent", ["crypto_analysis"], can_auto_publish=False)
+            key_id = key.id
+        response = self.client.post(
+            "/api/agent/posts/crypto_analysis",
+            headers={"Authorization": f"Bearer {raw_key}"},
+            json={
+                "title": "BTC Session Smoke Analysis",
+                "summary": "Smoke crypto analysis",
+                "content": "Market structure and tokenomics notes.",
+                "status": "published",
+                "tags": ["BTC", "ETH"],
+                "market_session": "Asia",
+                "market_bias": "neutral",
+                "risk_level": "medium",
+                "tradingview_symbol": "BINANCE:BTCUSDT",
+                "tradingview_url": "https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT",
+                "analysis_category": "session_report",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "draft")
+        with SessionLocal() as db:
+            post = db.get(ContentPost, payload["post_id"])
+            self.assertIsNotNone(post)
+            self.assertEqual(post.post_type, ContentPostType.CRYPTO_ANALYSIS)
+            self.assertEqual(post.market_session, "Asia")
+            self.assertEqual(post.tradingview_symbol, "BINANCE:BTCUSDT")
+            db.delete(post)
+            db.delete(db.get(type(key), key_id))
+            db.commit()
+
+    def test_security_firewall_env_blocklist_logs_event(self):
+        old_blocklist = os.environ.get("SECURITY_IP_BLOCKLIST")
+        os.environ["SECURITY_IP_BLOCKLIST"] = "203.0.113.250"
+        get_settings.cache_clear()
+        try:
+            response = self.client.get("/", headers={"X-Forwarded-For": "203.0.113.250"})
+            self.assertEqual(response.status_code, 403)
+            with SessionLocal() as db:
+                event = (
+                    db.query(SecurityEvent)
+                    .filter(SecurityEvent.ip_address == "203.0.113.250", SecurityEvent.event_type == "request_blocked")
+                    .order_by(SecurityEvent.created_at.desc())
+                    .first()
+                )
+                self.assertIsNotNone(event)
+        finally:
+            if old_blocklist is None:
+                os.environ.pop("SECURITY_IP_BLOCKLIST", None)
+            else:
+                os.environ["SECURITY_IP_BLOCKLIST"] = old_blocklist
+            get_settings.cache_clear()
 
     def test_email_webhook_requires_configuration(self):
         response = self.client.post(

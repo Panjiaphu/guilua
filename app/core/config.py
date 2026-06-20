@@ -1,8 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -17,13 +18,15 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="dev-only-change-me")
     database_url: str = "sqlite:///./guilua.db"
     use_sqlite: bool = True
-    allowed_hosts: list[str] = ["localhost", "127.0.0.1"]
+    allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1"]
     session_cookie_name: str = "guilua_session"
     session_cookie_secure: bool = False
     session_max_age_seconds: int = 60 * 60 * 24 * 7
+    session_remember_max_age_seconds: int = 60 * 60 * 24 * 30
+    password_reset_token_max_age_seconds: int = 60 * 60
 
     default_locale: str = "vi"
-    supported_locales: list[str] = ["vi", "zh-TW"]
+    supported_locales: Annotated[list[str], NoDecode] = ["vi", "zh-TW"]
 
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -67,7 +70,48 @@ class Settings(BaseSettings):
     ip_service_provider_api_key: str | None = None
     ip_service_provider_timeout_seconds: float = 5.0
 
-    @field_validator("allowed_hosts", "supported_locales", mode="before")
+    security_dashboard_enabled: bool = True
+    security_logging_enabled: bool = True
+    security_firewall_enabled: bool = True
+    security_auto_block_enabled: bool = False
+    security_log_retention_days: int = 30
+    security_rate_limit_enabled: bool = True
+    security_rate_limit_window_seconds: int = 60
+    security_rate_limit_max_requests: int = 120
+    security_login_rate_limit_window_seconds: int = 300
+    security_login_rate_limit_max_attempts: int = 10
+    security_admin_rate_limit_max_requests: int = 80
+    security_agent_api_rate_limit_max_requests: int = 60
+    security_auto_block_threshold: int = 50
+    security_auto_block_minutes: int = 60
+    security_geoip_enabled: bool = True
+    security_geoip_provider: str = "none"
+    security_geoip_api_url: str | None = None
+    security_geoip_api_key: str | None = None
+    security_geoip_cache_hours: int = 24
+    security_ip_allowlist: Annotated[list[str], NoDecode] = []
+    security_ip_blocklist: Annotated[list[str], NoDecode] = []
+    security_country_allowlist: Annotated[list[str], NoDecode] = []
+    security_country_blocklist: Annotated[list[str], NoDecode] = []
+    security_trusted_proxy_headers: bool = True
+    security_notify_on_high_risk: bool = True
+    security_alert_email: str | None = None
+    security_block_suspicious_payloads: bool = False
+    security_log_suspicious_payloads: bool = True
+    security_honeypot_enabled: bool = True
+    security_admin_ip_restriction_enabled: bool = False
+    security_admin_ip_allowlist: Annotated[list[str], NoDecode] = []
+
+    @field_validator(
+        "allowed_hosts",
+        "supported_locales",
+        "security_ip_allowlist",
+        "security_ip_blocklist",
+        "security_country_allowlist",
+        "security_country_blocklist",
+        "security_admin_ip_allowlist",
+        mode="before",
+    )
     @classmethod
     def parse_csv(cls, value):
         if isinstance(value, str):

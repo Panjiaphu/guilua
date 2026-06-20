@@ -17,6 +17,7 @@ from app.models import User
 settings = get_settings()
 serializer = URLSafeTimedSerializer(settings.secret_key, salt="guilua-session")
 email_serializer = URLSafeTimedSerializer(settings.secret_key, salt="guilua-email")
+password_reset_serializer = URLSafeTimedSerializer(settings.secret_key, salt="guilua-password-reset")
 MIN_ADMIN_SEED_PASSWORD_LENGTH = 14
 
 
@@ -40,6 +41,18 @@ def read_email_token(token: str, max_age_seconds: int = 60 * 60 * 24) -> str:
     return str(payload["email"])
 
 
+def create_password_reset_token(email: str) -> str:
+    return password_reset_serializer.dumps({"email": email})
+
+
+def read_password_reset_token(token: str) -> str:
+    try:
+        payload = password_reset_serializer.loads(token, max_age=get_settings().password_reset_token_max_age_seconds)
+    except (BadSignature, SignatureExpired) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token") from exc
+    return str(payload["email"])
+
+
 class SessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response:
         request.state.session = self._load_session(request)
@@ -49,10 +62,11 @@ class SessionMiddleware(BaseHTTPMiddleware):
             response.delete_cookie(settings.session_cookie_name)
             return response
         cookie_value = serializer.dumps(request.state.session)
+        max_age = int(request.state.session.get("_max_age_seconds") or settings.session_max_age_seconds)
         response.set_cookie(
             settings.session_cookie_name,
             cookie_value,
-            max_age=settings.session_max_age_seconds,
+            max_age=max_age,
             httponly=True,
             secure=settings.session_cookie_secure,
             samesite="lax",
@@ -65,15 +79,19 @@ class SessionMiddleware(BaseHTTPMiddleware):
         if not raw_cookie:
             return {}
         try:
-            data = serializer.loads(raw_cookie, max_age=settings.session_max_age_seconds)
+            max_age = max(settings.session_max_age_seconds, settings.session_remember_max_age_seconds)
+            data = serializer.loads(raw_cookie, max_age=max_age)
         except (BadSignature, SignatureExpired):
             return {}
         return data if isinstance(data, dict) else {}
 
 
-def login_user(request: Request, user: User) -> None:
+def login_user(request: Request, user: User, remember_me: bool = False) -> None:
     request.state.session["user_id"] = user.id
     request.state.session["csrf_token"] = secrets.token_urlsafe(24)
+    request.state.session["_max_age_seconds"] = (
+        settings.session_remember_max_age_seconds if remember_me else settings.session_max_age_seconds
+    )
 
 
 def logout_user(request: Request) -> None:

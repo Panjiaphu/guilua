@@ -9,6 +9,7 @@ from app.db.session import Base, engine
 from app.routers import admin, agent, auth, member, public, webhooks
 from app.services.commercial import ensure_default_utilities
 from app.services.rates import ensure_default_rates
+from app.services.security_firewall import SecurityFirewallMiddleware, ensure_default_playbooks
 from app.db.session import SessionLocal
 
 
@@ -16,6 +17,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, debug=settings.debug)
     app.add_middleware(SessionMiddleware)
+    app.add_middleware(SecurityFirewallMiddleware)
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "app" / "static")), name="static")
     app.include_router(public.router)
     app.include_router(auth.router)
@@ -31,6 +33,7 @@ def create_app() -> FastAPI:
         with SessionLocal() as db:
             ensure_default_rates(db)
             ensure_default_utilities(db)
+            ensure_default_playbooks(db)
 
     @app.middleware("http")
     async def locale_cookie(request: Request, call_next):

@@ -3,7 +3,7 @@
 <section class="admin-shell">
   <section class="panel">
     <a class="muted-link" href="/admin/posts/{{ section }}?lang={{ locale }}">Back</a>
-    <h1>{{ "Edit" if post else "New" }} {{ "job post" if section == "jobs" else "shop post" }}</h1>
+    <h1>{{ "Edit" if post else "New" }} {% if section == "jobs" %}job post{% elif section == "shop" %}shop post{% else %}crypto analysis{% endif %}</h1>
     <form class="stack-form" method="post" action="{% if post %}/admin/posts/{{ section }}/{{ post.id }}{% else %}/admin/posts/{{ section }}{% endif %}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <label>Title<input name="title" required value="{{ post.title if post else '' }}"></label>
@@ -11,8 +11,32 @@
       <label>Content<textarea name="content" rows="8">{{ post.content if post else '' }}</textarea></label>
       <label>Image URL<input name="image_url" value="{{ post.image_url if post else '' }}"></label>
       <label>Target URL<input name="target_url" value="{{ post.target_url if post else '' }}"></label>
+      {% if section == "crypto-analysis" %}
+        <div class="form-grid">
+          <label>Market session<input name="market_session" placeholder="Asia / Europe / US" value="{{ post.market_session if post else '' }}"></label>
+          <label>Market bias
+            <select name="market_bias">
+              {% for value in ["", "bullish", "neutral", "bearish"] %}
+                <option value="{{ value }}" {% if post and post.market_bias == value %}selected{% endif %}>{{ value or "not set" }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Risk level
+            <select name="risk_level">
+              {% for value in ["", "low", "medium", "high"] %}
+                <option value="{{ value }}" {% if post and post.risk_level == value %}selected{% endif %}>{{ value or "not set" }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Category<input name="analysis_category" placeholder="TradingView / Tokenomics / Session report" value="{{ post.analysis_category if post else '' }}"></label>
+        </div>
+        <div class="form-grid">
+          <label>TradingView symbol<input name="tradingview_symbol" placeholder="BINANCE:BTCUSDT" value="{{ post.tradingview_symbol if post else '' }}"></label>
+          <label>TradingView URL<input name="tradingview_url" placeholder="https://www.tradingview.com/chart/..." value="{{ post.tradingview_url if post else '' }}"></label>
+        </div>
+      {% endif %}
       <div class="form-grid">
-        <label>Platform<input name="platform" value="{{ post.platform if post else ('shopee' if section == 'shop' else 'website') }}"></label>
+        <label>Platform<input name="platform" value="{{ post.platform if post else ('shopee' if section == 'shop' else ('tradingview' if section == 'crypto-analysis' else 'website')) }}"></label>
         <label>Locale
           <select name="locale">
             <option value="vi" {% if post and post.locale == "vi" %}selected{% endif %}>vi</option>

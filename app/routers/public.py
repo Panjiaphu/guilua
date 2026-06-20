@@ -30,9 +30,10 @@ def home(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/crypto")
-def crypto(request: Request):
+def crypto(request: Request, db: Session = Depends(get_db)):
     locale = resolve_locale(request)
     snapshot = get_crypto_market_snapshot()
+    latest_analysis = _published_posts(db, ContentPostType.CRYPTO_ANALYSIS, locale)[:3]
     tradingview_locale = "zh_TW" if locale == "zh-TW" else "vi_VN"
     chart_config = {
         "autosize": True,
@@ -67,6 +68,7 @@ def crypto(request: Request):
             market=snapshot,
             chart_config=chart_config,
             ticker_config=ticker_config,
+            latest_analysis=latest_analysis,
         ),
     )
 
@@ -153,6 +155,39 @@ def shop_detail(slug: str, request: Request, db: Session = Depends(get_db)):
             ContentPost.status == ContentPostStatus.PUBLISHED,
         )
         .first()
+    )
+
+
+@router.get("/crypto/analysis")
+def crypto_analysis(request: Request, db: Session = Depends(get_db)):
+    locale = resolve_locale(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="crypto_analysis_list.html",
+        context=context(
+            request,
+            posts=_published_posts(db, ContentPostType.CRYPTO_ANALYSIS, locale),
+        ),
+    )
+
+
+@router.get("/crypto/analysis/{slug}")
+def crypto_analysis_detail(slug: str, request: Request, db: Session = Depends(get_db)):
+    post = (
+        db.query(ContentPost)
+        .filter(
+            ContentPost.slug == slug,
+            ContentPost.post_type == ContentPostType.CRYPTO_ANALYSIS,
+            ContentPost.status == ContentPostStatus.PUBLISHED,
+        )
+        .first()
+    )
+    if not post:
+        raise HTTPException(status_code=404, detail="Crypto analysis not found")
+    return templates.TemplateResponse(
+        request=request,
+        name="crypto_analysis_detail.html",
+        context=context(request, post=post),
     )
     if not post:
         raise HTTPException(status_code=404, detail="Shop post not found")

@@ -11,6 +11,44 @@
     <span class="badge ok">{{ admin.email }}</span>
   </div>
 
+  <section class="admin-hub-grid">
+    <a class="hub-card panel" href="/admin/posts/jobs?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("briefcase") }}</span>
+      <strong>{{ t("admin.hub.jobs") }}</strong>
+      <small>{{ content_counts.jobs }} {{ t("admin.hub.items") }}</small>
+    </a>
+    <a class="hub-card panel" href="/admin/posts/shop?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("shop") }}</span>
+      <strong>{{ t("admin.hub.shop") }}</strong>
+      <small>{{ content_counts.shop }} {{ t("admin.hub.items") }}</small>
+    </a>
+    <a class="hub-card panel" href="/admin/posts/crypto-analysis?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("chart") }}</span>
+      <strong>{{ t("admin.hub.crypto_analysis") }}</strong>
+      <small>{{ content_counts.crypto_analysis }} {{ t("admin.hub.items") }}</small>
+    </a>
+    <a class="hub-card panel" href="/admin/members?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("user") }}</span>
+      <strong>{{ t("admin.hub.members") }}</strong>
+      <small>{{ member_count }} {{ t("admin.hub.accounts") }}</small>
+    </a>
+    <a class="hub-card panel" href="/admin/utilities?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("spark") }}</span>
+      <strong>{{ t("admin.hub.utilities") }}</strong>
+      <small>{{ t("admin.hub.utilities_desc") }}</small>
+    </a>
+    <a class="hub-card panel security-hub-card" href="/admin/firewall?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("shield") }}</span>
+      <strong>{{ t("admin.hub.firewall") }}</strong>
+      <small>{{ security_summary.blocked_24h }} {{ t("admin.hub.blocked_24h") }}</small>
+    </a>
+    <a class="hub-card panel" href="/admin/ai-agents?lang={{ locale }}">
+      <span class="icon">{{ icons.icon("bot") }}</span>
+      <strong>{{ t("admin.hub.ai_agents") }}</strong>
+      <small>{{ t("admin.hub.ai_agents_desc") }}</small>
+    </a>
+  </section>
+
   <div class="layout">
     <section class="panel">
       <div class="section-head">

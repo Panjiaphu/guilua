@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="crypto-page">
+  <section class="panel crypto-hero compact-hero">
+    <div>
+      <p class="eyebrow">{{ t("crypto_analysis.kicker") }}</p>
+      <h1>{{ t("crypto_analysis.title") }}</h1>
+      <p class="muted">{{ t("crypto_analysis.subtitle") }}</p>
+    </div>
+    <a class="button small" href="/crypto?lang={{ locale }}">{{ t("nav.crypto") }}</a>
+  </section>
+
+  <section class="analysis-grid wide-grid">
+    {% for post in posts %}
+      <a class="analysis-card panel" href="/crypto/analysis/{{ post.slug }}?lang={{ locale }}">
+        {% if post.image_url %}
+          <img src="{{ post.image_url }}" alt="{{ post.title }}">
+        {% endif %}
+        <div class="badge-row">
+          {% if post.market_session %}<span class="badge">{{ post.market_session }}</span>{% endif %}
+          {% if post.market_bias %}<span class="badge ok">{{ post.market_bias }}</span>{% endif %}
+          {% if post.risk_level %}<span class="badge warn">{{ post.risk_level }}</span>{% endif %}
+        </div>
+        <h2>{{ post.title }}</h2>
+        <p>{{ post.summary }}</p>
+        <div class="coin-chip-row">
+          {% for tag in parse_tags(post.tags)[:6] %}
+            <span>{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </a>
+    {% else %}
+      <article class="panel empty-state">{{ t("crypto_analysis.empty") }}</article>
+    {% endfor %}
+  </section>
+
+  {% include "_ad_slot.html" %}
+</section>
+{% endblock %}

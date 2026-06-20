@@ -17,6 +17,10 @@ from app.models import (
     EmailNotification,
     EmailReply,
     MemberUtilityUsage,
+    SecurityEvent,
+    SecurityIncident,
+    SecurityPlaybook,
+    SecurityRule,
     ServiceRequest,
     TransactionRequest,
     TransactionStatus,
@@ -34,6 +38,7 @@ from app.services.commercial import (
 from app.services.email import flush_email_queue, mark_reply_processed, queue_email
 from app.services.ip_provider import provision_ip_service
 from app.services.rates import latest_rates, update_manual_rate
+from app.services.security_firewall import dashboard_summary
 
 
 router = APIRouter(prefix="/admin")
@@ -46,6 +51,12 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     service_requests = db.query(ServiceRequest).order_by(ServiceRequest.created_at.desc()).limit(50).all()
     emails = db.query(EmailNotification).order_by(EmailNotification.created_at.desc()).limit(20).all()
     replies = db.query(EmailReply).order_by(EmailReply.created_at.desc()).limit(20).all()
+    member_count = db.query(User).filter(User.is_admin.is_(False)).count()
+    content_counts = {
+        "jobs": db.query(ContentPost).filter(ContentPost.post_type == ContentPostType.JOB).count(),
+        "shop": db.query(ContentPost).filter(ContentPost.post_type == ContentPostType.SHOP).count(),
+        "crypto_analysis": db.query(ContentPost).filter(ContentPost.post_type == ContentPostType.CRYPTO_ANALYSIS).count(),
+    }
     return templates.TemplateResponse(
         request=request,
         name="admin/dashboard.html",
@@ -58,6 +69,9 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             emails=emails,
             replies=replies,
             statuses=list(TransactionStatus),
+            member_count=member_count,
+            content_counts=content_counts,
+            security_summary=dashboard_summary(db),
         ),
     )
 
@@ -203,7 +217,7 @@ def create_ai_agent_key(
     db: Session = Depends(get_db),
     csrf_token: str = Form(...),
     name: str = Form(...),
-    allowed_post_types: str = Form("job,shop"),
+    allowed_post_types: str = Form("job,shop,crypto_analysis"),
     can_auto_publish: bool = Form(False),
 ):
     verify_csrf(request, csrf_token)
@@ -239,6 +253,8 @@ def _post_type_from_section(section: str) -> ContentPostType:
         return ContentPostType.JOB
     if section == "shop":
         return ContentPostType.SHOP
+    if section == "crypto-analysis":
+        return ContentPostType.CRYPTO_ANALYSIS
     raise HTTPException(status_code=404, detail="Unknown post section")
 
 
@@ -307,6 +323,12 @@ def create_admin_post(
     status: str = Form("draft"),
     tags: str = Form(""),
     sort_order: int = Form(0),
+    market_session: str = Form(""),
+    market_bias: str = Form(""),
+    risk_level: str = Form(""),
+    tradingview_symbol: str = Form(""),
+    tradingview_url: str = Form(""),
+    analysis_category: str = Form(""),
 ):
     verify_csrf(request, csrf_token)
     admin = require_admin(request, db)
@@ -327,6 +349,12 @@ def create_admin_post(
             created_by=admin,
             tags=tags,
             sort_order=sort_order,
+            market_session=market_session,
+            market_bias=market_bias,
+            risk_level=risk_level,
+            tradingview_symbol=tradingview_symbol,
+            tradingview_url=tradingview_url,
+            analysis_category=analysis_category,
         )
     except ValueError:
         return RedirectResponse(f"/admin/posts/{section}/new?error=invalid_input", status_code=303)
@@ -350,6 +378,12 @@ def update_admin_post(
     status: str = Form("draft"),
     tags: str = Form(""),
     sort_order: int = Form(0),
+    market_session: str = Form(""),
+    market_bias: str = Form(""),
+    risk_level: str = Form(""),
+    tradingview_symbol: str = Form(""),
+    tradingview_url: str = Form(""),
+    analysis_category: str = Form(""),
 ):
     verify_csrf(request, csrf_token)
     require_admin(request, db)
@@ -361,6 +395,8 @@ def update_admin_post(
         validate_public_url(image_url)
     if target_url:
         validate_public_url(target_url)
+    if tradingview_url:
+        validate_public_url(tradingview_url)
     old_status = post.status.value
     post.title = title.strip()
     post.slug = unique_slug(db, title, existing_id=post.id)
@@ -369,6 +405,12 @@ def update_admin_post(
     post.image_url = image_url.strip()
     post.target_url = target_url.strip()
     post.platform = platform.strip() or "other"
+    post.market_session = market_session.strip()
+    post.market_bias = market_bias.strip()
+    post.risk_level = risk_level.strip()
+    post.tradingview_symbol = tradingview_symbol.strip().upper()
+    post.tradingview_url = tradingview_url.strip()
+    post.analysis_category = analysis_category.strip()
     post.locale = locale if locale in {"vi", "zh-TW"} else "vi"
     post.status = ContentPostStatus(status)
     post.tags = dump_json_list(tags)
@@ -447,3 +489,107 @@ def admin_members(request: Request, db: Session = Depends(get_db)):
         name="admin/members.html",
         context=context(request, admin=admin, members=members, usage=usage),
     )
+
+
+@router.get("/firewall")
+def admin_firewall(request: Request, db: Session = Depends(get_db)):
+    admin = require_admin(request, db)
+    events = db.query(SecurityEvent).order_by(SecurityEvent.created_at.desc()).limit(120).all()
+    rules = db.query(SecurityRule).order_by(SecurityRule.created_at.desc()).limit(80).all()
+    incidents = db.query(SecurityIncident).order_by(SecurityIncident.updated_at.desc()).limit(80).all()
+    playbooks = db.query(SecurityPlaybook).filter(SecurityPlaybook.is_active.is_(True)).order_by(SecurityPlaybook.title.asc()).all()
+    return templates.TemplateResponse(
+        request=request,
+        name="admin/firewall.html",
+        context=context(
+            request,
+            admin=admin,
+            events=events,
+            rules=rules,
+            incidents=incidents,
+            playbooks=playbooks,
+            security_summary=dashboard_summary(db),
+        ),
+    )
+
+
+@router.post("/firewall/rules")
+def create_firewall_rule(
+    request: Request,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+    name: str = Form(...),
+    rule_type: str = Form(...),
+    value: str = Form(...),
+    action: str = Form("block"),
+    severity: str = Form("medium"),
+    note: str = Form(""),
+):
+    verify_csrf(request, csrf_token)
+    admin = require_admin(request, db)
+    if rule_type not in {
+        "ip_allow",
+        "ip_block",
+        "cidr_allow",
+        "cidr_block",
+        "country_allow",
+        "country_block",
+        "user_agent_block",
+        "path_protect",
+        "route_rate_limit",
+    }:
+        return RedirectResponse("/admin/firewall?error=invalid_rule_type", status_code=303)
+    if action not in {"allow", "block", "challenge", "log"}:
+        return RedirectResponse("/admin/firewall?error=invalid_action", status_code=303)
+    item = SecurityRule(
+        name=name.strip()[:160],
+        rule_type=rule_type,
+        value=value.strip()[:255],
+        action=action,
+        severity=severity if severity in {"info", "low", "medium", "high", "critical"} else "medium",
+        note=note.strip(),
+        created_by_user_id=admin.id,
+        is_active=True,
+    )
+    db.add(item)
+    db.commit()
+    return RedirectResponse("/admin/firewall?rule_created=1", status_code=303)
+
+
+@router.post("/firewall/rules/{rule_id}/toggle")
+def toggle_firewall_rule(
+    rule_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+):
+    verify_csrf(request, csrf_token)
+    require_admin(request, db)
+    item = db.get(SecurityRule, rule_id)
+    if not item:
+        return RedirectResponse("/admin/firewall?error=rule_not_found", status_code=303)
+    item.is_active = not item.is_active
+    db.commit()
+    return RedirectResponse("/admin/firewall?rule_updated=1", status_code=303)
+
+
+@router.post("/firewall/incidents/{incident_id}")
+def update_firewall_incident(
+    incident_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    csrf_token: str = Form(...),
+    status: str = Form(...),
+    resolution_note: str = Form(""),
+):
+    verify_csrf(request, csrf_token)
+    require_admin(request, db)
+    item = db.get(SecurityIncident, incident_id)
+    if not item:
+        return RedirectResponse("/admin/firewall?error=incident_not_found", status_code=303)
+    if status not in {"open", "investigating", "contained", "resolved", "false_positive"}:
+        return RedirectResponse("/admin/firewall?error=invalid_status", status_code=303)
+    item.status = status
+    item.resolution_note = resolution_note.strip()
+    db.commit()
+    return RedirectResponse("/admin/firewall?incident_updated=1", status_code=303)

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="analysis-detail panel">
+  <a class="muted-link" href="/crypto/analysis?lang={{ locale }}">{{ t("commerce.back") }}</a>
+  <div class="badge-row">
+    {% if post.market_session %}<span class="badge">{{ t("crypto_analysis.market_session") }}: {{ post.market_session }}</span>{% endif %}
+    {% if post.market_bias %}<span class="badge ok">{{ t("crypto_analysis.market_bias") }}: {{ post.market_bias }}</span>{% endif %}
+    {% if post.risk_level %}<span class="badge warn">{{ t("crypto_analysis.risk_level") }}: {{ post.risk_level }}</span>{% endif %}
+  </div>
+  <h1>{{ post.title }}</h1>
+  <p class="muted lead">{{ post.summary }}</p>
+  {% if post.image_url %}
+    <img class="analysis-hero-image" src="{{ post.image_url }}" alt="{{ post.title }}">
+  {% endif %}
+
+  <section class="analysis-meta-grid">
+    {% if post.tradingview_symbol %}
+      <div>
+        <span>{{ t("crypto_analysis.tradingview") }}</span>
+        <strong>{{ post.tradingview_symbol }}</strong>
+      </div>
+    {% endif %}
+    {% if post.analysis_category %}
+      <div>
+        <span>{{ t("crypto_analysis.category") }}</span>
+        <strong>{{ post.analysis_category }}</strong>
+      </div>
+    {% endif %}
+    <div>
+      <span>{{ t("crypto_analysis.symbols") }}</span>
+      <strong>{{ parse_tags(post.tags) | join(", ") or "-" }}</strong>
+    </div>
+  </section>
+
+  {% if post.tradingview_symbol %}
+    <section class="panel embedded-chart">
+      <div class="tradingview-widget-container">
+        <div class="tradingview-widget-container__widget"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+{
+  "symbols": [["{{ post.tradingview_symbol }}", "{{ post.tradingview_symbol }}|1D"]],
+  "chartOnly": false,
+  "width": "100%",
+  "height": "360",
+  "locale": "{{ 'zh_TW' if locale == 'zh-TW' else 'vi_VN' }}",
+  "colorTheme": "dark",
+  "autosize": true,
+  "showVolume": true,
+  "showMA": true
+}
+        </script>
+      </div>
+      {% if post.tradingview_url %}
+        <a class="button small" href="{{ post.tradingview_url }}" target="_blank" rel="noopener noreferrer">{{ t("crypto.open_chart") }}</a>
+      {% endif %}
+    </section>
+  {% endif %}
+
+  <section class="article-body">
+    {{ post.content | e | replace("\n", "<br>") | safe }}
+  </section>
+
+  <section class="disclaimer-box">
+    {{ t("crypto_analysis.disclaimer") }}
+  </section>
+</article>
+{% include "_ad_slot.html" %}
+{% endblock %}

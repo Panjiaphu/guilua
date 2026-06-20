@@ -47,6 +47,7 @@ class ContentPostSource(StrEnum):
 class ContentPostType(StrEnum):
     JOB = "job"
     SHOP = "shop"
+    CRYPTO_ANALYSIS = "crypto_analysis"
 
 
 class User(Base):
@@ -186,6 +187,12 @@ class ContentPost(Base):
     image_url: Mapped[str] = mapped_column(String(500), default="")
     target_url: Mapped[str] = mapped_column(String(500), default="")
     platform: Mapped[str] = mapped_column(String(64), default="other", index=True)
+    market_session: Mapped[str] = mapped_column(String(64), default="", index=True)
+    market_bias: Mapped[str] = mapped_column(String(32), default="", index=True)
+    risk_level: Mapped[str] = mapped_column(String(32), default="", index=True)
+    tradingview_symbol: Mapped[str] = mapped_column(String(80), default="")
+    tradingview_url: Mapped[str] = mapped_column(String(500), default="")
+    analysis_category: Mapped[str] = mapped_column(String(80), default="", index=True)
     locale: Mapped[str] = mapped_column(String(12), default="vi", index=True)
     status: Mapped[ContentPostStatus] = mapped_column(
         Enum(ContentPostStatus), default=ContentPostStatus.DRAFT, index=True
@@ -217,7 +224,7 @@ class AiAgentApiKey(Base):
     key_hash: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     prefix: Mapped[str] = mapped_column(String(16), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    allowed_post_types: Mapped[str] = mapped_column(Text, default='["job","shop"]')
+    allowed_post_types: Mapped[str] = mapped_column(Text, default='["job","shop","crypto_analysis"]')
     can_auto_publish: Mapped[bool] = mapped_column(Boolean, default=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -283,5 +290,119 @@ class ShortLink(Base):
     target_url: Mapped[str] = mapped_column(String(700))
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     click_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class SecurityRule(Base):
+    __tablename__ = "security_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160))
+    rule_type: Mapped[str] = mapped_column(String(40), index=True)
+    value: Mapped[str] = mapped_column(String(255), index=True)
+    action: Mapped[str] = mapped_column(String(24), default="block")
+    severity: Mapped[str] = mapped_column(String(24), default="medium", index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class IpReputationCache(Base):
+    __tablename__ = "ip_reputation_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ip_address: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    ip_version: Mapped[str] = mapped_column(String(16), default="unknown")
+    country_code: Mapped[str] = mapped_column(String(8), default="", index=True)
+    country_name: Mapped[str] = mapped_column(String(120), default="")
+    region: Mapped[str] = mapped_column(String(120), default="")
+    city: Mapped[str] = mapped_column(String(120), default="")
+    latitude: Mapped[float | None] = mapped_column(Numeric(10, 6), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(10, 6), nullable=True)
+    timezone: Mapped[str] = mapped_column(String(80), default="")
+    asn: Mapped[str] = mapped_column(String(80), default="")
+    isp: Mapped[str] = mapped_column(String(160), default="")
+    organization: Mapped[str] = mapped_column(String(160), default="")
+    is_proxy: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_vpn: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_tor: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_hosting: Mapped[bool] = mapped_column(Boolean, default=False)
+    risk_score: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    provider: Mapped[str] = mapped_column(String(80), default="")
+    raw_json: Mapped[str] = mapped_column(Text, default="{}")
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class SecurityEvent(Base):
+    __tablename__ = "security_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    severity: Mapped[str] = mapped_column(String(24), default="info", index=True)
+    risk_score: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    ip_address: Mapped[str] = mapped_column(String(80), default="", index=True)
+    ip_version: Mapped[str] = mapped_column(String(16), default="unknown")
+    country_code: Mapped[str] = mapped_column(String(8), default="", index=True)
+    country_name: Mapped[str] = mapped_column(String(120), default="")
+    region: Mapped[str] = mapped_column(String(120), default="")
+    city: Mapped[str] = mapped_column(String(120), default="")
+    asn: Mapped[str] = mapped_column(String(80), default="")
+    isp: Mapped[str] = mapped_column(String(160), default="")
+    path: Mapped[str] = mapped_column(String(500), default="", index=True)
+    method: Mapped[str] = mapped_column(String(12), default="")
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    user_agent: Mapped[str] = mapped_column(Text, default="")
+    referer: Mapped[str] = mapped_column(Text, default="")
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    username_or_email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    rule_id: Mapped[int | None] = mapped_column(ForeignKey("security_rules.id"), nullable=True, index=True)
+    request_id: Mapped[str] = mapped_column(String(80), default="", index=True)
+    details_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    __table_args__ = (
+        Index("ix_security_events_type_created", "event_type", "created_at"),
+        Index("ix_security_events_ip_created", "ip_address", "created_at"),
+    )
+
+
+class SecurityIncident(Base):
+    __tablename__ = "security_incidents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(220))
+    incident_type: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="open", index=True)
+    severity: Mapped[str] = mapped_column(String(24), default="medium", index=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    affected_ip: Mapped[str] = mapped_column(String(80), default="", index=True)
+    affected_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    event_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolution_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class SecurityPlaybook(Base):
+    __tablename__ = "security_playbooks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    incident_type: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(220))
+    description: Mapped[str] = mapped_column(Text, default="")
+    immediate_steps: Mapped[str] = mapped_column(Text, default="")
+    containment_steps: Mapped[str] = mapped_column(Text, default="")
+    eradication_steps: Mapped[str] = mapped_column(Text, default="")
+    recovery_steps: Mapped[str] = mapped_column(Text, default="")
+    prevention_steps: Mapped[str] = mapped_column(Text, default="")
+    checklist_json: Mapped[str] = mapped_column(Text, default="[]")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

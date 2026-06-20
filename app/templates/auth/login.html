@@ -4,13 +4,19 @@
   <h1>{{ t("auth.login") }}</h1>
   <p class="muted">{{ t("auth.login_hint") }}</p>
   {% if error %}<p class="alert">{{ error }}</p>{% endif %}
+  {% if reset_success %}<p class="success">{{ t("auth.reset_success") }}</p>{% endif %}
   <form method="post" action="/login" class="form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="next_url" value="{{ next_url or '/member' }}">
     <label>{{ t("auth.email") }}<input type="email" name="email" required autocomplete="email"></label>
     <label>{{ t("auth.password") }}<input type="password" name="password" required autocomplete="current-password"></label>
+    <div class="auth-options">
+      <label class="check-row"><input type="checkbox" name="remember_me" value="1"> {{ t("auth.remember_me") }}</label>
+      <a href="/forgot-password?lang={{ locale }}">{{ t("auth.forgot_password") }}</a>
+    </div>
     <button class="button primary" type="submit">{{ t("auth.login") }}</button>
   </form>
   <p class="form-help">{{ t("auth.register_hint") }}</p>
+  <a class="button ghost full" href="/register?lang={{ locale }}">{{ t("auth.register_free") }}</a>
 </section>
 {% endblock %}

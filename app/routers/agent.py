@@ -17,6 +17,7 @@ from app.services.commercial import (
     validate_public_url,
     verify_agent_key,
 )
+from app.services.security_firewall import log_security_event
 
 
 router = APIRouter(prefix="/api/agent", tags=["ai-agent"])
@@ -32,6 +33,12 @@ class AgentPostPayload(BaseModel):
     locale: str = "vi"
     tags: list[str] = Field(default_factory=list)
     status: str = "draft"
+    market_session: str = ""
+    market_bias: str = ""
+    risk_level: str = ""
+    tradingview_symbol: str = ""
+    tradingview_url: str = ""
+    analysis_category: str = ""
 
 
 def _request_ip(request: Request) -> str:
@@ -69,6 +76,14 @@ def require_agent_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             error_message="Invalid AI agent key",
         )
+        log_security_event(
+            db,
+            request=request,
+            event_type="ai_agent_auth_failed",
+            severity="medium",
+            risk_score=45,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid AI agent key")
     return agent_key
 
@@ -86,7 +101,7 @@ def create_agent_post(
     db: Session = Depends(get_db),
     agent_key=Depends(require_agent_key),
 ):
-    if post_type not in {"job", "shop"}:
+    if post_type not in {"job", "shop", "crypto_analysis"}:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unsupported post type")
     allowed = set(parse_json_list(agent_key.allowed_post_types))
     if post_type not in allowed:
@@ -124,6 +139,12 @@ def create_agent_post(
             source="ai_agent",
             ai_agent_name=agent_key.name,
             tags=payload.tags,
+            market_session=payload.market_session,
+            market_bias=payload.market_bias,
+            risk_level=payload.risk_level,
+            tradingview_symbol=payload.tradingview_symbol,
+            tradingview_url=payload.tradingview_url,
+            analysis_category=payload.analysis_category,
         )
     except ValueError as exc:
         log_agent_request(
@@ -146,7 +167,16 @@ def create_agent_post(
         status_code=200,
         created_post_id=post.id,
     )
-    admin_section = "jobs" if post_type == "job" else "shop"
+    log_security_event(
+        db,
+        request=request,
+        event_type="ai_agent_post_created",
+        severity="info",
+        risk_score=10,
+        status_code=200,
+        details={"post_type": post_type, "post_id": post.id},
+    )
+    admin_section = {"job": "jobs", "shop": "shop", "crypto_analysis": "crypto-analysis"}[post_type]
     return {
         "ok": True,
         "post_id": post.id,

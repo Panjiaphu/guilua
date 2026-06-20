@@ -50,6 +50,34 @@
     </div>
   </section>
 
+  <section class="panel analysis-preview-panel">
+    <div class="section-head">
+      <div>
+        <h2>{{ t("crypto_analysis.latest") }}</h2>
+        <span>{{ t("crypto_analysis.subtitle") }}</span>
+      </div>
+      <a class="button small" href="/crypto/analysis?lang={{ locale }}">{{ t("crypto_analysis.view_all") }}</a>
+    </div>
+    <div class="analysis-grid">
+      {% for post in latest_analysis %}
+        <a class="analysis-card" href="/crypto/analysis/{{ post.slug }}?lang={{ locale }}">
+          {% if post.image_url %}<img src="{{ post.image_url }}" alt="{{ post.title }}">{% endif %}
+          <div>
+            <div class="badge-row">
+              {% if post.market_session %}<span class="badge">{{ post.market_session }}</span>{% endif %}
+              {% if post.market_bias %}<span class="badge ok">{{ post.market_bias }}</span>{% endif %}
+              {% if post.risk_level %}<span class="badge warn">{{ post.risk_level }}</span>{% endif %}
+            </div>
+            <h3>{{ post.title }}</h3>
+            <p>{{ post.summary }}</p>
+          </div>
+        </a>
+      {% else %}
+        <article class="empty-state">{{ t("crypto_analysis.empty") }}</article>
+      {% endfor %}
+    </div>
+  </section>
+
   <section class="panel">
     <div class="section-head">
       <div>

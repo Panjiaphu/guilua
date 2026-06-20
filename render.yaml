@@ -17,6 +17,10 @@ services:
         value: true
       - key: SESSION_COOKIE_SECURE
         value: true
+      - key: SESSION_REMEMBER_MAX_AGE_SECONDS
+        value: 2592000
+      - key: PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
+        value: 3600
       - key: RUN_MIGRATIONS_DURING_BUILD
         value: false
       - key: ADMIN_NOTIFICATION_EMAIL
@@ -55,6 +59,52 @@ services:
         value: https://api.coingecko.com/api/v3/simple/price
       - key: BINANCE_API_URL
         value: https://api.binance.com/api/v3/ticker/24hr
+      - key: SECURITY_DASHBOARD_ENABLED
+        value: true
+      - key: SECURITY_LOGGING_ENABLED
+        value: true
+      - key: SECURITY_FIREWALL_ENABLED
+        value: true
+      - key: SECURITY_AUTO_BLOCK_ENABLED
+        value: false
+      - key: SECURITY_LOG_RETENTION_DAYS
+        value: 30
+      - key: SECURITY_RATE_LIMIT_ENABLED
+        value: true
+      - key: SECURITY_RATE_LIMIT_WINDOW_SECONDS
+        value: 60
+      - key: SECURITY_RATE_LIMIT_MAX_REQUESTS
+        value: 120
+      - key: SECURITY_LOGIN_RATE_LIMIT_WINDOW_SECONDS
+        value: 300
+      - key: SECURITY_LOGIN_RATE_LIMIT_MAX_ATTEMPTS
+        value: 10
+      - key: SECURITY_ADMIN_RATE_LIMIT_MAX_REQUESTS
+        value: 80
+      - key: SECURITY_AGENT_API_RATE_LIMIT_MAX_REQUESTS
+        value: 60
+      - key: SECURITY_AUTO_BLOCK_THRESHOLD
+        value: 50
+      - key: SECURITY_AUTO_BLOCK_MINUTES
+        value: 60
+      - key: SECURITY_GEOIP_ENABLED
+        value: true
+      - key: SECURITY_GEOIP_PROVIDER
+        value: none
+      - key: SECURITY_GEOIP_CACHE_HOURS
+        value: 24
+      - key: SECURITY_TRUSTED_PROXY_HEADERS
+        value: true
+      - key: SECURITY_NOTIFY_ON_HIGH_RISK
+        value: true
+      - key: SECURITY_BLOCK_SUSPICIOUS_PAYLOADS
+        value: false
+      - key: SECURITY_LOG_SUSPICIOUS_PAYLOADS
+        value: true
+      - key: SECURITY_HONEYPOT_ENABLED
+        value: true
+      - key: SECURITY_ADMIN_IP_RESTRICTION_ENABLED
+        value: false
       - key: SECRET_KEY
         sync: false
       - key: ADMIN_SEED_PASSWORD
@@ -97,3 +147,19 @@ services:
         sync: false
       - key: IP_SERVICE_PROVIDER_TIMEOUT_SECONDS
         value: 5
+      - key: SECURITY_GEOIP_API_URL
+        sync: false
+      - key: SECURITY_GEOIP_API_KEY
+        sync: false
+      - key: SECURITY_IP_ALLOWLIST
+        sync: false
+      - key: SECURITY_IP_BLOCKLIST
+        sync: false
+      - key: SECURITY_COUNTRY_ALLOWLIST
+        sync: false
+      - key: SECURITY_COUNTRY_BLOCKLIST
+        sync: false
+      - key: SECURITY_ALERT_EMAIL
+        sync: false
+      - key: SECURITY_ADMIN_IP_ALLOWLIST
+        sync: false
