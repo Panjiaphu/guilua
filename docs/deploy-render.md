@@ -36,6 +36,8 @@ AI_AGENT_DEFAULT_POST_STATUS=draft
 AI_AGENT_ALLOW_AUTOPUBLISH=false
 UPLOAD_MAX_MB=5
 UPLOAD_STORAGE_BACKEND=local
+UPLOAD_IMAGE_MAX_WIDTH=1600
+UPLOAD_IMAGE_QUALITY=82
 PUBLIC_BASE_URL=https://fumap-line-webhook.onrender.com
 SHOPEE_AFFILIATE_DISCLOSURE_ENABLED=true
 ```
@@ -105,8 +107,10 @@ Authorization: Bearer <AI_AGENT_API_KEY>
 X-AI-Agent-Key: <AI_AGENT_API_KEY>
 ```
 
-Local upload trên Render chỉ phù hợp MVP. Nếu cần giữ file sau deploy/rebuild,
-cần Render Disk hoặc storage ngoài như S3/Cloudinary.
+Admin và AI Agent upload ảnh sẽ nén ảnh thành WebP và trả về URL public dưới
+`/static/uploads/...`. Local upload trên Render chỉ phù hợp MVP vì filesystem
+có thể mất file sau deploy/rebuild. Nếu cần giữ file bền cho sản phẩm thật,
+cần Render Disk hoặc storage ngoài như S3/Cloudinary/R2.
 
 VPN page chỉ hiện download/guide link nếu set:
 

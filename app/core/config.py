@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     ai_agent_allow_autopublish: bool = False
     upload_max_mb: int = 5
     upload_storage_backend: str = "local"
+    upload_image_max_width: int = 1600
+    upload_image_quality: int = 82
     public_base_url: str = "http://127.0.0.1:8000"
     vpn_download_url: str | None = None
     vpn_setup_guide_url: str | None = None

@@ -1,6 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,7 @@ from app.services.commercial import (
 )
 from app.services.email import flush_email_queue, mark_reply_processed, queue_email
 from app.services.ip_provider import provision_ip_service
+from app.services.media import save_uploaded_image
 from app.services.rates import latest_rates, update_manual_rate
 from app.services.security_firewall import dashboard_summary
 
@@ -258,6 +259,25 @@ def _post_type_from_section(section: str) -> ContentPostType:
     raise HTTPException(status_code=404, detail="Unknown post section")
 
 
+def _post_image_url_from_form(
+    *,
+    image_url: str,
+    image_file: UploadFile | None,
+    title: str,
+    section: str,
+) -> str:
+    if not image_file or not image_file.filename:
+        return image_url.strip()
+    image_file.file.seek(0)
+    saved = save_uploaded_image(
+        content=image_file.file.read(),
+        original_filename=image_file.filename,
+        folder=f"posts/{section}",
+        name_hint=title,
+    )
+    return saved.url
+
+
 @router.get("/posts/{section}")
 def admin_posts(section: str, request: Request, db: Session = Depends(get_db)):
     admin = require_admin(request, db)
@@ -317,6 +337,7 @@ def create_admin_post(
     summary: str = Form(""),
     content: str = Form(""),
     image_url: str = Form(""),
+    image_file: UploadFile | None = File(None),
     target_url: str = Form(""),
     platform: str = Form("other"),
     locale: str = Form("vi"),
@@ -334,13 +355,19 @@ def create_admin_post(
     admin = require_admin(request, db)
     post_type = _post_type_from_section(section)
     try:
+        final_image_url = _post_image_url_from_form(
+            image_url=image_url,
+            image_file=image_file,
+            title=title,
+            section=section,
+        )
         create_content_post(
             db,
             post_type=post_type.value,
             title=title,
             summary=summary,
             content=content,
-            image_url=image_url,
+            image_url=final_image_url,
             target_url=target_url,
             platform=platform,
             locale=locale,
@@ -372,6 +399,7 @@ def update_admin_post(
     summary: str = Form(""),
     content: str = Form(""),
     image_url: str = Form(""),
+    image_file: UploadFile | None = File(None),
     target_url: str = Form(""),
     platform: str = Form("other"),
     locale: str = Form("vi"),
@@ -391,18 +419,27 @@ def update_admin_post(
     post = db.get(ContentPost, post_id)
     if not post or post.post_type != post_type:
         return RedirectResponse(f"/admin/posts/{section}?error=not_found", status_code=303)
-    if image_url:
-        validate_public_url(image_url)
-    if target_url:
-        validate_public_url(target_url)
-    if tradingview_url:
-        validate_public_url(tradingview_url)
+    try:
+        final_image_url = _post_image_url_from_form(
+            image_url=image_url,
+            image_file=image_file,
+            title=title,
+            section=section,
+        )
+        if final_image_url:
+            validate_public_url(final_image_url)
+        if target_url:
+            validate_public_url(target_url)
+        if tradingview_url:
+            validate_public_url(tradingview_url)
+    except ValueError:
+        return RedirectResponse(f"/admin/posts/{section}/{post_id}/edit?error=invalid_input", status_code=303)
     old_status = post.status.value
     post.title = title.strip()
     post.slug = unique_slug(db, title, existing_id=post.id)
     post.summary = summary.strip()
     post.content = content.strip()
-    post.image_url = image_url.strip()
+    post.image_url = final_image_url
     post.target_url = target_url.strip()
     post.platform = platform.strip() or "other"
     post.market_session = market_session.strip()

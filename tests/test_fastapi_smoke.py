@@ -1,14 +1,17 @@
 from decimal import Decimal
+from io import BytesIO
 import os
 import subprocess
 import sys
 import unittest
 
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import get_settings
+from app.core.config import BASE_DIR, get_settings
+from app.core.security import hash_password
 from app.db.session import Base
 from app.db.session import SessionLocal
 from app.main import app
@@ -272,6 +275,73 @@ class FastApiSmokeTest(unittest.TestCase):
             self.assertEqual(post.tradingview_symbol, "BINANCE:BTCUSDT")
             db.delete(post)
             db.delete(db.get(type(key), key_id))
+            db.commit()
+
+    def test_admin_post_upload_compresses_image_to_webp(self):
+        email = f"admin-upload-{os.getpid()}@example.com"
+        password = "AdminUpload!2026"
+        with SessionLocal() as db:
+            old_user = db.query(User).filter(User.email == email).first()
+            if old_user:
+                db.delete(old_user)
+                db.commit()
+            admin = User(
+                email=email,
+                password_hash=hash_password(password),
+                full_name="Upload Admin",
+                locale="vi",
+                is_admin=True,
+                is_email_verified=True,
+            )
+            db.add(admin)
+            db.commit()
+            admin_id = admin.id
+
+        login_page = self.client.get("/login?lang=vi")
+        token = login_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+        login = self.client.post(
+            "/login?lang=vi",
+            data={"csrf_token": token, "email": email, "password": password, "next_url": "/admin"},
+        )
+        self.assertEqual(login.status_code, 200)
+
+        form_page = self.client.get("/admin/posts/jobs/new?lang=vi")
+        self.assertEqual(form_page.status_code, 200)
+        token = form_page.text.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+        image_buffer = BytesIO()
+        Image.new("RGB", (640, 360), "#00d09c").save(image_buffer, format="PNG")
+        response = self.client.post(
+            "/admin/posts/jobs",
+            data={
+                "csrf_token": token,
+                "title": "Upload Smoke Job Post",
+                "summary": "Upload smoke summary",
+                "content": "Upload smoke content",
+                "target_url": "https://example.com/job",
+                "platform": "website",
+                "locale": "vi",
+                "status": "published",
+                "tags": "upload, smoke",
+                "sort_order": "1",
+            },
+            files={"image_file": ("cover.png", image_buffer.getvalue(), "image/png")},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+
+        settings = get_settings()
+        with SessionLocal() as db:
+            post = db.query(ContentPost).filter(ContentPost.title == "Upload Smoke Job Post").first()
+            self.assertIsNotNone(post)
+            self.assertTrue(post.image_url.endswith(".webp"))
+            self.assertIn("/static/uploads/posts/jobs/", post.image_url)
+            relative_url = post.image_url.replace(settings.public_base_url.rstrip(), "")
+            saved_path = BASE_DIR / "app" / relative_url.lstrip("/")
+            self.assertTrue(saved_path.exists())
+            saved_path.unlink(missing_ok=True)
+            db.delete(post)
+            db.query(SecurityEvent).filter(SecurityEvent.user_id == admin_id).delete()
+            db.delete(db.get(User, admin_id))
             db.commit()
 
     def test_security_firewall_env_blocklist_logs_event(self):

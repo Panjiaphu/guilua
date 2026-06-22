@@ -45,6 +45,10 @@ services:
         value: 5
       - key: UPLOAD_STORAGE_BACKEND
         value: local
+      - key: UPLOAD_IMAGE_MAX_WIDTH
+        value: 1600
+      - key: UPLOAD_IMAGE_QUALITY
+        value: 82
       - key: PUBLIC_BASE_URL
         value: https://fumap-line-webhook.onrender.com
       - key: SHOPEE_AFFILIATE_DISCLOSURE_ENABLED

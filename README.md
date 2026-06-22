@@ -47,6 +47,8 @@ AI_AGENT_DEFAULT_POST_STATUS=draft
 AI_AGENT_ALLOW_AUTOPUBLISH=false
 UPLOAD_MAX_MB=5
 UPLOAD_STORAGE_BACKEND=local
+UPLOAD_IMAGE_MAX_WIDTH=1600
+UPLOAD_IMAGE_QUALITY=82
 PUBLIC_BASE_URL=https://fumap-line-webhook.onrender.com
 VPN_DOWNLOAD_URL=
 VPN_SETUP_GUIDE_URL=
@@ -108,6 +110,8 @@ AI_AGENT_DEFAULT_POST_STATUS=draft
 AI_AGENT_ALLOW_AUTOPUBLISH=false
 UPLOAD_MAX_MB=5
 UPLOAD_STORAGE_BACKEND=local
+UPLOAD_IMAGE_MAX_WIDTH=1600
+UPLOAD_IMAGE_QUALITY=82
 PUBLIC_BASE_URL=https://fumap-line-webhook.onrender.com
 SHOPEE_AFFILIATE_DISCLOSURE_ENABLED=true
 ```
@@ -120,6 +124,7 @@ Xem thêm trong `docs/deploy-render.md`.
 - Binance: app đang dùng public Spot market endpoint, không cần API key cho giá public.
 - Google AdSense: tạo site trong AdSense, lấy `ca-pub-...` cho `GOOGLE_ADSENSE_CLIENT`, tạo ad unit lấy `GOOGLE_ADSENSE_SLOT`, lấy publisher id `pub-...` cho `GOOGLE_ADSENSE_PUBLISHER_ID`, và nếu Google yêu cầu meta verification thì set `GOOGLE_SITE_VERIFICATION`.
 - AI Agent: tạo key trong `/admin/ai-agents`. Raw key chỉ hiển thị một lần, không lưu raw key trong database.
+- Upload ảnh bài viết: admin và AI Agent upload ảnh sẽ được nén thành WebP và tạo URL dưới `/static/uploads/...`. `local` chỉ phù hợp MVP trên Render; sản phẩm thật nên dùng Render Disk hoặc storage ngoài như S3/Cloudinary/R2.
 - VPN download: set `VPN_DOWNLOAD_URL` và `VPN_SETUP_GUIDE_URL` khi có phần mềm/hướng dẫn thật.
 
 ## Bổ sung mới: Crypto analysis, login reset và firewall

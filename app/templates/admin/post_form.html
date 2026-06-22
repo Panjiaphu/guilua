@@ -1,60 +1,169 @@
 {% extends "base.html" %}
+{% set section_title = t("admin.post.type_job") if section == "jobs" else (t("admin.post.type_shop") if section == "shop" else t("admin.post.type_crypto")) %}
 {% block content %}
-<section class="admin-shell">
-  <section class="panel">
-    <a class="muted-link" href="/admin/posts/{{ section }}?lang={{ locale }}">Back</a>
-    <h1>{{ "Edit" if post else "New" }} {% if section == "jobs" %}job post{% elif section == "shop" %}shop post{% else %}crypto analysis{% endif %}</h1>
-    <form class="stack-form" method="post" action="{% if post %}/admin/posts/{{ section }}/{{ post.id }}{% else %}/admin/posts/{{ section }}{% endif %}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>Title<input name="title" required value="{{ post.title if post else '' }}"></label>
-      <label>Summary<textarea name="summary" rows="3">{{ post.summary if post else '' }}</textarea></label>
-      <label>Content<textarea name="content" rows="8">{{ post.content if post else '' }}</textarea></label>
-      <label>Image URL<input name="image_url" value="{{ post.image_url if post else '' }}"></label>
-      <label>Target URL<input name="target_url" value="{{ post.target_url if post else '' }}"></label>
+<section class="admin-shell post-editor-shell">
+  <div class="post-editor-head">
+    <a class="muted-link" href="/admin/posts/{{ section }}?lang={{ locale }}">{{ t("commerce.back") }}</a>
+    <div>
+      <p class="eyebrow">{{ t("admin.post.kicker") }}</p>
+      <h1>{{ t("admin.post.edit") if post else t("admin.post.new") }} {{ section_title }}</h1>
+      <p class="muted">{{ t("admin.post.subtitle") }}</p>
+    </div>
+  </div>
+
+  {% if request.query_params.get("error") %}
+    <div class="alert">{{ t("admin.post.invalid_input") }}</div>
+  {% endif %}
+
+  <form
+    class="post-editor-grid"
+    method="post"
+    enctype="multipart/form-data"
+    action="{% if post %}/admin/posts/{{ section }}/{{ post.id }}{% else %}/admin/posts/{{ section }}{% endif %}"
+  >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <section class="panel post-editor-main">
+      <div class="form-section-title">
+        <span>{{ t("admin.post.content_section") }}</span>
+        <small>{{ t("admin.post.content_hint") }}</small>
+      </div>
+
+      <label>{{ t("admin.post.title") }}
+        <input name="title" required maxlength="255" value="{{ post.title if post else '' }}" placeholder="{{ t("admin.post.title_placeholder") }}">
+      </label>
+      <label>{{ t("admin.post.summary") }}
+        <textarea name="summary" rows="4" maxlength="700" placeholder="{{ t("admin.post.summary_placeholder") }}">{{ post.summary if post else '' }}</textarea>
+      </label>
+      <label>{{ t("admin.post.content") }}
+        <textarea class="article-editor" name="content" rows="14" placeholder="{{ t("admin.post.content_placeholder") }}">{{ post.content if post else '' }}</textarea>
+      </label>
+
       {% if section == "crypto-analysis" %}
+        <div class="form-section-title">
+          <span>{{ t("admin.post.market_section") }}</span>
+          <small>{{ t("admin.post.market_hint") }}</small>
+        </div>
         <div class="form-grid">
-          <label>Market session<input name="market_session" placeholder="Asia / Europe / US" value="{{ post.market_session if post else '' }}"></label>
-          <label>Market bias
+          <label>{{ t("admin.post.market_session") }}
+            <input name="market_session" placeholder="Asia / Europe / US" value="{{ post.market_session if post else '' }}">
+          </label>
+          <label>{{ t("admin.post.market_bias") }}
             <select name="market_bias">
               {% for value in ["", "bullish", "neutral", "bearish"] %}
-                <option value="{{ value }}" {% if post and post.market_bias == value %}selected{% endif %}>{{ value or "not set" }}</option>
+                <option value="{{ value }}" {% if post and post.market_bias == value %}selected{% endif %}>{{ value or t("admin.post.not_set") }}</option>
               {% endfor %}
             </select>
           </label>
-          <label>Risk level
+          <label>{{ t("admin.post.risk_level") }}
             <select name="risk_level">
               {% for value in ["", "low", "medium", "high"] %}
-                <option value="{{ value }}" {% if post and post.risk_level == value %}selected{% endif %}>{{ value or "not set" }}</option>
+                <option value="{{ value }}" {% if post and post.risk_level == value %}selected{% endif %}>{{ value or t("admin.post.not_set") }}</option>
               {% endfor %}
             </select>
           </label>
-          <label>Category<input name="analysis_category" placeholder="TradingView / Tokenomics / Session report" value="{{ post.analysis_category if post else '' }}"></label>
+          <label>{{ t("admin.post.category") }}
+            <input name="analysis_category" placeholder="TradingView / Tokenomics / Session report" value="{{ post.analysis_category if post else '' }}">
+          </label>
         </div>
-        <div class="form-grid">
-          <label>TradingView symbol<input name="tradingview_symbol" placeholder="BINANCE:BTCUSDT" value="{{ post.tradingview_symbol if post else '' }}"></label>
-          <label>TradingView URL<input name="tradingview_url" placeholder="https://www.tradingview.com/chart/..." value="{{ post.tradingview_url if post else '' }}"></label>
+        <div class="form-grid two">
+          <label>{{ t("admin.post.tradingview_symbol") }}
+            <input name="tradingview_symbol" placeholder="BINANCE:BTCUSDT" value="{{ post.tradingview_symbol if post else '' }}">
+          </label>
+          <label>{{ t("admin.post.tradingview_url") }}
+            <input name="tradingview_url" placeholder="https://www.tradingview.com/chart/..." value="{{ post.tradingview_url if post else '' }}">
+          </label>
         </div>
       {% endif %}
+
+      <div class="form-section-title">
+        <span>{{ t("admin.post.publish_section") }}</span>
+        <small>{{ t("admin.post.publish_hint") }}</small>
+      </div>
       <div class="form-grid">
-        <label>Platform<input name="platform" value="{{ post.platform if post else ('shopee' if section == 'shop' else ('tradingview' if section == 'crypto-analysis' else 'website')) }}"></label>
-        <label>Locale
+        <label>{{ t("admin.post.platform") }}
+          <input name="platform" value="{{ post.platform if post else ('shopee' if section == 'shop' else ('tradingview' if section == 'crypto-analysis' else 'website')) }}">
+        </label>
+        <label>{{ t("admin.post.locale") }}
           <select name="locale">
-            <option value="vi" {% if post and post.locale == "vi" %}selected{% endif %}>vi</option>
-            <option value="zh-TW" {% if post and post.locale == "zh-TW" %}selected{% endif %}>zh-TW</option>
+            <option value="vi" {% if post and post.locale == "vi" %}selected{% endif %}>Tiếng Việt</option>
+            <option value="zh-TW" {% if post and post.locale == "zh-TW" %}selected{% endif %}>繁體中文</option>
           </select>
         </label>
-        <label>Status
+        <label>{{ t("admin.post.status") }}
           <select name="status">
             {% for value in ["draft", "published", "archived"] %}
-              <option value="{{ value }}" {% if post and post.status.value == value %}selected{% endif %}>{{ value }}</option>
+              <option value="{{ value }}" {% if post and post.status.value == value %}selected{% endif %}>{{ t("admin.post.status_" ~ value) }}</option>
             {% endfor %}
           </select>
         </label>
-        <label>Sort<input name="sort_order" type="number" value="{{ post.sort_order if post else 0 }}"></label>
+        <label>{{ t("admin.post.sort") }}
+          <input name="sort_order" type="number" value="{{ post.sort_order if post else 0 }}">
+        </label>
       </div>
-      <label>Tags<input name="tags" value="{{ post.tags if post else '' }}"></label>
-      <button class="button" type="submit">Save</button>
-    </form>
-  </section>
+      <label>{{ t("admin.post.tags") }}
+        <input name="tags" value="{{ post.tags if post else '' }}" placeholder="BTC, Taiwan, Shopee">
+      </label>
+      <label>{{ t("admin.post.target_url") }}
+        <input name="target_url" value="{{ post.target_url if post else '' }}" placeholder="https://...">
+      </label>
+    </section>
+
+    <aside class="panel post-media-panel">
+      <div class="form-section-title">
+        <span>{{ t("admin.post.media_section") }}</span>
+        <small>{{ t("admin.post.media_hint") }}</small>
+      </div>
+
+      <div class="post-image-preview" id="postImagePreview">
+        {% if post and post.image_url %}
+          <img src="{{ post.image_url }}" alt="{{ post.title }}" loading="lazy">
+        {% else %}
+          <div class="post-image-empty">{{ section_title }}</div>
+        {% endif %}
+      </div>
+
+      <label class="upload-drop">
+        <span>{{ t("admin.post.upload_image") }}</span>
+        <small>{{ t("admin.post.upload_hint") }}</small>
+        <input id="postImageFile" name="image_file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+      </label>
+
+      <label>{{ t("admin.post.image_url") }}
+        <input id="postImageUrl" name="image_url" value="{{ post.image_url if post else '' }}" placeholder="https://...">
+      </label>
+
+      {% if post and post.image_url %}
+        <a class="button small ghost" href="{{ post.image_url }}" target="_blank" rel="noopener noreferrer">{{ t("admin.post.open_image") }}</a>
+      {% endif %}
+
+      <div class="media-spec-list">
+        <span>{{ t("admin.post.spec_ratio") }}</span>
+        <span>{{ t("admin.post.spec_compress") }}</span>
+        <span>{{ t("admin.post.spec_safe") }}</span>
+      </div>
+
+      <button class="button primary full" type="submit">{{ t("admin.post.save") }}</button>
+    </aside>
+  </form>
 </section>
+
+<script>
+  (() => {
+    const input = document.getElementById("postImageFile");
+    const preview = document.getElementById("postImagePreview");
+    if (!input || !preview) return;
+    input.addEventListener("change", () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      preview.innerHTML = "";
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = file.name;
+      image.onload = () => URL.revokeObjectURL(url);
+      preview.appendChild(image);
+    });
+  })();
+</script>
 {% endblock %}

@@ -1,22 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.config import BASE_DIR, get_settings
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.services.commercial import (
-    ALLOWED_IMAGE_EXTENSIONS,
     create_content_post,
     log_agent_request,
     parse_json_list,
-    validate_public_url,
     verify_agent_key,
 )
+from app.services.media import save_uploaded_image
 from app.services.security_firewall import log_security_event
 
 
@@ -192,23 +190,21 @@ async def upload_agent_media(
     db: Session = Depends(get_db),
     agent_key=Depends(require_agent_key),
 ):
-    settings = get_settings()
-    suffix = Path(file.filename or "").suffix.lower()
-    if suffix not in ALLOWED_IMAGE_EXTENSIONS:
-        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only image files are allowed")
     content = await file.read()
-    max_bytes = settings.upload_max_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File is too large")
-    if settings.upload_storage_backend != "local":
-        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Only local upload is implemented")
-    upload_dir = BASE_DIR / "app" / "static" / "uploads" / "agent"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{agent_key.prefix}-{Path(file.filename or 'image').stem[:30]}-{len(content)}{suffix}"
-    safe_name = "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "-" for ch in filename)
-    target = upload_dir / safe_name
-    target.write_bytes(content)
-    image_url = f"/static/uploads/agent/{safe_name}"
+    try:
+        saved = save_uploaded_image(
+            content=content,
+            original_filename=file.filename or "image",
+            folder="agent",
+            name_hint=agent_key.prefix,
+        )
+    except ValueError as exc:
+        error = str(exc)
+        if error == "image_too_large":
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File is too large") from exc
+        if error == "unsupported_upload_storage":
+            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Only local upload is implemented") from exc
+        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only image files are allowed") from exc
     log_agent_request(
         db,
         agent_key=agent_key,
@@ -217,4 +213,10 @@ async def upload_agent_media(
         request_ip=_request_ip(request),
         status_code=200,
     )
-    return {"ok": True, "image_url": validate_public_url(f"{settings.public_base_url.rstrip('/')}{image_url}")}
+    return {
+        "ok": True,
+        "image_url": saved.url,
+        "width": saved.width,
+        "height": saved.height,
+        "compressed_bytes": saved.compressed_bytes,
+    }
