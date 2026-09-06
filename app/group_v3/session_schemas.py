@@ -34,3 +34,15 @@ class VideoSubscriptionsUpdate(StrictModel):
         if len(value) != len(set(value)) or any(not 1 <= len(item) <= 36 for item in value):
             raise ValueError("invalid_participant_membership_ids")
         return value
+
+
+class MediaConnectionStateUpdate(StrictModel):
+    status: str
+    failure_code: str = Field(default="", max_length=80)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value):
+        if value not in {"connecting", "connected", "reconnecting", "failed"}:
+            raise ValueError("invalid_media_connection_status")
+        return value

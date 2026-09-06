@@ -1,0 +1,307 @@
+/* Final owner of active Group workspace geometry. Normal chat/Direct are
+   deliberately excluded. VisualViewport remains owned by its existing adapter. */
+.video-call-layout .video-stage {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  position: relative;
+}
+.video-stage > .video-panel-toolbar { grid-row: 1; grid-column: 1; justify-self: end; position: static; }
+.video-stage > .call-status-line { grid-row: 1; grid-column: 1; padding-right: 110px; min-height: 44px; }
+.video-stage .video-layout-mode, .video-panel-toolbar [data-video-mode-label],
+.translation-dock [data-translation-mode-label] { display: none; }
+[data-radio-mode-label], [data-radio-translation-mode-label] { display: none; }
+.video-stage > .video-grid { grid-row: 2; min-height: 0; }
+.video-stage > .call-control-dock { grid-row: 3; }
+.video-tile > video.local-media, .video-tile > video.remote-media {
+  width: 100%; height: 100%; max-width: 100%; object-fit: contain;
+  object-position: center; background: #10211e;
+}
+.video-tile[data-video-fit="FILL"] > video { object-fit: cover; }
+.video-tile.has-video > .avatar { visibility: hidden; }
+.video-tile.is-presentation-hidden > video { visibility: hidden; }
+.video-tile-actions button, .translation-dock__bar .icon-button { min-width: 44px; min-height: 44px; }
+.workspace-control:disabled { opacity: .35; cursor: default; background: var(--canvas); color: var(--muted); }
+.translation-dock { padding: 0; gap: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.translation-dock .translation-dock__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.translation-dock[data-translation-mode="COLLAPSED"] { grid-template-rows: auto; }
+.translation-dock[data-translation-mode="COLLAPSED"] .translation-safety-layer { display: none; }
+.translation-dock__bar .translation-open-icon { display: none; }
+.call-communication-layout {
+  position: relative; min-width: 0; min-height: 0; height: 100%;
+  display: grid; overflow: hidden; background: var(--white);
+}
+.call-workspace-stage {
+  min-width: 0; min-height: 0; display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); overflow: hidden;
+}
+.call-workspace-stage > .call-stage { min-width: 0; min-height: 0; }
+.call-communication-layout > .translation-dock { border-left: 1px solid var(--border); }
+.media-audio-recovery {
+  z-index: 12; display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: min(620px, calc(100% - 24px)); padding: 8px 10px; border: 1px solid #efc8bd;
+  border-radius: 12px; color: #913c2d; background: #fff0eb; box-shadow: var(--shadow-sm);
+}
+.media-audio-recovery > span, .media-audio-recovery > small { flex: 1; line-height: 1.4; }
+.media-audio-recovery .action-button { min-height: 44px; flex: 0 0 auto; }
+.video-stage > .media-audio-recovery {
+  position: absolute; top: 66px; left: 50%; transform: translateX(-50%);
+}
+.group-translation-v2__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.group-translation-v2__actions button { min-height: 48px; height: 48px; min-width: 0; gap: 6px; }
+.group-translation-v2__actions [data-v2-action="record"] { font-variant-numeric: tabular-nums; }
+.group-translation-v2 textarea, .group-translation-v2 select { font-size: 16px; }
+.group-translation-v2 [data-v2-warning] { padding: 8px; color: #785300; background: #fff6dd; }
+.group-translation-v2__variant > span { overflow-wrap: anywhere; }
+.group-translation-v2__retry, .group-translation-v2__play { min-height: 44px; }
+@media (min-width: 641px) {
+  .native-desktop .video-call-layout[data-translation-mode="COLLAPSED"] { grid-template-columns: minmax(0, 1fr) 60px; }
+  .native-desktop .video-call-layout[data-translation-mode="HALF"] { grid-template-columns: minmax(0, 1fr) minmax(320px, 36%); }
+  .native-desktop .video-call-layout[data-translation-mode="FULL"] { grid-template-columns: minmax(0, 1fr) minmax(360px, 50%); }
+  .native-desktop .call-communication-layout[data-translation-mode="COLLAPSED"] { grid-template-columns: minmax(0, 1fr) 60px; }
+  .native-desktop .call-communication-layout[data-translation-mode="HALF"] { grid-template-columns: minmax(0, 1fr) minmax(320px, 36%); }
+  .native-desktop .call-communication-layout[data-translation-mode="FULL"] { grid-template-columns: minmax(0, 1fr) minmax(360px, 50%); }
+  .native-desktop .translation-dock[data-translation-mode="COLLAPSED"] { width: 60px; align-content: start; }
+  .native-desktop .translation-dock[data-translation-mode="COLLAPSED"] .translation-dock__bar {
+    flex-direction: row; min-height: 56px; height: 56px; padding: 6px; border: 0;
+  }
+  .native-desktop .translation-dock[data-translation-mode="COLLAPSED"] .translation-dock__bar > strong,
+  .native-desktop .translation-dock[data-translation-mode="COLLAPSED"] [data-workspace-action="translation-minus"],
+  .native-desktop .translation-dock[data-translation-mode="COLLAPSED"] .translation-open-chevron { display: none; }
+  .native-desktop .translation-dock[data-translation-mode="COLLAPSED"] .translation-open-icon { display: inline-flex; }
+}
+/* Includes touch-phone landscape, not a width-only breakpoint. */
+body.group-v3-body.group-communication-immersive:has(.native-mobile) #group-native-app {
+  height: var(--group-visual-viewport-bottom, 100dvh);
+  padding: var(--group-visual-viewport-offset-top, 0px) 0 0;
+  overflow: hidden;
+}
+body.group-v3-body.group-communication-immersive .native-mobile {
+  height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr); padding: 0;
+}
+body.group-v3-body.group-communication-immersive .native-mobile .native-main {
+  height: 100%; min-height: 0; grid-row: 1; grid-column: 1;
+  grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
+}
+body.group-v3-body.group-communication-immersive .native-mobile .native-main > :not(.surface-content),
+body.group-v3-body.group-communication-immersive .native-mobile > :not(.native-main) { display: none; }
+body.group-v3-body.group-communication-immersive .native-mobile .native-main .surface-content {
+  grid-row: 1; grid-column: 1; height: 100%; min-height: 0; overflow: hidden;
+}
+body.group-communication-immersive .native-mobile .video-call-layout[data-video-mode] {
+  position: relative; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+body.group-communication-immersive .native-mobile .call-communication-layout {
+  position: relative; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto; height: 100%; min-height: 0;
+}
+body.group-communication-immersive .native-mobile .call-workspace-stage {
+  min-height: 0; grid-template-columns: minmax(0, 1fr); overflow: hidden;
+}
+body.group-communication-immersive .native-mobile .call-workspace-stage .audio-stage {
+  height: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+}
+body.group-communication-immersive .native-mobile .video-stage {
+  padding: 6px; gap: 6px; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto;
+}
+body.group-communication-immersive .native-mobile .video-panel-toolbar {
+  display: flex; position: static; z-index: 7; min-height: 44px;
+}
+.native-mobile .video-stage .call-control-dock {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px;
+}
+.native-mobile .video-stage .call-control-dock > .action-button {
+  display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  min-width: 0; min-height: 48px; padding: 4px 2px; font-size: 10px;
+}
+.native-mobile .video-grid.count-2 .video-tile.is-featured { grid-column: auto; grid-row: auto; }
+.native-mobile .video-grid .video-tile { min-height: 0; }
+.native-mobile .video-call-layout .translation-dock[data-translation-mode="COLLAPSED"] {
+  position: relative; inset: auto; width: 100%; height: auto; max-height: none;
+  padding: 0 0 env(safe-area-inset-bottom, 0px); gap: 0;
+}
+.native-mobile .call-communication-layout .translation-dock[data-translation-mode="COLLAPSED"] {
+  position: relative; inset: auto; width: 100%; height: 52px; min-height: 52px;
+  padding: 0; gap: 0;
+}
+.native-mobile .translation-dock__bar { padding: 4px 8px; min-height: 52px; }
+.native-mobile .translation-dock[data-translation-mode="COLLAPSED"] .translation-safety-layer { display: none; }
+.native-mobile .video-call-layout .translation-dock[data-translation-mode="HALF"] {
+  position: absolute; inset: auto 0 0; height: 55%; max-height: none;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0 0 env(safe-area-inset-bottom, 0px); z-index: 20;
+}
+.native-mobile .call-communication-layout .translation-dock[data-translation-mode="HALF"] {
+  position: absolute; inset: auto 0 0; height: 55%; max-height: none; width: 100%;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0; z-index: 20; box-shadow: 0 -12px 28px rgba(7,95,84,.16);
+}
+.native-mobile .video-call-layout .translation-dock[data-translation-mode="FULL"] {
+  position: absolute; inset: 0; height: 100%; max-height: none;
+  z-index: 20;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.native-mobile .call-communication-layout .translation-dock[data-translation-mode="FULL"] {
+  position: absolute; inset: 0; height: 100%; max-height: none; width: 100%;
+  z-index: 20; grid-template-rows: auto minmax(0, 1fr) auto; padding: 0;
+}
+.native-mobile .video-call-layout .translation-dock[data-translation-mode] .translation-dock__body {
+  height: auto; max-height: none; overflow: auto;
+}
+.native-mobile .call-communication-layout .translation-dock[data-translation-mode] .translation-dock__body {
+  height: auto; max-height: none; min-height: 0; overflow: auto;
+}
+.native-mobile .translation-dock:not([data-translation-mode="COLLAPSED"]) .translation-safety-layer { display: flex; }
+.native-mobile .video-call-layout[data-video-mode="COMPACT"] .video-grid {
+  grid-template-columns: minmax(0, 1fr) 76px; grid-template-rows: minmax(0, 1fr);
+}
+.video-grid .video-compact-summary { display: none; }
+.native-mobile .video-call-layout[data-video-mode="COMPACT"] .video-compact-summary { display: grid; }
+.native-mobile .video-call-layout[data-video-mode="COMPACT"] .video-tile:not(.is-featured) { display: none; }
+@media (orientation: landscape) {
+  .native-mobile .video-call-layout .translation-dock[data-translation-mode="HALF"] {
+    inset: 0 0 0 auto; width: 46%; height: 100%;
+  }
+  .native-mobile .call-communication-layout .translation-dock[data-translation-mode="HALF"] {
+    inset: 0 0 0 auto; width: 46%; height: 100%;
+  }
+  .native-mobile .video-stage .call-control-dock > .action-button { flex-direction: row; min-height: 44px; }
+}
+@media (orientation: portrait) {
+  .native-mobile .video-call-layout:not([data-video-mode="COMPACT"]) .video-grid.count-2 {
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+}
+.video-call-layout .video-grid.has-explicit-focus,
+.native-mobile .video-call-layout:not([data-video-mode="COMPACT"]) .video-grid.has-explicit-focus {
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+}
+.video-call-layout .video-grid.has-explicit-focus .video-tile:not(.is-featured) { display: none; }
+
+/* Start-stage reservation: the identity block never shrinks or overlaps the
+   member picker; only member rows own scrolling. */
+.native-desktop .chat-content.media-start-layout.state-active_video {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(340px, 1fr) minmax(120px, 30%);
+}
+.chat-content > .media-start-empty {
+  position: relative; box-sizing: border-box; width: 100%; height: 100%; min-height: 0;
+  align-self: stretch; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch; justify-items: center; gap: 16px;
+  padding: clamp(14px, 3vh, 28px) 12px max(14px, env(safe-area-inset-bottom, 0px)); overflow: hidden;
+}
+.media-start-intro {
+  width: min(720px, 100%); min-width: 0; min-height: 64px; flex: 0 0 auto;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: 12px; text-align: left;
+}
+.media-start-intro > span {
+  width: 58px; height: 58px; display: grid; place-items: center;
+  border-radius: 16px; color: var(--teal); background: var(--mint);
+}
+.media-start-intro h2 { margin: 0 0 4px; font-size: clamp(20px, 2vw, 28px); line-height: 1.15; }
+.media-start-intro p { margin: 0; color: var(--muted); line-height: 1.4; }
+.media-room-picker-toggle { min-width: 44px; width: 44px; min-height: 44px; height: 44px; }
+.media-room-picker {
+  position: absolute; inset: 82px 12px auto 12px; z-index: 40;
+  max-height: min(62vh, 520px); overflow: auto; padding: 10px;
+  border: 1px solid #d1e5dd; border-radius: 14px; background: var(--white);
+  box-shadow: 0 4px 20px #12332e33;
+}
+.media-room-picker[hidden] { display: none; }
+.media-room-picker > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 2px 8px; }
+.media-room-picker h2 { margin: 0; font-size: 1rem; }
+.media-room-picker-row {
+  width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
+  color: #12332e; background: transparent; text-align: left; font: inherit;
+}
+.media-room-picker-row.is-active { border-color: #b9ded1; background: #e3f2ec; }
+.media-room-picker-row b { color: #117563; }
+.video-call-layout > .media-room-picker, .call-communication-layout > .media-room-picker { inset: 64px 12px auto 12px; }
+.call-status-line .active-media-room-button { margin-left: auto; }
+.translation-safety-layer .translation-room-button { flex: 0 0 44px; }
+.audio-stage > .media-audio-recovery { width: min(620px, 100%); }
+.radio-recovery.media-audio-recovery { width: 100%; }
+.radio-recovery.media-audio-recovery .action-button { margin-left: auto; }
+.media-start-empty .media-start-form {
+  width: min(720px, 100%); height: auto; min-height: 0; max-height: none;
+  align-self: stretch; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+.media-start-form .media-member-list { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.media-start-form .media-member-list fieldset { max-height: none; overflow: visible; }
+.media-start-form > .action-button { width: 100%; }
+
+.communication-device-settings {
+  display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border);
+  border-radius: 14px; background: var(--canvas);
+}
+.communication-device-settings h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--teal-strong); }
+.communication-device-settings > p { margin: 0; color: var(--muted); line-height: 1.45; }
+.communication-device-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.communication-device-grid label, .device-output-managed { min-width: 0; display: grid; gap: 6px; }
+.communication-device-grid label > span, .device-output-managed > span { color: var(--muted); font-size: 11px; font-weight: 700; }
+.communication-device-grid select, .device-output-managed > strong {
+  min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--white); color: var(--ink); font: inherit;
+}
+.device-output-managed > strong { display: flex; align-items: center; font-size: 12px; }
+.communication-device-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.communication-device-status { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--teal-strong); }
+.communication-device-status i {
+  --meter-level: 12%; width: 64px; height: 7px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--teal) var(--meter-level), var(--border) var(--meter-level));
+}
+.settings-form-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.settings-form-heading h2 { min-width: 0; margin: 0; }
+.settings-collapse-control { flex: 0 0 44px; width: 44px; min-height: 44px; }
+.settings-form-body { display: grid; gap: 10px; }
+.settings-form.is-collapsed { gap: 0; }
+
+@media (max-width: 640px) {
+  .chat-content > .media-start-empty {
+    gap: 14px; padding: 12px 12px max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  .media-start-intro { min-height: 58px; gap: 10px; }
+  .media-start-intro > span { width: 54px; height: 54px; border-radius: 14px; }
+  .media-start-intro h2 { font-size: 20px; }
+  .media-start-intro p { font-size: 12px; }
+  .media-start-empty .media-start-form { width: 100%; height: auto; min-height: 0; }
+  .media-room-picker { inset: 76px 8px auto 8px; max-height: 58vh; }
+  .video-call-layout > .media-room-picker, .call-communication-layout > .media-room-picker { inset: 54px 6px auto 6px; }
+  .media-audio-recovery { width: calc(100% - 12px); flex-wrap: wrap; }
+  .media-audio-recovery .action-button { width: 100%; }
+  .communication-device-grid { grid-template-columns: minmax(0, 1fr); }
+  .communication-device-actions { grid-template-columns: minmax(0, 1fr); }
+  .native-mobile .settings-form { max-height: none; }
+  .native-mobile .settings-form-body { min-height: 0; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .chat-content > .media-start-empty {
+    display: grid; grid-template-columns: minmax(190px, .34fr) minmax(0, .66fr);
+    grid-template-rows: minmax(0, 1fr); align-items: stretch;
+    gap: 12px; padding: 8px 12px; overflow: hidden;
+  }
+  .media-start-intro {
+    width: 100%; min-height: 0; align-content: center;
+    grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 8px;
+  }
+  .media-start-intro > span { width: 48px; height: 48px; }
+  .media-start-intro > div { min-width: 0; }
+  .media-start-intro h2 { font-size: 18px; }
+  .media-start-intro p { display: block; font-size: 11px; }
+  .media-start-intro .media-start-room-button { grid-column: 1 / -1; justify-self: start; }
+  .media-start-empty .media-start-form {
+    width: 100%; height: 100%; min-height: 0; max-height: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(128px, 36%);
+    grid-template-rows: 44px minmax(0, 1fr); gap: 6px; padding: 8px;
+  }
+  .media-start-form .media-member-search { grid-column: 1; grid-row: 1; min-height: 44px; }
+  .media-start-form .media-member-list { grid-column: 1; grid-row: 2; min-height: 0; }
+  .media-start-form > .action-button {
+    grid-column: 2; grid-row: 1 / 3; align-self: stretch; width: 100%; height: auto;
+  }
+  .media-start-empty > .media-room-picker { inset: 8px 12px 8px calc(34% + 12px); max-height: none; }
+}

@@ -5,12 +5,15 @@ from fastapi.responses import JSONResponse
 
 from app.group_translation.provider import GroupTranslationProviderError
 from app.group_v3.auth import require_group_actor, require_write_origin
+from app.group_v3.voice_input import read_voice_form
 from app.group_v3.translation_schemas import (
     LanguageProfileUpdate,
     TranslationConsentUpdate,
     TranslationFinalCreate,
     TranslationReservationRelease,
     TranslationSecretCreate,
+    TranslationSegmentTextCreate,
+    TranslationVariantRetry,
     TtsJobAck,
 )
 
@@ -119,6 +122,90 @@ async def get_translation_quota(
         raise HTTPException(status_code=400, detail="invalid_media_kind")
     quota = request.app.state.group_translation_service.quota(actor, _id(space_id, "space_id"), media_kind)
     return _json({"quota": quota})
+
+
+@router.post("/spaces/{space_id}/translation/segments/text")
+async def submit_translation_text(
+    request: Request,
+    space_id: str,
+    body: TranslationSegmentTextCreate,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.translation.use")
+    result = await request.app.state.group_translation_service.submit_text(
+        actor, _id(space_id, "space_id"), body.model_dump(), idempotency_key
+    )
+    return _json({"segment": result}, status_code=201)
+
+
+@router.post("/spaces/{space_id}/translation/segments/voice")
+async def submit_translation_voice(
+    request: Request,
+    space_id: str,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.translation.use")
+    fields, data, filename, content_type = await read_voice_form(request)
+    runtime_kind = fields.get("runtime_kind")
+    runtime_id = fields.get("runtime_id")
+    client_segment_id = fields.get("client_segment_id")
+    source_language = fields.get("source_language")
+    if runtime_kind not in {"call", "video", "radio"} or source_language not in {"vi", "en", "zh-TW", "auto"}:
+        raise HTTPException(status_code=400, detail="invalid_translation_segment")
+    if idempotency_key and str(idempotency_key).strip() != str(client_segment_id).strip():
+        raise HTTPException(status_code=400, detail="group_translation_idempotency_mismatch")
+    result = await request.app.state.group_translation_service.submit_voice(
+        actor,
+        _id(space_id, "space_id"),
+        {
+            "runtime_kind": runtime_kind,
+            "runtime_id": _id(runtime_id, "runtime_id"),
+            "client_segment_id": _id(client_segment_id, "client_segment_id", 128),
+            "source_language": source_language,
+            "duration_seconds": fields.get("duration_seconds"),
+        },
+        data,
+        filename,
+        content_type,
+    )
+    return _json({"segment": result}, status_code=201)
+
+
+@router.post("/spaces/{space_id}/translation/segments/{segment_id}/variants/{target_language}/retry")
+async def retry_translation_variant(
+    request: Request,
+    space_id: str,
+    segment_id: str,
+    target_language: str,
+    body: TranslationVariantRetry | None = None,
+) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.translation.use")
+    target = body.target_language if body else target_language
+    result = await request.app.state.group_translation_service.retry_variant(
+        actor, _id(space_id, "space_id"), _id(segment_id, "segment_id"), target
+    )
+    return _json({"segment": result})
+
+
+@router.get("/spaces/{space_id}/translation/v2-history")
+async def translation_v2_history(
+    request: Request,
+    space_id: str,
+    runtime_kind: str | None = Query(default=None),
+    runtime_id: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=100),
+    before_id: str | None = Query(default=None, max_length=36),
+) -> JSONResponse:
+    actor = require_group_actor(request, "group.translation.use")
+    if runtime_kind not in {None, "call", "video", "radio"}:
+        raise HTTPException(status_code=400, detail="invalid_runtime_kind")
+    result = request.app.state.group_translation_service.v2_history(
+        actor, _id(space_id, "space_id"), runtime_kind, _id(runtime_id, "runtime_id") if runtime_id else None, limit, before_id
+    )
+    return _json({"segments": result})
 
 
 @router.post("/spaces/{space_id}/translation/client-secret")

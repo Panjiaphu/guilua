@@ -93,14 +93,14 @@
    is closed. The full layout viewport is authoritative until an editor is
    focused and the adapter marks the keyboard open. */
 @media (display-mode: standalone) {
-  body.group-v3-body:not(.group-keyboard-open) {
+  body.group-v3-body:not(.group-keyboard-open):not(.group-communication-immersive) {
     --group-visual-viewport-height: 100vh !important;
     --group-visual-viewport-offset-top: 0px !important;
     --group-visual-viewport-bottom: 100vh !important;
   }
 }
 
-body.group-v3-body.group-pwa-standalone:not(.group-keyboard-open) {
+body.group-v3-body.group-pwa-standalone:not(.group-keyboard-open):not(.group-communication-immersive) {
   --group-visual-viewport-height: 100vh !important;
   --group-visual-viewport-offset-top: 0px !important;
   --group-visual-viewport-bottom: 100vh !important;

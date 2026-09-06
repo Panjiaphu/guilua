@@ -120,6 +120,10 @@ def test_two_identity_group_chat_persists_full_native_history_and_denies_outside
         )
         assert downloaded.status_code == 200
         assert downloaded.content == attachment_payload
+        inline_text = client.get(
+            f"/api/group/spaces/{space_id}/attachments/{attachment_id}/inline"
+        )
+        assert inline_text.status_code == 415
 
         reply = client.post(
             f"/api/group/spaces/{space_id}/messages",

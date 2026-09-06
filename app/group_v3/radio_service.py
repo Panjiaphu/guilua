@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import Settings
@@ -21,7 +21,9 @@ from app.models import (
     GroupRadioParticipant,
     GroupRadioProcessingJob,
     GroupRadioSession,
+    GroupSpace,
     GroupTranslationConsent,
+    GroupTranslationSegment,
 )
 
 
@@ -42,10 +44,15 @@ def _token_hash(value: str) -> str:
 
 
 class GroupRadioService:
-    def __init__(self, database: Database, settings: Settings, provider: LiveKitGroupMediaProvider):
+    def __init__(self, database: Database, settings: Settings, provider: LiveKitGroupMediaProvider, event_broker=None):
         self.database = database
         self.settings = settings
         self.provider = provider
+        self.event_broker = event_broker
+
+    def _enqueue(self, db, space_id: str, event_type: str, resource_id: object = "") -> None:
+        if self.event_broker:
+            self.event_broker.enqueue_in_transaction(db, space_id, event_type, resource_id=resource_id)
 
     def _enabled(self) -> None:
         if not self.settings.group_radio_v3_enabled:
@@ -127,6 +134,7 @@ class GroupRadioService:
                     self._audit(db, actor, space_id, "radio.session_created", "radio_session", session.id, {"invitee_count": len(invitees)})
                     db.flush()
                     db.refresh(session)
+                    self._enqueue(db, space_id, "radio.session_created", session.id)
                     return self._session_payload(db, session)
             except IntegrityError as exc:
                 raise GroupServiceError("group_radio_session_conflict", 409) from exc
@@ -149,21 +157,58 @@ class GroupRadioService:
             self._participant(db, session.id, actor)
             return self._session_payload(db, session)
 
+    def open_room(self, actor, space_id):
+        """One current transport epoch per persistent space-level Radio room."""
+        self._enabled()
+        with self.database.session() as db:
+            with db.begin():
+                member = self._membership(db, space_id, actor)
+                db.scalar(select(GroupSpace).where(GroupSpace.id == space_id).with_for_update())
+                session = db.scalar(select(GroupRadioSession).where(
+                    GroupRadioSession.space_id == space_id, GroupRadioSession.status == "ready"
+                ).order_by(GroupRadioSession.created_at.desc()).limit(1))
+                if not session:
+                    session_id = str(uuid4())
+                    session = GroupRadioSession(id=session_id, space_id=space_id,
+                        title="", created_by_membership_id=member.id,
+                        livekit_room_name=room_name(f"radio:{session_id}"), status="ready")
+                    db.add(session)
+                    db.flush()
+                    self._enqueue(db, space_id, "radio.session_created", session_id)
+                session_id = session.id
+        return self.join(actor, space_id, session_id)
+
     def join(self, actor: GroupActor, space_id: str, session_id: str) -> dict:
         self._enabled()
         with self.database.session() as db:
             with db.begin():
-                self._membership(db, space_id, actor)
+                member = self._membership(db, space_id, actor)
                 session = self._session(db, space_id, session_id, for_update=True)
-                participant = self._participant(db, session.id, actor, for_update=True)
-                if session.status != "ready" or participant.status not in {"invited", "joined"}:
+                participant = db.scalar(select(GroupRadioParticipant).where(
+                    GroupRadioParticipant.radio_session_id == session.id,
+                    GroupRadioParticipant.membership_id == member.id,
+                ).with_for_update())
+                if session.status != "ready":
                     raise GroupServiceError("group_radio_join_not_allowed", 409)
+                joined = list(db.scalars(select(GroupRadioParticipant.id).where(
+                    GroupRadioParticipant.radio_session_id == session.id, GroupRadioParticipant.status == "joined"
+                )).all())
+                if (not participant or participant.status != "joined") and len(joined) >= self.settings.group_media_max_participants:
+                    raise GroupServiceError("group_radio_capacity_exceeded", 409)
+                if not participant:
+                    participant = GroupRadioParticipant(id=str(uuid4()), radio_session_id=session.id,
+                        membership_id=member.id, principal_type=member.principal_type,
+                        principal_id=member.principal_id, principal_user_id=member.principal_user_id,
+                        display_name=member.display_name,
+                        livekit_identity=participant_identity(f"radio:{session.id}", member.id))
+                    db.add(participant)
                 participant.status = "joined"
                 participant.device_state = "ready"
                 participant.joined_at = participant.joined_at or _now()
                 participant.left_at = None
                 participant.updated_at = _now()
                 self._audit(db, actor, space_id, "radio.participant_joined", "radio_session", session.id)
+                self._enqueue(db, space_id, "radio.participant_joined", session.id)
                 db.flush()
                 return self._session_payload(db, session)
 
@@ -187,6 +232,7 @@ class GroupRadioService:
                     "radio_session",
                     session.id,
                 )
+                self._enqueue(db, space_id, "radio.participant_rejected", session.id)
                 db.flush()
                 return self._session_payload(db, session)
 
@@ -196,11 +242,23 @@ class GroupRadioService:
             with db.begin():
                 self._membership(db, space_id, actor)
                 session = self._session(db, space_id, session_id, for_update=True)
-                participant = self._participant(db, session.id, actor, joined=True, for_update=True)
+                participant = self._participant(db, session.id, actor, for_update=True)
+                if participant.status == "left":
+                    return self._session_payload(db, session)
+                # Defensive closure after the caller released this member's floor.
+                for burst in db.scalars(select(GroupRadioBurst).where(
+                    GroupRadioBurst.radio_session_id == session.id,
+                    GroupRadioBurst.speaker_membership_id == participant.membership_id,
+                    GroupRadioBurst.state == "talking",
+                ).with_for_update()).all():
+                    burst.state = "failed"
+                    burst.stop_reason = "left_without_clip"
+                    burst.stopped_at = burst.finalized_at = _now()
                 participant.status = "left"
                 participant.left_at = _now()
                 participant.updated_at = _now()
                 self._audit(db, actor, space_id, "radio.participant_left", "radio_session", session.id, {"ended_for_all": False})
+                self._enqueue(db, space_id, "radio.participant_left", session.id)
                 db.flush()
                 return self._session_payload(db, session)
 
@@ -224,6 +282,7 @@ class GroupRadioService:
                             participant.status = "left"
                             participant.left_at = now
                     self._audit(db, actor, space_id, "radio.session_ended_for_all", "radio_session", session.id, {"ended_for_all": True})
+                    self._enqueue(db, space_id, "radio.session_ended_for_all", session.id)
                 db.flush()
                 return self._session_payload(db, session)
 
@@ -274,7 +333,6 @@ class GroupRadioService:
                             select(GroupLanguageProfile.preferred_output_language).where(
                                 GroupLanguageProfile.space_id == space_id,
                                 GroupLanguageProfile.membership_id.in_(joined_membership_ids),
-                                GroupLanguageProfile.auto_translate_enabled == 1,
                             )
                         ).all()
                         planned_targets = sorted(
@@ -283,6 +341,7 @@ class GroupRadioService:
                 burst = GroupRadioBurst(id=str(uuid4()), radio_session_id=session.id, space_id=space_id, speaker_participant_id=participant.id, speaker_membership_id=participant.membership_id, floor_token_hash=_token_hash(floor_token), state="talking", source_language=source_language, target_languages_json=json.dumps(planned_targets, separators=(",", ":")), started_at=_now())
                 db.add(burst)
                 self._audit(db, actor, space_id, "radio.floor_acquired", "radio_burst", burst.id, {"target_language_count": len(planned_targets), "targets_from_recipient_profiles": True})
+                self._enqueue(db, space_id, "radio.floor_acquired", burst.id)
                 db.flush()
                 return self._burst_payload(burst)
 
@@ -310,13 +369,16 @@ class GroupRadioService:
                         targets = json.loads(burst.target_languages_json)
                     except json.JSONDecodeError:
                         targets = []
-                    burst.state = "finalizing" if targets else "final"
+                    # Source transcription is required even for same-language rooms.
+                    processing = self.settings.group_translation_enabled
+                    burst.state = "finalizing" if processing else "final"
                     burst.stop_reason = reason[:40]
                     burst.stopped_at = _now()
-                    burst.finalized_at = None if targets else burst.stopped_at
+                    burst.finalized_at = None if processing else burst.stopped_at
                     burst.updated_at = _now()
-                    db.add(GroupRadioProcessingJob(id=str(uuid4()), burst_id=burst.id, status="ready" if targets else "completed"))
+                    db.add(GroupRadioProcessingJob(id=str(uuid4()), burst_id=burst.id, status="ready" if processing else "completed"))
                     self._audit(db, actor, space_id, "radio.burst_floor_released", "radio_burst", burst.id, {"before_downstream": True, "reason": reason[:40]})
+                    self._enqueue(db, space_id, "radio.floor_released", burst.id)
                 db.flush()
                 return self._burst_payload(burst)
 
@@ -341,6 +403,7 @@ class GroupRadioService:
                     participant.updated_at = now
                     db.add(GroupRadioProcessingJob(id=str(uuid4()), burst_id=burst.id, status="suppressed", failure_code="device_lost_private_audio_suppressed"))
                     self._audit(db, actor, space_id, "radio.burst_device_lost", "radio_burst", burst.id, {"private_audio_playback": "suppressed"})
+                    self._enqueue(db, space_id, "radio.device_lost", burst.id)
                 db.flush()
                 return self._burst_payload(burst)
 
@@ -366,6 +429,52 @@ class GroupRadioService:
             self._participant(db, session.id, actor)
             bursts = list(db.scalars(select(GroupRadioBurst).where(GroupRadioBurst.radio_session_id == session.id).order_by(GroupRadioBurst.created_at.desc()).limit(limit)).all())
             return [self._burst_payload(item) for item in bursts]
+
+    def leave_context(self, actor, space_id, session_id):
+        # Exit authorization is intentionally independent of device/floor state.
+        with self.database.session() as db:
+            member = self._membership(db, space_id, actor)
+            self._session(db, space_id, session_id)
+            self._participant(db, session_id, actor)
+            return member.id
+
+    def room_history(self, actor, space_id, translation_service, limit=50, before_id=None):
+        with self.database.session() as db:
+            self._membership(db, space_id, actor)
+            query = select(GroupRadioBurst).where(
+                GroupRadioBurst.space_id == space_id,
+            )
+            if before_id:
+                cursor = db.get(GroupRadioBurst, before_id)
+                if not cursor or cursor.space_id != space_id:
+                    raise GroupServiceError("invalid_history_cursor", 400)
+                cursor_time = select(GroupRadioBurst.started_at).where(GroupRadioBurst.id == cursor.id).scalar_subquery()
+                query = query.where(or_(GroupRadioBurst.started_at < cursor_time,
+                    and_(GroupRadioBurst.started_at == cursor_time, GroupRadioBurst.id < cursor.id)))
+            rows = db.scalars(query.order_by(GroupRadioBurst.started_at.desc(), GroupRadioBurst.id.desc())
+                              .limit(max(1, min(limit, 100)))).all()
+            result = []
+            for burst in rows:
+                item = self._burst_payload(burst)
+                speaker = db.get(GroupMembership, burst.speaker_membership_id)
+                item["speaker_display_name"] = speaker.display_name
+                segment = db.scalar(select(GroupTranslationSegment).where(
+                    GroupTranslationSegment.space_id == space_id,
+                    GroupTranslationSegment.runtime_kind == "radio",
+                    GroupTranslationSegment.runtime_id == burst.radio_session_id,
+                    GroupTranslationSegment.speaker_membership_id == burst.speaker_membership_id,
+                    GroupTranslationSegment.client_segment_id == burst.id,
+                ))
+                item["segment"] = translation_service._project_v2(db, actor, segment) if segment else None
+                job = db.scalar(select(GroupRadioProcessingJob).where(GroupRadioProcessingJob.burst_id == burst.id))
+                item["failure_code"] = job.failure_code if job else ""
+                # A lost upload/process never leaves an unexplained eternal spinner.
+                if not segment and job and job.status in {"ready", "processing"}:
+                    updated = job.updated_at.replace(tzinfo=timezone.utc) if job.updated_at.tzinfo is None else job.updated_at
+                    if _now() - updated > timedelta(minutes=5):
+                        item["state"], item["failure_code"] = "failed", "group_radio_transcription_interrupted"
+                result.append(item)
+            return result
 
     async def reconcile_device_loss(self, floor) -> int:
         if not self.settings.group_radio_v3_enabled:

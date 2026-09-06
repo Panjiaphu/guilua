@@ -18,9 +18,16 @@ def _now() -> datetime:
 
 
 class GroupInvitationService:
-    def __init__(self, database: Database, invitation_ttl_seconds: int):
+    def __init__(self, database: Database, invitation_ttl_seconds: int, event_broker=None):
         self.database = database
         self.invitation_ttl_seconds = invitation_ttl_seconds
+        self.event_broker = event_broker
+
+    def _enqueue(self, db, space_id: str, event_type: str, resource_id: object = "") -> None:
+        if self.event_broker:
+            self.event_broker.enqueue_in_transaction(
+                db, space_id, event_type, resource_id=resource_id
+            )
 
     @staticmethod
     def _require_membership(db, actor: GroupActor, space_id: str, roles: set[str] | None = None):
@@ -218,6 +225,7 @@ class GroupInvitationService:
                     db.add(item)
                     db.flush()
                     self._audit(db, actor, space_id, "invitation.created", item.id)
+                    self._enqueue(db, space_id, "invitation.created", item.id)
                     return {"invitation": self._payload(item), "idempotent": False}
         except IntegrityError as exc:
             with self.database.session() as db:
@@ -276,6 +284,7 @@ class GroupInvitationService:
                 item.cancelled_at = _now()
                 item.updated_at = _now()
                 self._audit(db, actor, space_id, "invitation.cancelled", item.id)
+                self._enqueue(db, space_id, "invitation.cancelled", item.id)
                 return self._payload(item)
 
     def decide(self, actor: GroupActor, invitation_id: str, *, accept: bool) -> dict[str, Any]:
@@ -312,6 +321,7 @@ class GroupInvitationService:
                         item.status = "rejected"
                         item.rejected_at = _now()
                         self._audit(db, actor, item.space_id, "invitation.rejected", item.id)
+                        self._enqueue(db, item.space_id, "invitation.rejected", item.id)
                         return {"invitation": self._payload(item), "membership": None, "idempotent": False}
                     membership = db.scalar(
                         select(GroupMembership).where(
@@ -344,6 +354,7 @@ class GroupInvitationService:
                     item.accepted_at = _now()
                     db.flush()
                     self._audit(db, actor, item.space_id, "invitation.accepted", item.id)
+                    self._enqueue(db, item.space_id, "invitation.accepted", item.id)
                     return {
                         "invitation": self._payload(item),
                         "membership": GroupService._membership_payload(membership),

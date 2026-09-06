@@ -28,6 +28,11 @@ class SpaceUpdate(StrictModel):
         return value
 
 
+class OwnershipTransfer(StrictModel):
+    target_membership_id: str = Field(min_length=1, max_length=36)
+    version: int = Field(ge=1)
+
+
 class MembershipCreate(StrictModel):
     principal_type: str
     principal_id: str = Field(min_length=1, max_length=128)

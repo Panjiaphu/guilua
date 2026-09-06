@@ -4,10 +4,22 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app.group_v3.auth import require_group_actor, require_write_origin
-from app.group_v3.session_schemas import MediaSessionCreate, VideoSubscriptionsUpdate
+from app.group_v3.session_schemas import (
+    MediaConnectionStateUpdate,
+    MediaSessionCreate,
+    VideoSubscriptionsUpdate,
+)
 
 
 router = APIRouter(prefix="/api/group", tags=["group-v3-media"])
+
+
+def _event_broker(request: Request):
+    return request.app.state.group_event_broker
+
+
+async def _publish(request: Request, space_id: str, event_type: str, resource_id: object = "") -> None:
+    await _event_broker(request).publish(space_id, event_type, resource_id=resource_id)
 
 
 def _json(payload: object, *, status_code: int = 200) -> JSONResponse:
@@ -61,6 +73,7 @@ async def create_session(
         _id(space_id, "space_id"),
         body.model_dump(),
     )
+    await _publish(request, session["space_id"], "media_session.created", session["id"])
     return _json({"session": session}, status_code=201)
 
 
@@ -84,6 +97,7 @@ async def join_session(request: Request, space_id: str, session_id: str) -> JSON
         _id(space_id, "space_id"),
         _id(session_id, "session_id"),
     )
+    await _publish(request, session["space_id"], "media_session.joined", session["id"])
     return _json({"session": session})
 
 
@@ -96,6 +110,7 @@ async def reject_session(request: Request, space_id: str, session_id: str) -> JS
         _id(space_id, "space_id"),
         _id(session_id, "session_id"),
     )
+    await _publish(request, session["space_id"], "media_session.rejected", session["id"])
     return _json({"session": session})
 
 
@@ -108,6 +123,7 @@ async def leave_session(request: Request, space_id: str, session_id: str) -> JSO
         _id(space_id, "space_id"),
         _id(session_id, "session_id"),
     )
+    await _publish(request, session["space_id"], "media_session.left", session["id"])
     return _json({"session": session, "ended_for_all": False})
 
 
@@ -120,7 +136,29 @@ async def end_session_for_all(request: Request, space_id: str, session_id: str) 
         _id(space_id, "space_id"),
         _id(session_id, "session_id"),
     )
+    await _publish(request, session["space_id"], "media_session.ended_for_all", session["id"])
     return _json({"session": session, "ended_for_all": True})
+
+
+@router.post("/spaces/{space_id}/sessions/{session_id}/connection-state")
+async def update_connection_state(
+    request: Request,
+    space_id: str,
+    session_id: str,
+    body: MediaConnectionStateUpdate,
+) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.media.use")
+    normalized_space_id = _id(space_id, "space_id")
+    session = request.app.state.group_media_session_service.update_connection_state(
+        actor,
+        normalized_space_id,
+        _id(session_id, "session_id"),
+        body.status,
+        body.failure_code,
+    )
+    await _publish(request, normalized_space_id, "media_session.connection_state", session["id"])
+    return _json({"session": session})
 
 
 @router.put("/spaces/{space_id}/sessions/{session_id}/video-subscriptions")
@@ -138,6 +176,7 @@ async def update_video_subscriptions(
         _id(session_id, "session_id"),
         body.participant_membership_ids,
     )
+    await _publish(request, _id(space_id, "space_id"), "media_session.video_subscriptions_updated", _id(session_id, "session_id"))
     return _json(result)
 
 

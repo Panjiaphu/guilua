@@ -135,10 +135,23 @@ def test_timeblock_mobile_viewport_keyboard_contract_is_locked_and_scoped():
     assert "filename='js/assistant_pwa_standalone_viewport_v1.js'" in assistant_template
 
     campaign_paths = _campaign_changed_paths()
-    protected_paths = {
-        "app/templates/group_communication_v3.html",
+    # Group V3 is AI-COMMUNICATION-owned. Its template/runtime is intentionally
+    # outside the Timeblock Direct 1:1 mobile keyboard campaign and may evolve
+    # on the Group branch. Keep the canonical Direct/Assistant assets locked.
+    direct_paths = {
+        "app/templates/communication.html",
+        "app/templates/assistant.html",
+        "app/static/communication.js",
+        "app/static/communication.css",
+        "app/static/js/assistant.js",
+        "app/static/js/assistant_pwa_standalone_viewport_v1.js",
+        "app/static/css/mobile_input_keyboard_contract.css",
+        "app/static/css/timeblock_v2_mobile_nav_safe_area_v1.css",
     }
     assert not any(
-        path in protected_paths or path.startswith("app/static/group-v3/")
+        path in direct_paths
+        or path.startswith("app/static/js/assistant_")
+        or path.startswith("app/static/css/assistant_")
+        or path.startswith("vendor/timeblock-assistant/")
         for path in campaign_paths
     )

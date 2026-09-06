@@ -50,11 +50,13 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_realtime_translation_model: str = 'gpt-realtime-translate'
     openai_realtime_transcription_model: str = 'gpt-realtime-whisper'
+    openai_group_transcription_model: str = 'gpt-4o-mini-transcribe'
     openai_text_translation_model: str = 'gpt-4.1-mini'
     group_translation_max_targets: int = Field(default=2, ge=1, le=3)
     group_translation_client_secret_ttl_seconds: int = Field(default=60, ge=10, le=300)
     group_translation_reservation_ttl_seconds: int = Field(default=300, ge=60, le=900)
     group_translation_max_segment_seconds: int = Field(default=300, ge=1, le=900)
+    group_translation_max_audio_bytes: int = Field(default=5 * 1024 * 1024, ge=64 * 1024, le=25 * 1024 * 1024)
     group_translation_monthly_audio_target_seconds: int = Field(
         default=3600, ge=60, le=10_000_000
     )
