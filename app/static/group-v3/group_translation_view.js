@@ -53,12 +53,14 @@
   }
 
   function authorVariant(item, variant, labels) {
-    var text = variant.translated_text == null ? (labels.pending || "Processing…") : variant.translated_text;
-    var failed = variant.state === "FAILED";
+    var inconsistentFinal = variant.state === "FINAL" && variant.translated_text == null;
+    var failed = variant.state === "FAILED" || inconsistentFinal;
+    var state = failed ? "FAILED" : variant.state;
+    var text = failed ? (labels.failed || "Translation failed") : variant.translated_text == null ? (labels.pending || "Processing…") : variant.translated_text;
     var playable = variant.state === "FINAL" && Boolean(variant.translated_text);
     return '<div class="group-translation-v2__variant ' + (failed ? "is-failed" : "") + '" data-variant-language="' +
       esc(variant.target_language) + '"><span>' + esc(labels.readOnly || variant.recipient_count > 0 ? (labels.variants || "Translation") : (labels.noRecipients || "No recipients")) + ' · ' +
-      esc(variant.target_language) + ' · ' + esc(variant.state) +
+      esc(variant.target_language) + ' · ' + esc(state) +
       (labels.readOnly ? '' : ' · ' + esc(String(variant.recipient_count || 0)) + ' ' + esc(labels.recipients || "recipients")) + '</span><strong>' + esc(text) + '</strong>' +
       (playable ? playButton(variant.translated_text, variant.target_language, labels) : "") +
       (failed ? retryButton(item, variant.target_language, labels) : "") + '</div>';
@@ -67,10 +69,12 @@
   function historyItem(item, labels) {
     labels = labels || {};
     var author = Boolean(item && (item.author_view || item.projection === "author"));
-    var failed = item && item.state === "FAILED";
+    var inconsistentFinal = item && item.state === "FINAL" && item.translated_text == null && !item.author_view && item.projection !== "author";
+    var failed = item && item.state === "FAILED" || inconsistentFinal;
+    var displayState = failed ? "FAILED" : item && item.state || "PROCESSING";
     var source = item && item.source_text || "";
     var translated = item && item.translated_text;
-    var finalText = translated == null ? (labels.pending || "Processing…") : translated;
+    var finalText = failed ? (labels.failed || "Translation failed") : translated == null ? (labels.pending || "Processing…") : translated;
     var common = ' class="group-translation-v2__item ' + (failed ? "is-failed" : "") + '" data-segment-id="' +
       esc(item && item.id) + '"';
     var metadata = '<div class="translation-history-context"><strong>' + esc(item.speaker_display_name || "") +
@@ -94,7 +98,7 @@
       '</summary><p>' + esc(item.source_language) + ' · ' + esc(source) + '</p></details>' : "";
     return '<article' + common + '>' + metadata + '<div class="group-translation-v2__item-meta"><span>' +
       esc(labels.received || "Received translation") + ' · ' + esc(item && item.display_language || item && item.target_language) +
-      '</span><span>' + esc(item && item.state || "PROCESSING") + '</span></div><p class="group-translation-v2__result">' +
+      '</span><span>' + esc(displayState) + '</span></div><p class="group-translation-v2__result">' +
       esc(finalText) + '</p>' + playButton(translated, item && item.target_language, labels) + original + '</article>';
   }
 

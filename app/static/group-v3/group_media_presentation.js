@@ -32,6 +32,9 @@
       entry.element.addEventListener("playing", function () { mark(entry); });
     }
     if (entry.element.parentNode !== target) target.appendChild(entry.element);
+    if (entry.kind === "audio" && window.GroupV3DeviceManager && window.GroupV3DeviceManager.applyOutput) {
+      window.GroupV3DeviceManager.applyOutput(entry.element).catch(function () {});
+    }
     mark(entry);
     if (entry.element.paused && entry.element.play) {
       var result = entry.element.play();

@@ -17,7 +17,8 @@ from app.group_v3.auth import GroupActor
 from app.group_v3.service import GroupServiceError
 from app.group_v3.translation_schemas import LanguageProfileUpdate, TranslationSegmentTextCreate
 from app.models import (GroupLanguageProfile, GroupMediaParticipant, GroupMediaSession, GroupMembership,
-    GroupRadioBurst, GroupRadioProcessingJob, GroupRadioSession, GroupTranslationConsent, GroupTranslationSegment)
+    GroupRadioBurst, GroupRadioProcessingJob, GroupRadioSession, GroupTranslationConsent,
+    GroupTranslationSegment, GroupTranslationVariant)
 from tests.test_group_translation_v2 import _runtime, FakeV2Provider
 from tests.test_group_radio_floor_v3 import FakeAsyncRedis
 from tests.test_group_v3_native import SCOPES, AI_ENTITLEMENT, PUBLIC_ORIGIN
@@ -103,6 +104,28 @@ async def test_video_archive_ended_left_pagination_and_removed_membership(tmp_pa
         db.scalar(select(GroupMembership).where(GroupMembership.principal_id == "99")).status = "removed"
     with pytest.raises(GroupServiceError):
         service.v2_history(actor("99"), space, "video", runtime, 10)
+
+
+@pytest.mark.anyio
+async def test_terminal_recipient_projection_never_reports_final_without_text(tmp_path):
+    app, _, _, space, runtime = _runtime(tmp_path)
+    service = app.state.group_translation_service
+    result = await service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-missing-recipient-variant",
+        source_language="vi", source_text="Source requiring translation",
+    ))
+    with app.state.database.session() as db, db.begin():
+        variant = db.scalar(select(GroupTranslationVariant).where(
+            GroupTranslationVariant.segment_id == result["id"],
+            GroupTranslationVariant.target_language == "zh-TW",
+        ))
+        assert variant is not None
+        db.delete(variant)
+    projected = service.v2_history(actor("99"), space, "video", runtime, 10)[0]
+    assert projected["translated_text"] is None
+    assert projected["state"] == "FAILED"
+    assert projected["failure_code"] == "group_translation_variant_missing"
 
 class ProviderClient:
     output = '{"language":"vi"}'
@@ -285,8 +308,16 @@ def test_r1_static_no_audio_storage_and_protected_voice_button():
     assert "new window.MediaStream([track])" in recorder or "new MediaStream([track])" in recorder
     app = (root/"app/static/group-v3/group_v3_app.js").read_text(encoding="utf-8")
     stop = app[app.index("  async function stopRadio()"):app.index("  async function radioDeviceLost()")]
+    assert "var clipPromise = window.GroupV3RadioRecording.stop(false);" in stop
+    assert "await window.GroupV3RadioRecording.stop(false)" not in stop
+    assert stop.index('"/floor/stop"') < stop.index("clipPromise.then")
     assert stop.index('"/floor/stop"') < stop.index("finalizeRadioClip(context, clip)")
     voice = (root/"app/static/group-v3/group_v3_translation.js").read_text(encoding="utf-8")
     assert 'source.value !== "auto"' in voice
+    tts = (root/"app/static/group-v3/group_tts_manager.js").read_text(encoding="utf-8")
+    assert "utterance.onstart" in tts and "utterance.onend" in tts and "utterance.onerror" in tts
+    assert "voiceschanged" in tts and "startTimeoutMs" in tts
+    assert "localStorage" not in tts and "indexedDB" not in tts
     template = (root/"app/templates/group_communication_v3.html").read_text(encoding="utf-8")
     assert "group_radio_recording.js" in template and "group_v3_room_closure.css" in template
+    assert "group_tts_manager.js" in template

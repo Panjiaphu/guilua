@@ -6,7 +6,19 @@
   var meterSource = null;
   var meterAnalyser = null;
   var meterFrame = 0;
+  var STORAGE_KEY = "group-v3-device-preferences-v1";
   var preferences = Object.create(null);
+
+  try {
+    var stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}");
+    ["audioInput", "videoInput", "audioOutput"].forEach(function (kind) {
+      if (typeof stored[kind] === "string") preferences[kind] = stored[kind];
+    });
+  } catch (_error) {}
+
+  function persistPreferences() {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences)); } catch (_error) {}
+  }
 
   function normalizeError(error) {
     var name = String(error && error.name || "");
@@ -46,7 +58,10 @@
   }
 
   function remember(kind, deviceId) {
+    if (["audioInput", "videoInput", "audioOutput"].indexOf(kind) < 0) return;
     if (deviceId) preferences[kind] = String(deviceId);
+    else delete preferences[kind];
+    persistPreferences();
   }
 
   function remembered(kind) {
@@ -140,9 +155,14 @@
     };
   }
 
+  function outputSelectionSupported(element) {
+    var prototype = window.HTMLMediaElement && window.HTMLMediaElement.prototype;
+    return typeof (element && element.setSinkId || prototype && prototype.setSinkId) === "function";
+  }
+
   async function setOutput(element, deviceId) {
     if (!element || !deviceId) return false;
-    if (typeof element.setSinkId !== "function") return false;
+    if (!outputSelectionSupported(element)) return false;
     try {
       await element.setSinkId(deviceId);
       remember("audioOutput", deviceId);
@@ -152,13 +172,27 @@
     }
   }
 
+  async function applyOutput(element) {
+    var deviceId = remembered("audioOutput");
+    if (!deviceId) return { supported: outputSelectionSupported(element), applied: false, mode: "default" };
+    if (!outputSelectionSupported(element)) return { supported: false, applied: false, mode: "os-managed" };
+    var applied = await setOutput(element, deviceId);
+    return { supported: true, applied: applied, mode: applied ? "selected" : "failed" };
+  }
+
   window.GroupV3DeviceManager = Object.freeze({
     enumerate: enumerate,
     acquire: acquire,
     stop: stop,
     startMeter: startMeter,
     setOutput: setOutput,
+    applyOutput: applyOutput,
+    outputSelectionSupported: outputSelectionSupported,
     normalizeError: normalizeError,
-    remembered: remembered
+    remembered: remembered,
+    remember: remember,
+    preferences: function () {
+      return { audioInput: remembered("audioInput"), videoInput: remembered("videoInput"), audioOutput: remembered("audioOutput") };
+    }
   });
 })(window);

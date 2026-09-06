@@ -804,6 +804,26 @@ class GroupTranslationService:
                 aad=f"group-translation-variant:{segment.id}:{variant.target_language}",
                 version=variant.encryption_version,
             )
+        if target == segment.source_language:
+            projected_state = "FINAL"
+            projected_failure = None
+        elif variant:
+            projected_state = variant.state
+            projected_failure = variant.failure_code if variant.state == "FAILED" else None
+            if variant.state == "FINAL" and translated is None:
+                projected_state = "FAILED"
+                projected_failure = "group_translation_variant_missing"
+        elif segment.state == "FAILED":
+            projected_state = "FAILED"
+            projected_failure = segment.failure_code or "group_translation_variant_missing"
+        elif segment.state in {"FINAL", "PARTIAL"}:
+            # A recipient may change preferred language after a segment was
+            # created. Never expose the contradictory FINAL + null projection.
+            projected_state = "FAILED"
+            projected_failure = "group_translation_variant_missing"
+        else:
+            projected_state = "PROCESSING"
+            projected_failure = None
         payload = {
             "id": segment.id,
             "client_segment_id": segment.client_segment_id,
@@ -816,8 +836,8 @@ class GroupTranslationService:
             "target_language": target,
             "source_text": source,
             "translated_text": translated,
-            "state": "FINAL" if target == segment.source_language else variant.state if variant else segment.state,
-            "failure_code": (variant.failure_code if variant and variant.state == "FAILED" else segment.failure_code),
+            "state": projected_state,
+            "failure_code": projected_failure,
             "is_original": target == segment.source_language,
             "auto_read_enabled": effective["auto_read_enabled"],
             "show_original_enabled": effective["show_original_enabled"],
@@ -875,15 +895,20 @@ class GroupTranslationService:
                         row.translated_ciphertext, row.translated_nonce,
                         aad=f"group-translation-variant:{segment.id}:{row.target_language}", version=row.encryption_version,
                     )
+                row_state = row.state
+                row_failure = row.failure_code
+                if row_state == "FINAL" and value is None:
+                    row_state = "FAILED"
+                    row_failure = "group_translation_variant_missing"
                 variants.append({
                     "target_language": row.target_language,
-                    "state": row.state,
+                    "state": row_state,
                     "translated_text": value,
                     "recipient_count": sum(
                         1 for item in effective_by_member.values()
                         if item["preferred_output_language"] == row.target_language
                     ),
-                    "failure_code": row.failure_code,
+                    "failure_code": row_failure,
                 })
             payload["variants"] = variants
             payload["author_view"] = True

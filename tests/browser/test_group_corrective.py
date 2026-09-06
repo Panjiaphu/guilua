@@ -20,6 +20,7 @@ ASSETS = ROOT / "app/static/group-v3"
 
 DEVICE = """
 window.__mediaCounts={acquire:0,publish:0,rooms:0,attach:0};
+window.__devicePrefs=JSON.parse(localStorage.getItem('qa-device-prefs')||'{}');
 window.__makeStream=()=> {
   const canvas=document.createElement('canvas');canvas.width=640;canvas.height=360;
   const c=canvas.getContext('2d');c.fillStyle='#186f62';c.fillRect(0,0,640,360);
@@ -32,12 +33,20 @@ window.__makeStream=()=> {
   return stream;
 };
 window.GroupV3DeviceManager={
- enumerate:async()=>({audioInputs:[],videoInputs:[],audioOutputs:[]}),remembered:()=>'',remember:()=>{},
- acquire:async(options)=>{__mediaCounts.acquire++;const stream=__makeStream();if(options?.mediaKind==='audio')stream.getVideoTracks().forEach(t=>{t.stop();stream.removeTrack(t);});return window.__local=stream;},
+ enumerate:async()=>({audioInputs:[{deviceId:'mic-qa',label:'QA microphone'}],videoInputs:[{deviceId:'camera-qa',label:'QA camera'}],audioOutputs:[{deviceId:'speaker-qa',label:'QA speaker'}]}),
+ remembered:k=>__devicePrefs[k]||'',remember:(k,v)=>{if(v)__devicePrefs[k]=v;else delete __devicePrefs[k];localStorage.setItem('qa-device-prefs',JSON.stringify(__devicePrefs));},
+ acquire:async(options)=>{__mediaCounts.acquire++;window.__lastAcquire=options;const stream=__makeStream();if(options?.mediaKind==='audio')stream.getVideoTracks().forEach(t=>{t.stop();stream.removeTrack(t);});return window.__local=stream;},
  startMeter:()=>()=>{},stop:()=>{if(window.__local)__local.getTracks().forEach(t=>t.stop());},
- setOutput:async()=>{},normalizeError:e=>({code:e.code||'device_error'}),onDeviceChange:()=>()=>{}
+ setOutput:async(e,v)=>{GroupV3DeviceManager.remember('audioOutput',v);return true;},applyOutput:async()=>({supported:true,applied:true,mode:'selected'}),
+ outputSelectionSupported:()=>true,preferences:()=>({...__devicePrefs}),normalizeError:e=>({code:e.code||'device_error'}),onDeviceChange:()=>()=>{}
 };
-window.EventSource=class {addEventListener(){}close(){}};
+window.__eventSources=[];
+window.EventSource=class {
+ constructor(){this.listeners={};__eventSources.push(this);}
+ addEventListener(k,f){(this.listeners[k]||(this.listeners[k]=[])).push(f);}
+ emit(k,data={}){(this.listeners[k]||[]).forEach(f=>f({data:JSON.stringify(data)}));}
+ close(){}
+};
 window.LivekitClient={
  RoomEvent:{TrackSubscribed:'sub',TrackUnsubscribed:'unsub',Disconnected:'disconnected',ActiveSpeakersChanged:'speakers'},
  Track:{Source:{Camera:'camera',Microphone:'microphone'}},
@@ -205,7 +214,8 @@ def test_r1_old_radio_translation_url_alias_and_unified_settings(page):
     expect(page.locator(".mobile-language-bar")).to_have_count(0)
 
 
-def boot(page, surface="video", connected=True, locale="vi", participant_count=2):
+def boot(page, surface="video", connected=True, locale="vi", participant_count=2, has_session=True,
+         output_supported=True):
     members = [dict(id="m1", principal_type="member", principal_id="42", principal_user_id="42",
         display_name="Nguyễn Minh", role="owner", status="active"),
         dict(id="m2", principal_type="member", principal_id="84", principal_user_id="84",
@@ -213,6 +223,8 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
     people = [dict(id="p1", membership_id="m1", livekit_identity="owner", display_name="Nguyễn Minh", invite_status="joined", media_connected=True),
         dict(id="p2", membership_id="m2", livekit_identity="guest", display_name="Trần An", invite_status="joined", media_connected=True)]
     for index in range(2, participant_count):
+        members.append(dict(id=f"m{index+1}", principal_type="member", principal_id=str(100+index), principal_user_id=str(100+index),
+            display_name=f"QA {index}", role="member", status="active"))
         people.append(dict(id=f"p{index+1}", membership_id=f"m{index+1}", livekit_identity=f"guest{index}", display_name=f"QA {index}", invite_status="joined", media_connected=True))
     radio_people = [dict(p, status="joined", joined_at="2026-09-05T07:00:00Z") for p in people]
     radio_session = dict(id="r1", title="QA Radio", status="ready", participants=radio_people)
@@ -230,7 +242,9 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
         path = urlparse(route.request.url).path
         if path.startswith("/static/"):
             if path.endswith("/group_device_manager.js"):
-                return route.fulfill(content_type="application/javascript", body=DEVICE)
+                device_source = DEVICE if output_supported else DEVICE.replace(
+                    "outputSelectionSupported:()=>true", "outputSelectionSupported:()=>false")
+                return route.fulfill(content_type="application/javascript", body=device_source)
             file = ROOT / "app" / path.lstrip("/")
             if file.exists():
                 return route.fulfill(path=str(file))
@@ -262,7 +276,7 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
             segment={"id":"radio-segment","runtime_kind":"radio","source_text":"Radio text fixture","source_language":"vi","author_view":True,"state":"FINAL","variants":[]}
             radio_history.append({"id":"burst-qa","state":"final","speaker_display_name":"Nguyễn Minh","started_at":"2026-09-05T07:00:00Z","segment":segment})
             payload={"segment":segment}
-        elif path.endswith("/sessions"): payload={"sessions":[session]}
+        elif path.endswith("/sessions"): payload={"sessions":[session] if has_session else []}
         elif path.endswith("/radio/sessions/r1"): payload={"session":radio_session,"floor":None}
         elif path.endswith("/radio/sessions/r1/join"): payload={"session":session}
         elif path.endswith("/connection-state"): payload={"session":session}
@@ -496,7 +510,7 @@ def test_partial_voice_has_variant_error_and_no_duplicate_source(page):
 
 def test_received_final_auto_read_is_local_and_deduplicated(page):
     voice_setup(page)
-    page.evaluate("() => {window.__spoken=[];speechSynthesis.speak=u=>__spoken.push(u.text);speechSynthesis.cancel=()=>{};}")
+    page.evaluate("""() => {window.__spoken=[];speechSynthesis.speak=u=>{__spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};speechSynthesis.cancel=()=>{};}""")
     page.locator("[data-v2-auto-read]").check()
     page.wait_for_function("GroupV3Runtime.snapshot().auto_read")
     item={"id":"received1","state":"FINAL","translated_text":"Translated fixture","source_text":"Original",
@@ -507,6 +521,239 @@ def test_received_final_auto_read_is_local_and_deduplicated(page):
         page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
     assert page.evaluate("__spoken") == ["Translated fixture"]
     assert page.evaluate("__mediaCounts.publish") == before
+
+
+def test_autoread_queues_all_finals_and_consumes_only_after_onstart(page):
+    voice_setup(page)
+    items = [
+        {"id":f"received-{index}","state":"FINAL","translated_text":text,"source_text":"Original",
+         "created_at":f"2026-09-06T00:00:0{index}Z","speaker_membership_id":"m2",
+         "display_language":"zh-TW","target_language":"zh-TW","author_view":False}
+        for index, text in enumerate(["Bản A", "Bản B", "Bản C"], 1)
+    ]
+    page.route("**/translation/v2-history?*", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segments":items})))
+    page.evaluate("""() => {
+      window.__spoken=[];
+      speechSynthesis.speak=utterance=>{__spoken.push(utterance.text);queueMicrotask(()=>{
+        utterance.onstart?.();utterance.onend?.();
+      });};
+      speechSynthesis.cancel=()=>{};
+    }""")
+    page.locator("[data-v2-auto-read]").check()
+    page.wait_for_function("__spoken.length === 3")
+    assert page.evaluate("__spoken") == ["Bản A", "Bản B", "Bản C"]
+    assert len(page.evaluate("GroupV3TtsManager.diagnostics().startedKeys.filter(k=>k.includes('received-'))")) == 3
+
+
+def test_autoread_disabled_bootstrap_remains_eligible_when_enabled(page):
+    voice_setup(page)
+    item = {"id":"disabled-bootstrap","state":"FINAL","translated_text":"Play after enable",
+        "source_text":"Original","created_at":"2026-09-06T00:00:01Z","speaker_membership_id":"m2",
+        "display_language":"en","target_language":"en","author_view":False}
+    page.route("**/translation/v2-history?*", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segments":[item]})))
+    page.evaluate("""() => {window.__spoken=[];speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{
+      __spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};}""")
+    page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
+    page.wait_for_timeout(50)
+    assert page.evaluate("__spoken") == []
+    page.locator("[data-v2-auto-read]").check()
+    page.wait_for_function("__spoken.length === 1")
+    assert page.evaluate("__spoken") == ["Play after enable"]
+
+
+def test_autoread_start_timeout_is_retryable_and_manual_tts_is_deterministic(page):
+    voice_setup(page)
+    item = {"id":"retryable-final","state":"FINAL","translated_text":"Retry me","source_text":"Original",
+        "created_at":"2026-09-06T00:00:01Z","speaker_membership_id":"m2",
+        "display_language":"en","target_language":"en","author_view":False}
+    page.route("**/translation/v2-history?*", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segments":[item]})))
+    page.evaluate("""() => {
+      GroupV3TtsManager.configureForTests({startTimeoutMs:60,voiceWaitMs:0});
+      window.__speakAttempts=0;window.__spoken=[];
+      speechSynthesis.cancel=()=>{};
+      speechSynthesis.speak=utterance=>{
+        __speakAttempts++;
+        if(__speakAttempts===1)return;
+        __spoken.push(utterance.text);queueMicrotask(()=>{utterance.onstart?.();utterance.onend?.();});
+      };
+    }""")
+    page.locator("[data-v2-auto-read]").check()
+    page.wait_for_function("__speakAttempts === 1")
+    page.wait_for_timeout(100)
+    page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
+    page.wait_for_function("__spoken.length === 1")
+    assert page.evaluate("__speakAttempts") == 2
+    page.evaluate("""() => {
+      window.__insideManualClick=false;window.__manualWasSynchronous=false;
+      speechSynthesis.speak=utterance=>{__manualWasSynchronous=__insideManualClick;
+        __spoken.push(utterance.text);queueMicrotask(()=>{utterance.onstart?.();utterance.onend?.();});};
+      __insideManualClick=true;
+      document.querySelector('[data-segment-id=retryable-final] [data-v2-play]').click();
+      __insideManualClick=false;
+    }""")
+    page.wait_for_function("__spoken.length === 2")
+    assert page.evaluate("__spoken") == ["Retry me", "Retry me"]
+    assert page.evaluate("__manualWasSynchronous") is True
+    page.evaluate("speechSynthesis.speak=utterance=>{queueMicrotask(()=>utterance.onerror?.({error:'not-allowed'}));}")
+    page.locator("[data-segment-id=retryable-final] [data-v2-play]").click()
+    expect(page.locator("[data-v2-error]")).to_have_attribute("data-error-category", "TTS_ERROR")
+
+
+def test_tts_waits_for_voiceschanged_and_selects_matching_voice(page):
+    voice_setup(page)
+    page.evaluate("""() => {
+      window.__voices=[];window.__selectedVoice='';
+      window.SpeechSynthesisUtterance=class { constructor(text){this.text=text;this.lang='';this.voice=null;} };
+      Object.defineProperty(speechSynthesis,'getVoices',{configurable:true,value:()=>__voices});
+      speechSynthesis.cancel=()=>{};
+      speechSynthesis.speak=utterance=>{__selectedVoice=utterance.voice?.name||'';
+        queueMicrotask(()=>{utterance.onstart?.();utterance.onend?.();});};
+      GroupV3TtsManager.configureForTests({voiceWaitMs:500,startTimeoutMs:500});
+      GroupV3TtsManager.enqueue({key:'voices-ready',text:'Xin chào',language:'vi',automatic:true});
+    }""")
+    page.wait_for_timeout(30)
+    assert page.evaluate("__selectedVoice") == ""
+    page.evaluate("""() => {
+      window.__voices=[{name:'Vietnamese QA',lang:'vi-VN'}];
+      speechSynthesis.dispatchEvent(new Event('voiceschanged'));
+    }""")
+    page.wait_for_function("__selectedVoice === 'Vietnamese QA'")
+
+
+def test_processing_history_converges_and_sse_open_reconciles(page):
+    voice_setup(page)
+    calls = {"history":0}
+    processing = {"id":"eventual-final","state":"PROCESSING","translated_text":None,"source_text":"Original",
+        "created_at":"2026-09-06T00:00:01Z","speaker_membership_id":"m2",
+        "display_language":"en","target_language":"en","author_view":False}
+    final = dict(processing, state="FINAL", translated_text="Converged")
+    def history(route):
+        calls["history"] += 1
+        route.fulfill(content_type="application/json", body=json.dumps({"segments":[processing if calls["history"] == 1 else final]}))
+    page.route("**/translation/v2-history?*", history)
+    page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
+    expect(page.locator("[data-segment-id=eventual-final]")).to_contain_text("Converged")
+    before = calls["history"]
+    page.evaluate("__eventSources[0].emit('open')")
+    page.wait_for_function("value => window.GroupV3TranslationController && document.querySelector('[data-segment-id=eventual-final]')", before)
+    page.wait_for_timeout(250)
+    assert calls["history"] > before
+
+
+def test_translation_event_during_submit_is_not_lost(page):
+    voice_setup(page)
+    calls = {"history": 0}
+    item = {"id":"busy-event-final","state":"FINAL","translated_text":"Busy event retained",
+        "source_text":"Submitted while event arrived","created_at":"2026-09-06T00:00:02Z",
+        "speaker_membership_id":"m2","display_language":"zh-TW","target_language":"zh-TW",
+        "author_view":False}
+    page.route("**/translation/segments/text", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segment":item})))
+    def history(route):
+        calls["history"] += 1
+        route.fulfill(content_type="application/json", body=json.dumps({"segments":[item]}))
+    page.route("**/translation/v2-history?*", history)
+    page.locator("[data-v2-text]").fill("Submitted while event arrived")
+    page.evaluate("""() => {
+      document.querySelector('[data-v2-action=send]').click();
+      window.dispatchEvent(new CustomEvent('group-v3:translation-segment', {detail:{id:'busy-event-final'}}));
+    }""")
+    expect(page.locator("[data-segment-id=busy-event-final]")).to_contain_text("Busy event retained")
+    page.wait_for_function("() => document.querySelector('[data-group-translation-v2]').dataset.translationState !== 'PROCESSING'")
+    page.wait_for_timeout(100)
+    assert calls["history"] >= 2
+
+
+def test_translation_device_settings_are_local_shared_and_permission_safe(page):
+    boot(page, surface="chat-translation", connected=False)
+    expect(page.locator(".communication-device-settings")).to_be_visible()
+    assert page.evaluate("__mediaCounts.acquire") == 0
+    page.locator("[data-change=device-pref-audio]").select_option("mic-qa")
+    page.locator("[data-change=device-pref-video]").select_option("camera-qa")
+    page.locator("[data-change=device-pref-output]").select_option("speaker-qa")
+    assert page.evaluate("__mediaCounts.acquire") == 0
+    assert page.evaluate("GroupV3DeviceManager.preferences()") == {
+        "audioInput":"mic-qa", "videoInput":"camera-qa", "audioOutput":"speaker-qa"}
+    page.locator("[data-action=test-microphone]").click()
+    expect(page.locator(".communication-device-status")).to_contain_text("Mic hoạt động")
+    assert page.evaluate("__mediaCounts.acquire") == 1
+    page.evaluate("""() => {window.__spoken=[];speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{
+      __spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};}""")
+    page.locator("[data-action=test-device-voice]").click()
+    page.wait_for_function("__spoken.length === 1")
+    expect(page.locator(".communication-device-status")).to_contain_text("Giọng đọc hoạt động")
+    page.reload()
+    expect(page.locator("[data-change=device-pref-audio]")).to_have_value("mic-qa")
+    assert page.evaluate("__mediaCounts.acquire") == 0
+    page.locator("[data-surface=radio]:visible").click()
+    page.locator(".radio-ptt").click()
+    page.wait_for_function("GroupV3Runtime.snapshot().media_connected")
+    page.locator(".radio-ptt").click()
+    page.wait_for_function("__mediaCounts.acquire === 1")
+    assert page.evaluate("__lastAcquire.audioDeviceId") == "mic-qa"
+
+
+def test_unsupported_output_selection_is_reported_as_os_managed(page):
+    boot(page, surface="chat-translation", connected=False, output_supported=False)
+    expect(page.locator(".device-output-managed")).to_contain_text("hệ điều hành")
+    expect(page.locator("[data-change=device-pref-output]")).to_have_count(0)
+    assert page.evaluate("__mediaCounts.acquire") == 0
+
+
+def test_archive_manual_tts_failure_is_visible_instead_of_silent(page):
+    boot(page, surface="chat-translation", connected=False)
+    item = {"id":"archive-manual","runtime_kind":"video","state":"FINAL",
+        "translated_text":"Visible archive speech","source_text":"Original",
+        "created_at":"2026-09-06T00:00:03Z","speaker_membership_id":"m2",
+        "speaker_display_name":"Trần An","display_language":"en","target_language":"en",
+        "author_view":False,"projection":"recipient"}
+    page.route("**/translation/v2-history?*", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segments":[item]})))
+    page.locator("[data-action=history-tab][data-tab=media]").click()
+    expect(page.locator("[data-translation-archive] [data-v2-play]")).to_be_visible()
+    page.evaluate("""() => {speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{
+      queueMicrotask(()=>u.onerror?.({error:'not-allowed'}));};}""")
+    page.locator("[data-translation-archive] [data-v2-play]").click()
+    expect(page.locator("[data-toast]")).to_have_class("toast is-visible")
+    expect(page.locator("[data-toast]")).to_contain_text("giọng đọc")
+
+
+def test_radio_final_remains_autoread_eligible_until_listen_media_connects(page):
+    boot(page, surface="radio", connected=False)
+    segment = {"id":"radio-remote-final","state":"FINAL","translated_text":"Radio translated",
+        "source_text":"Radio source","created_at":"2026-09-06T00:00:01Z","speaker_membership_id":"m2",
+        "display_language":"vi","target_language":"vi","author_view":False}
+    burst = {"id":"remote-burst","state":"final","speaker_display_name":"Trần An",
+        "started_at":"2026-09-06T00:00:01Z","segment":segment}
+    page.route("**/radio/history?*", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"bursts":[burst]})))
+    page.evaluate("""() => {
+      GroupV3Runtime.updateProfile({auto_read_enabled:true});window.__spoken=[];
+      speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{__spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};
+    }""")
+    page.evaluate("segment => GroupV3TranslationController.readRadioHistory([segment])", segment)
+    assert page.evaluate("__spoken") == []
+    page.locator(".radio-ptt").click()
+    page.wait_for_function("GroupV3Runtime.snapshot().media_connected && __spoken.length === 1")
+    assert page.evaluate("__spoken") == ["Radio translated"]
+
+
+@pytest.mark.parametrize("width,height", [(1440,900),(390,844),(844,390)])
+def test_member_picker_uses_available_height_and_keeps_action_visible(page, width, height):
+    page.set_viewport_size({"width":width,"height":height})
+    boot(page, surface="video", connected=False, participant_count=8, has_session=False)
+    form = page.locator(".media-start-form")
+    expect(form).to_be_visible()
+    form_box = form.bounding_box()
+    list_box = page.locator(".media-member-list").bounding_box()
+    action_box = form.locator("button[type=submit]").bounding_box()
+    assert form_box["height"] >= (220 if height < 500 else 300)
+    assert list_box["height"] >= 100
+    assert action_box["y"] + action_box["height"] <= min(height, form_box["y"] + form_box["height"] + 1)
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
 
 
 @pytest.mark.parametrize("width,height",[(390,844),(844,390)])

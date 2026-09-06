@@ -3,10 +3,8 @@
 
   var mounted = new WeakMap();
   var activeStates = new Set();
-  var autoplaySeen = window.__groupV3AutoplaySeen || (window.__groupV3AutoplaySeen = new Set());
-  var initializedRuntimes = window.__groupV3TranslationHistoryBootstrapped || (window.__groupV3TranslationHistoryBootstrapped = new Set());
-  var tts = window.speechSynthesis || null;
-  var activePlayback = null;
+  var autoplayConsumed = window.__groupV3AutoplayConsumed || (window.__groupV3AutoplayConsumed = new Set());
+  var autoplayQueued = window.__groupV3AutoplayQueued || (window.__groupV3AutoplayQueued = new Set());
   var traces = [];
   function trace(state, stage, status, detail, segmentId) {
     // Never retain audio, transcript, credentials or complete response bodies.
@@ -55,8 +53,9 @@
       pending: translate("translationPending"),
       recipients: translate("recipients"),
       play: translate("translationPlay"),
-      retry: translate("translationRetry")
-      ,noRecipients: translate("translationNoRecipients"), variants: translate("translationVariants")
+      retry: translate("translationRetry"),
+      failed: translate("translationVariantError"),
+      noRecipients: translate("translationNoRecipients"), variants: translate("translationVariants")
     };
   }
 
@@ -83,6 +82,11 @@
         ttsText: "",
         ttsKey: "",
         ttsPlaying: false,
+        historyPending: false,
+        historyTimer: 0,
+        historyAttempts: 0,
+        historyDeadline: 0,
+        refreshIntent: false,
         disposed: false
       };
       mounted.set(panel, current);
@@ -143,6 +147,14 @@
     node.hidden = !message;
     node.textContent = message || "";
     node.dataset.errorCategory = message ? category || "TRANSLATION_VARIANT_ERROR" : "";
+  }
+
+  function reportTtsFailure(panel) {
+    var message = translate("translationTtsUnavailable");
+    setError(panel, message, "TTS_ERROR");
+    if (panel === document.body) {
+      window.dispatchEvent(new CustomEvent("group-v3:tts-error", { detail: { code: "tts_error" } }));
+    }
   }
   function warning(panel, message) {
     var node = panel.querySelector("[data-v2-warning]");
@@ -258,45 +270,61 @@
   }
 
   function stopPlayback() {
-    if (tts) tts.cancel();
-    if (activePlayback && activePlayback.panel) {
-      activePlayback.state.ttsPlaying = false;
-      activePlayback.state.ttsText = "";
-      activePlayback.state.ttsKey = "";
-      setButtonPlayback(activePlayback.panel, activePlayback.text, false);
-    }
-    activePlayback = null;
+    if (window.GroupV3TtsManager) window.GroupV3TtsManager.cancel();
+    activeStates.forEach(function (state) {
+      state.ttsPlaying = false;
+      setButtonPlayback(state.panel, state.ttsText, false);
+      state.ttsText = "";
+      state.ttsKey = "";
+    });
   }
 
   function play(text, language, panel, automatic, key) {
     var state = mounted.get(panel);
     if (!text || !state || state.disposed) return false;
-    if (!tts || typeof window.SpeechSynthesisUtterance !== "function") {
-      setError(panel, translate("translationTtsUnavailable"), "TTS_ERROR");
+    var manager = window.GroupV3TtsManager;
+    if (!manager || !manager.supported()) {
+      reportTtsFailure(panel);
       return false;
     }
-    if (state.ttsPlaying && state.ttsText === text) {
+    if (!automatic && state.ttsPlaying && state.ttsText === text) {
       stopPlayback();
       return true;
     }
-    stopPlayback();
-    var utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = language === "zh-TW" ? "zh-TW" : language || "en";
-    state.ttsPlaying = true;
-    state.ttsText = text;
+    if (!automatic) stopPlayback();
+    if (!automatic) state.ttsText = text;
     state.ttsKey = key || "";
-    activePlayback = { panel: panel, state: state, text: text, key: key || "" };
-    setButtonPlayback(panel, text, true);
-    utterance.onend = function () {
-      if (activePlayback && activePlayback.state === state && activePlayback.text === text) stopPlayback();
+    var playback = automatic ? String(key || "") : String(key || "manual") + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    var options = {
+      key: playback,
+      text: text,
+      language: language,
+      automatic: automatic,
+      onState: function (playbackState, detail) {
+        if (playbackState === "STARTED") {
+          if (!automatic) state.ttsPlaying = true;
+          setButtonPlayback(panel, text, true);
+          if (automatic) autoplayConsumed.add(playback);
+          autoplayQueued.delete(playback);
+          setError(panel, "");
+        }
+        if (playbackState === "COMPLETED" || playbackState === "FAILED") {
+          if (!automatic) {
+            state.ttsPlaying = false;
+            state.ttsText = "";
+            state.ttsKey = "";
+          }
+          autoplayQueued.delete(playback);
+          setButtonPlayback(panel, text, false);
+          if (playbackState === "FAILED" && detail !== "tts_cancelled") reportTtsFailure(panel);
+        }
+      }
     };
-    utterance.onerror = function () {
-      stopPlayback();
-      setError(panel, translate("translationTtsUnavailable"), "TTS_ERROR");
-    };
-    tts.speak(utterance);
+    var accepted = automatic ? manager.enqueue(options) : manager.playManual(options);
+    if (automatic && accepted) autoplayQueued.add(playback);
+    if (!accepted && automatic && manager.hasStarted(playback)) autoplayConsumed.add(playback);
     if (!automatic) setError(panel, "");
-    return true;
+    return accepted;
   }
 
   // Archive playback is generated from authorized TEXT, never a recorded file.
@@ -311,25 +339,16 @@
   });
 
   function maybeAutoRead(segments, panel, snapshot) {
-    if (!snapshot) return;
-    var key = runtimeKey(snapshot);
-    var bootstrap = !initializedRuntimes.has(key);
-    var candidate = null;
-    (segments || []).forEach(function (item) {
+    if (!snapshot || !snapshot.auto_read || snapshot.device_lost || snapshot.media_connected === false) return;
+    (segments || []).slice().sort(function (a, b) {
+      return (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0) || String(a.id || "").localeCompare(String(b.id || ""));
+    }).forEach(function (item) {
       if (!item || item.state !== "FINAL" || item.author_view || !item.translated_text ||
         String(item.speaker_membership_id || "") === String(snapshot.membership_id || "")) return;
       var playback = playbackKey(snapshot, item);
-      if (bootstrap || !snapshot.auto_read) {
-        autoplaySeen.add(playback);
-      } else if (!autoplaySeen.has(playback)) {
-        autoplaySeen.add(playback);
-        if (!candidate) candidate = item;
-      }
+      if (autoplayConsumed.has(playback) || autoplayQueued.has(playback)) return;
+      play(item.translated_text, item.display_language || item.target_language, panel, true, playback);
     });
-    initializedRuntimes.add(key);
-    if (candidate) {
-      play(candidate.translated_text, candidate.display_language || candidate.target_language, panel, true, playbackKey(snapshot, candidate));
-    }
   }
 
   function readRadioHistory(segments) {
@@ -337,9 +356,36 @@
     if (!snapshot || snapshot.runtime_kind !== "radio" || !snapshot.runtime_id) return;
     var state = stateFor(document.body, snapshot);
     state.archive = true;
-    maybeAutoRead(segments, document.body, Object.assign({}, snapshot, {
-      auto_read: Boolean(snapshot.auto_read && snapshot.media_connected && !snapshot.device_lost)
-    }));
+    maybeAutoRead(segments, document.body, snapshot);
+  }
+
+  function containsProcessing(segments) {
+    return (segments || []).some(function (segment) { return segment && segment.state === "PROCESSING"; });
+  }
+
+  function requestHistoryRefresh(panel) {
+    var state = mounted.get(panel);
+    if (!state || state.disposed) return;
+    state.refreshIntent = true;
+    if (state.recording || state.submitting || state.historyPending) return;
+    state.refreshIntent = false;
+    loadHistory(panel);
+  }
+
+  function scheduleHistoryConvergence(panel, state, segments) {
+    window.clearTimeout(state.historyTimer);
+    state.historyTimer = 0;
+    if (!containsProcessing(segments)) {
+      state.historyAttempts = 0;
+      state.historyDeadline = 0;
+      return;
+    }
+    if (!state.historyDeadline) state.historyDeadline = Date.now() + 15000;
+    if (Date.now() >= state.historyDeadline || state.historyAttempts >= 6) return;
+    var delays = [400, 800, 1400, 2200, 3200, 4500];
+    var delay = delays[Math.min(state.historyAttempts, delays.length - 1)];
+    state.historyAttempts += 1;
+    state.historyTimer = window.setTimeout(function () { requestHistoryRefresh(panel); }, delay);
   }
 
   function loadHistory(panel) {
@@ -368,6 +414,7 @@
       state.segments = new Map(ordered.map(function (segment) { return [String(segment.id), segment]; }));
       renderHistory(panel, ordered);
       maybeAutoRead(segments, panel, snapshot);
+      scheduleHistoryConvergence(panel, state, segments);
       state.historyLoaded = true;
       warning(panel, "");
       return segments;
@@ -375,7 +422,10 @@
       if (!isCurrent(panel, state, generation) || error.name === "AbortError") return [];
       warning(panel, errorText(error, "translationHistoryError"));
       return [];
-    }).finally(function () { if (sequence === state.historySequence) state.historyPending = false; });
+    }).finally(function () {
+      if (sequence === state.historySequence) state.historyPending = false;
+      if (state.refreshIntent && !state.recording && !state.submitting) window.queueMicrotask(function () { requestHistoryRefresh(panel); });
+    });
   }
 
   function syncSharedProfile(profile) {
@@ -463,6 +513,7 @@
       throw error;
     }).finally(function () {
       state.submitting = false;
+      if (state.refreshIntent) window.queueMicrotask(function () { requestHistoryRefresh(panel); });
     });
   }
 
@@ -581,7 +632,10 @@
         if (isCurrent(panel, state, generation) && error.name !== "AbortError") {
           recordingFailure(panel, errorText(error, "translationSttError"), error.category || "STT_ERROR");
         }
-      }).finally(function () { if (!state.disposed) state.submitting = false; });
+      }).finally(function () {
+        if (!state.disposed) state.submitting = false;
+        if (state.refreshIntent) window.queueMicrotask(function () { requestHistoryRefresh(panel); });
+      });
     }, { once: true });
     setError(panel, "");
     try {
@@ -641,7 +695,10 @@
       state.submitting = true;
       setStatus(panel, "PREPARING");
       saveProfile(panel).then(function () { return submitText(panel); }).catch(function (error) { handleFailure(panel, error); })
-        .finally(function () { state.submitting = false; });
+        .finally(function () {
+          state.submitting = false;
+          if (state.refreshIntent) window.queueMicrotask(function () { requestHistoryRefresh(panel); });
+        });
     });
     panel.querySelector('[data-v2-action="record"]').addEventListener("click", function () {
       var current = mounted.get(panel);
@@ -658,7 +715,7 @@
     ["[data-v2-target]", "[data-v2-source]", "[data-v2-auto-read]"].forEach(function (selector) {
       var control = panel.querySelector(selector);
       if (control) control.addEventListener("change", function () {
-        saveProfile(panel).catch(function (error) { handleFailure(panel, error); });
+        saveProfile(panel).then(function () { return loadHistory(panel); }).catch(function (error) { handleFailure(panel, error); });
       });
     });
     panel.addEventListener("click", function (event) {
@@ -683,7 +740,10 @@
         mergeSegment(panel, payload.segment);
         completeSegment(panel, payload.segment);
         return loadHistory(panel);
-      }).catch(function (error) { handleFailure(panel, error); }).finally(function () { currentState.submitting = false; });
+      }).catch(function (error) { handleFailure(panel, error); }).finally(function () {
+        currentState.submitting = false;
+        if (currentState.refreshIntent) window.queueMicrotask(function () { requestHistoryRefresh(panel); });
+      });
     });
     loadHistory(panel);
   }
@@ -692,7 +752,9 @@
     if (!state || state.disposed) return;
     state.disposed = true;
     window.clearInterval(state.timer);
+    window.clearTimeout(state.historyTimer);
     state.timer = 0;
+    state.historyTimer = 0;
     state.generation += 1;
     state.requests.forEach(function (controller) { try { controller.abort(); } catch (_error) {} });
     state.requests.clear();
@@ -702,7 +764,6 @@
       } catch (_error) {}
     }
     state.recording = null;
-    if (activePlayback && activePlayback.state === state) stopPlayback();
     activeStates.delete(state);
   }
 
@@ -723,11 +784,13 @@
   }
 
   window.addEventListener("group-v3:rendered", mountAll);
-  window.addEventListener("group-v3:translation-segment", function () {
+  function reconcileHistories() {
     activeStates.forEach(function (state) {
-      if (!state.disposed && !state.recording && !state.archive) loadHistory(state.panel);
+      if (!state.disposed && !state.archive) requestHistoryRefresh(state.panel);
     });
-  });
+  }
+  window.addEventListener("group-v3:translation-segment", reconcileHistories);
+  window.addEventListener("group-v3:translation-reconcile", reconcileHistories);
   window.addEventListener("group-video-layout:change", mountAll);
   window.addEventListener("group-v3:media-disconnected", cleanup);
   window.addEventListener("pagehide", cleanup, { once: true });

@@ -536,5 +536,53 @@ Object.assign(copy["zh-TW"], {
   "radioMember_left": "已離開",
   "radioMember_rejected": "已拒絕"
 });
+Object.assign(copy.vi, {
+  communicationDevices: "Thiết bị giao tiếp",
+  communicationDevicesNote: "Dùng chung lựa chọn cục bộ này cho Video nhóm và Radio. Chỉ nút kiểm tra hoặc tham gia mới xin quyền thiết bị.",
+  deviceOutputOsManaged: "Do hệ điều hành / trình duyệt quản lý",
+  devicePreferencesLoading: "Đang đọc danh sách thiết bị…",
+  devicePreferencesReady: "Cài đặt thiết bị cục bộ đã sẵn sàng",
+  devicePreferencesSaved: "Đã lưu lựa chọn trên thiết bị này",
+  testMicrophone: "Kiểm tra mic",
+  testVoice: "Kiểm tra giọng đọc",
+  deviceMicrophoneTesting: "Đang nghe thử mic…",
+  deviceMicrophoneReady: "Mic hoạt động bình thường",
+  deviceVoiceTesting: "Đang chuẩn bị giọng đọc…",
+  deviceVoicePlaying: "Đang phát giọng thử…",
+  deviceVoiceReady: "Giọng đọc hoạt động bình thường",
+  deviceVoiceSample: "Đây là âm thanh kiểm tra của AI-COMMUNICATION."
+});
+Object.assign(copy.en, {
+  communicationDevices: "Communication devices",
+  communicationDevicesNote: "These local choices are shared by Group Video and Radio. Device permission is requested only when you test or join.",
+  deviceOutputOsManaged: "Managed by the operating system / browser",
+  devicePreferencesLoading: "Reading available devices…",
+  devicePreferencesReady: "Local device settings are ready",
+  devicePreferencesSaved: "Saved on this device",
+  testMicrophone: "Test microphone",
+  testVoice: "Test speech",
+  deviceMicrophoneTesting: "Testing the microphone…",
+  deviceMicrophoneReady: "Microphone is working",
+  deviceVoiceTesting: "Preparing test speech…",
+  deviceVoicePlaying: "Playing test speech…",
+  deviceVoiceReady: "Speech playback is working",
+  deviceVoiceSample: "This is the AI-COMMUNICATION speech test."
+});
+Object.assign(copy["zh-TW"], {
+  communicationDevices: "通訊裝置",
+  communicationDevicesNote: "這些本機選擇會共用於群組視訊與 Radio。只有測試或加入時才會請求裝置權限。",
+  deviceOutputOsManaged: "由作業系統／瀏覽器管理",
+  devicePreferencesLoading: "正在讀取可用裝置…",
+  devicePreferencesReady: "本機裝置設定已就緒",
+  devicePreferencesSaved: "已儲存在此裝置",
+  testMicrophone: "測試麥克風",
+  testVoice: "測試語音",
+  deviceMicrophoneTesting: "正在測試麥克風…",
+  deviceMicrophoneReady: "麥克風運作正常",
+  deviceVoiceTesting: "正在準備測試語音…",
+  deviceVoicePlaying: "正在播放測試語音…",
+  deviceVoiceReady: "語音播放運作正常",
+  deviceVoiceSample: "這是 AI-COMMUNICATION 的語音測試。"
+});
 window.GroupV3I18n = Object.freeze({ copy, localeOptions, translator });
 }(window));
