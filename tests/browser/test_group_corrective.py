@@ -761,14 +761,14 @@ def test_historical_translate_is_on_demand_and_never_auto_speaks(page):
     page.route("**/translation/segments/history-missing/variants/zh-TW/retry", lambda route: route.fulfill(
         content_type="application/json", body=json.dumps({"segment":final})))
     page.locator("[data-action=history-tab][data-tab=media]").click()
-    expect(page.locator("[data-segment-id=history-missing]")).to_contain_text("Nguồn lịch sử luôn hiển thị")
+    expect(page.locator("article[data-segment-id=history-missing]")).to_contain_text("Nguồn lịch sử luôn hiển thị")
     expect(page.locator("[data-action=history-translate]")).to_be_visible()
     page.locator("[data-action=toggle-auto-read]").click()
     page.wait_for_function("GroupV3Runtime.snapshot().auto_read")
     page.evaluate("""() => {window.__spoken=[];speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{
       __spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};}""")
     page.locator("[data-action=history-translate]").click()
-    expect(page.locator("[data-segment-id=history-missing]")).to_contain_text("歷史翻譯")
+    expect(page.locator("article[data-segment-id=history-missing]")).to_contain_text("歷史翻譯")
     assert page.evaluate("__spoken") == []
     page.locator("[data-segment-id=history-missing] [data-v2-play]").click()
     page.wait_for_function("__spoken.length === 1")
