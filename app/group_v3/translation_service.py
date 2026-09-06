@@ -56,6 +56,10 @@ class GroupTranslationService:
         # submissions per canonical client id so the provider STT request is
         # issued once even when the browser retries before the first response.
         self._voice_locks: dict[str, asyncio.Lock] = {}
+        # The deployed service uses one Gunicorn worker.  Serialize provider
+        # work by the canonical shared variant identity so two recipients
+        # cannot translate the same missing historical language twice.
+        self._variant_locks: dict[str, asyncio.Lock] = {}
 
     def set_runtime_dependencies(self, provider=None, event_broker=None) -> None:
         """Allow application startup to wire the provider after construction."""
@@ -78,6 +82,14 @@ class GroupTranslationService:
         if not membership:
             raise GroupServiceError("group_membership_required", 403)
         return membership
+
+    @staticmethod
+    def _membership_actor_key(membership: GroupMembership) -> str:
+        return ":".join((
+            str(membership.principal_type),
+            str(membership.principal_id),
+            str(membership.principal_user_id),
+        ))
 
     @staticmethod
     def _audit(db, actor: GroupActor, space_id: str, event_type: str, resource_type: str, resource_id: str, metadata: dict | None = None) -> None:
@@ -918,7 +930,97 @@ class GroupTranslationService:
             payload["author_view"] = False
         return payload
 
-    async def _translate_variants(self, actor: GroupActor, segment_id: str, source_text: str, source_language: str, targets: list[str]) -> None:
+    async def _translate_variant_locked(
+        self,
+        cost_owner_key: str,
+        segment_id: str,
+        source_text: str,
+        source_language: str,
+        target: str,
+        *,
+        event_type: str,
+    ) -> None:
+        # Caller owns the canonical (segment, target) lock.
+        with self.database.session() as db:
+            variant = db.scalar(select(GroupTranslationVariant).where(
+                GroupTranslationVariant.segment_id == segment_id,
+                GroupTranslationVariant.target_language == target,
+            ))
+            if not variant or (
+                variant.state == "FINAL"
+                and variant.translated_ciphertext
+                and variant.translated_nonce
+                and variant.encryption_version
+            ):
+                return
+        try:
+            if self.provider is None:
+                raise GroupServiceError("group_translation_provider_not_configured", 503)
+            result = await self.provider.translate_text(
+                source_text=source_text,
+                source_language=source_language,
+                target_language=target,
+                principal_id=cost_owner_key,
+                idempotency_key=f"group-v2:{segment_id}:{target}",
+            )
+            outcome = ("FINAL", result.text, result.model, result.request_id, "")
+        except Exception as exc:
+            code = getattr(exc, "args", [None])[0] or "group_translation_provider_failed"
+            outcome = ("FAILED", None, "", "", str(code)[:80])
+        event_space_id = ""
+        with self.database.session() as db:
+            with db.begin():
+                variant = db.scalar(select(GroupTranslationVariant).where(
+                    GroupTranslationVariant.segment_id == segment_id,
+                    GroupTranslationVariant.target_language == target,
+                ).with_for_update())
+                if not variant:
+                    return
+                variant.state, text_value, variant.provider_model, variant.provider_request_id, variant.failure_code = outcome
+                variant.updated_at = _now()
+                if text_value is not None:
+                    ciphertext, nonce, version = self.crypto.encrypt_text(
+                        text_value, aad=f"group-translation-variant:{segment_id}:{target}"
+                    )
+                    variant.translated_ciphertext = ciphertext
+                    variant.translated_nonce = nonce
+                    variant.encryption_version = version
+                else:
+                    # A failed retry must not expose stale ciphertext as a
+                    # successful historical translation.
+                    variant.translated_ciphertext = None
+                    variant.translated_nonce = None
+                    variant.encryption_version = None
+                segment = db.get(GroupTranslationSegment, segment_id)
+                if segment:
+                    event_space_id = segment.space_id
+                    variants = list(db.scalars(select(GroupTranslationVariant).where(
+                        GroupTranslationVariant.segment_id == segment_id,
+                    )).all())
+                    segment.state = self._segment_state(variants)
+                    segment.failure_code = next((
+                        item.failure_code for item in variants
+                        if item.state == "FAILED" and item.failure_code
+                    ), "")
+                    if self.event_broker:
+                        self.event_broker.enqueue_in_transaction(
+                            db, segment.space_id, event_type, resource_id=segment.id
+                        )
+        if self.event_broker and event_space_id:
+            await self.event_broker.publish(
+                event_space_id, event_type, resource_id=segment_id
+            )
+
+    async def _translate_variants(
+        self,
+        cost_owner_key: str,
+        segment_id: str,
+        source_text: str,
+        source_language: str,
+        targets: list[str],
+        *,
+        event_type: str = "translation.segment.changed",
+    ) -> None:
         if not targets:
             with self.database.session() as db:
                 with db.begin():
@@ -930,47 +1032,13 @@ class GroupTranslationService:
         semaphore = asyncio.Semaphore(3)
 
         async def one(target: str) -> None:
-            async with semaphore:
-                try:
-                    if self.provider is None:
-                        raise GroupServiceError("group_translation_provider_not_configured", 503)
-                    result = await self.provider.translate_text(
-                        source_text=source_text,
-                        source_language=source_language,
-                        target_language=target,
-                        principal_id=actor.key,
-                        idempotency_key=f"group-v2:{segment_id}:{target}",
-                    )
-                    outcome = ("FINAL", result.text, result.model, result.request_id, "")
-                except Exception as exc:
-                    code = getattr(exc, "args", [None])[0] or "group_translation_provider_failed"
-                    outcome = ("FAILED", None, "", "", str(code)[:80])
-                with self.database.session() as db:
-                    with db.begin():
-                        variant = db.scalar(select(GroupTranslationVariant).where(
-                            GroupTranslationVariant.segment_id == segment_id,
-                            GroupTranslationVariant.target_language == target,
-                        ).with_for_update())
-                        if not variant:
-                            return
-                        variant.state, text_value, variant.provider_model, variant.provider_request_id, variant.failure_code = outcome
-                        variant.updated_at = _now()
-                        if text_value is not None:
-                            ciphertext, nonce, version = self.crypto.encrypt_text(
-                                text_value, aad=f"group-translation-variant:{segment_id}:{target}"
-                            )
-                            variant.translated_ciphertext = ciphertext
-                            variant.translated_nonce = nonce
-                            variant.encryption_version = version
-                        segment = db.get(GroupTranslationSegment, segment_id)
-                        if segment:
-                            variants = list(db.scalars(select(GroupTranslationVariant).where(GroupTranslationVariant.segment_id == segment_id)).all())
-                            segment.state = self._segment_state(variants)
-                            segment.failure_code = next((v.failure_code for v in variants if v.state == "FAILED" and v.failure_code), "")
-                            if self.event_broker:
-                                self.event_broker.enqueue_in_transaction(db, segment.space_id, "translation.segment.changed", resource_id=segment.id)
-                if self.event_broker:
-                    await self.event_broker.publish(segment.space_id, "translation.segment.changed", resource_id=segment.id)
+            lock_key = f"{segment_id}:{target}"
+            lock = self._variant_locks.setdefault(lock_key, asyncio.Lock())
+            async with semaphore, lock:
+                await self._translate_variant_locked(
+                    cost_owner_key, segment_id, source_text, source_language,
+                    target, event_type=event_type,
+                )
 
         await asyncio.gather(*(one(target) for target in targets))
 
@@ -1038,7 +1106,7 @@ class GroupTranslationService:
                 payload = self._project_v2(db, actor, segment)
         if self.event_broker:
             await self.event_broker.publish(space_id, "translation.segment.created", resource_id=segment.id)
-        await self._translate_variants(actor, segment.id, source_text, source_language, targets)
+        await self._translate_variants(actor.key, segment.id, source_text, source_language, targets)
         with self.database.session() as db:
             segment = db.get(GroupTranslationSegment, segment.id)
             return self._project_v2(db, actor, segment) if segment else payload
@@ -1176,7 +1244,7 @@ class GroupTranslationService:
 
     def v2_history(self, actor: GroupActor, space_id: str, runtime_kind: str | None, runtime_id: str | None, limit: int, before_id: str | None = None) -> list[dict]:
         with self.database.session() as db:
-            membership = self._membership(db, space_id, actor)
+            self._membership(db, space_id, actor)
             if runtime_kind and runtime_id:
                 self._authorize_v2_history(db, actor, space_id, runtime_kind, runtime_id)
             elif runtime_id:
@@ -1186,24 +1254,14 @@ class GroupTranslationService:
                 query = query.where(GroupTranslationSegment.runtime_kind == runtime_kind)
             if runtime_id:
                 query = query.where(GroupTranslationSegment.runtime_id == runtime_id)
-            if not runtime_id:
-                media_ids = select(GroupMediaParticipant.session_id).where(
-                    GroupMediaParticipant.membership_id == membership.id,
-                    GroupMediaParticipant.joined_at.is_not(None),
-                )
-                radio_ids = select(GroupRadioParticipant.radio_session_id).where(
-                    GroupRadioParticipant.membership_id == membership.id,
-                    GroupRadioParticipant.joined_at.is_not(None),
-                )
-                query = query.where(or_(
-                    and_(GroupTranslationSegment.runtime_kind.in_(("call", "video")), GroupTranslationSegment.runtime_id.in_(media_ids)),
-                    and_(GroupTranslationSegment.runtime_kind == "radio", GroupTranslationSegment.runtime_id.in_(radio_ids)),
-                ))
+            # Space archive is source history for every current authorized
+            # member, including members who joined after an older runtime.
+            # Missing target variants remain explicit/on-demand below; merely
+            # reading this query never starts provider work.
             if before_id:
                 cursor = db.get(GroupTranslationSegment, before_id)
                 if not cursor or cursor.space_id != space_id:
                     raise GroupServiceError("invalid_history_cursor", 400)
-                self._authorize_v2_history(db, actor, space_id, cursor.runtime_kind, cursor.runtime_id)
                 # Compare database values without rebinding a SQL timestamp as a
                 # microsecond-formatted Python datetime (SQLite legacy rows).
                 cursor_time = select(GroupTranslationSegment.created_at).where(
@@ -1222,21 +1280,60 @@ class GroupTranslationService:
     async def retry_variant(self, actor: GroupActor, space_id: str, segment_id: str, target_language: str) -> dict:
         if target_language not in {"vi", "en", "zh-TW"}:
             raise GroupServiceError("invalid_language", 400)
-        with self.database.session() as db:
-            segment = db.get(GroupTranslationSegment, segment_id)
-            if not segment or segment.space_id != space_id:
-                raise GroupServiceError("group_translation_segment_not_found", 404)
-            membership, _ = self._require_v2_runtime(db, actor, space_id, segment.runtime_kind, segment.runtime_id)
-            if membership.id != segment.speaker_membership_id:
-                raise GroupServiceError("group_translation_segment_forbidden", 403)
-            variant = db.scalar(select(GroupTranslationVariant).where(GroupTranslationVariant.segment_id == segment.id, GroupTranslationVariant.target_language == target_language))
-            if not variant:
-                raise GroupServiceError("group_translation_variant_not_found", 404)
-            if variant.state == "FINAL":
-                return self._project_v2(db, actor, segment, target_override=target_language)
-            source_text = self.crypto.decrypt_text(segment.source_ciphertext, segment.source_nonce, aad=f"group-translation-segment-source:{space_id}:{segment.id}", version=segment.encryption_version)
-            source_language = segment.source_language
-        await self._translate_variants(actor, segment.id, source_text, source_language, [target_language])
+        lock_key = f"{segment_id}:{target_language}"
+        lock = self._variant_locks.setdefault(lock_key, asyncio.Lock())
+        async with lock:
+            with self.database.session() as db:
+                with db.begin():
+                    segment = db.get(GroupTranslationSegment, segment_id)
+                    if not segment or segment.space_id != space_id:
+                        raise GroupServiceError("group_translation_segment_not_found", 404)
+                    # Historical translation is available to current Group
+                    # members and must not depend on an active media runtime.
+                    self._membership(db, space_id, actor)
+                    if target_language == segment.source_language:
+                        return self._project_v2(db, actor, segment, target_override=target_language)
+                    variant = db.scalar(select(GroupTranslationVariant).where(
+                        GroupTranslationVariant.segment_id == segment.id,
+                        GroupTranslationVariant.target_language == target_language,
+                    ))
+                    if (
+                        variant
+                        and variant.state == "FINAL"
+                        and variant.translated_ciphertext
+                        and variant.translated_nonce
+                        and variant.encryption_version
+                    ):
+                        return self._project_v2(db, actor, segment, target_override=target_language)
+                    if not variant:
+                        variant = GroupTranslationVariant(
+                            id=str(uuid4()), segment_id=segment.id,
+                            target_language=target_language, state="PROCESSING",
+                        )
+                        db.add(variant)
+                    else:
+                        variant.state = "PROCESSING"
+                        variant.failure_code = ""
+                        variant.updated_at = _now()
+                    source_author = db.get(GroupMembership, segment.speaker_membership_id)
+                    if not source_author:
+                        raise GroupServiceError("group_translation_cost_owner_unavailable", 409)
+                    cost_owner_key = self._membership_actor_key(source_author)
+                    source_text = self.crypto.decrypt_text(
+                        segment.source_ciphertext, segment.source_nonce,
+                        aad=f"group-translation-segment-source:{space_id}:{segment.id}",
+                        version=segment.encryption_version,
+                    )
+                    source_language = segment.source_language
+
+            # retry_variant already owns this canonical lock.  Perform the one
+            # provider call inline, then persist through the common worker.
+            # Temporarily release/reacquire is unnecessary because the worker
+            # supports a caller-held lock via the focused helper below.
+            await self._translate_variant_locked(
+                cost_owner_key, segment.id, source_text, source_language,
+                target_language, event_type="translation.segment.history_changed",
+            )
         with self.database.session() as db:
             return self._project_v2(db, actor, db.get(GroupTranslationSegment, segment.id), target_override=target_language)
 

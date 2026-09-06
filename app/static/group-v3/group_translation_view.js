@@ -27,6 +27,14 @@
       esc(labels.retry || "Retry") + "</button>";
   }
 
+  function historyTranslateButton(item, labels) {
+    if (!labels.readOnly || !item || !item.id || !item.target_language ||
+        item.target_language === item.source_language || item.translated_text) return "";
+    return '<button type="button" class="group-translation-v2__retry" data-action="history-translate" data-segment-id="' +
+      esc(item.id) + '" data-target-language="' + esc(item.target_language) + '">' +
+      esc(labels.translate || labels.retry || "Translate") + "</button>";
+  }
+
   function panel(options) {
     options = options || {};
     var labels = options.labels || {};
@@ -71,10 +79,12 @@
     var author = Boolean(item && (item.author_view || item.projection === "author"));
     var inconsistentFinal = item && item.state === "FINAL" && item.translated_text == null && !item.author_view && item.projection !== "author";
     var failed = item && item.state === "FAILED" || inconsistentFinal;
-    var displayState = failed ? "FAILED" : item && item.state || "PROCESSING";
+    var onDemand = failed && item && item.failure_code === "group_translation_variant_missing";
+    var displayState = onDemand ? "MANUAL" : failed ? "FAILED" : item && item.state || "PROCESSING";
     var source = item && item.source_text || "";
     var translated = item && item.translated_text;
-    var finalText = failed ? (labels.failed || "Translation failed") : translated == null ? (labels.pending || "Processing…") : translated;
+    var finalText = onDemand ? (labels.onDemand || "Translate on demand") :
+      failed ? (labels.failed || "Translation failed") : translated == null ? (labels.pending || "Processing…") : translated;
     var common = ' class="group-translation-v2__item ' + (failed ? "is-failed" : "") + '" data-segment-id="' +
       esc(item && item.id) + '"';
     var metadata = '<div class="translation-history-context"><strong>' + esc(item.speaker_display_name || "") +
@@ -93,13 +103,14 @@
         '<div class="group-translation-v2__distributed-label">' + esc(labels.variants || "Translation results") +
         '</div><div class="group-translation-v2__variants">' + variants + '</div></article>';
     }
-    var original = item && item.show_original_enabled ?
+    var original = item && (labels.readOnly || item.show_original_enabled) ?
       '<details class="group-translation-v2__original"' + (labels.readOnly ? ' open' : '') + '><summary>' + esc(labels.showOriginal || "Show original") +
       '</summary><p>' + esc(item.source_language) + ' · ' + esc(source) + '</p></details>' : "";
     return '<article' + common + '>' + metadata + '<div class="group-translation-v2__item-meta"><span>' +
       esc(labels.received || "Received translation") + ' · ' + esc(item && item.display_language || item && item.target_language) +
       '</span><span>' + esc(displayState) + '</span></div><p class="group-translation-v2__result">' +
-      esc(finalText) + '</p>' + playButton(translated, item && item.target_language, labels) + original + '</article>';
+      esc(finalText) + '</p>' + historyTranslateButton(item, labels) +
+      playButton(translated, item && item.target_language, labels) + original + '</article>';
   }
 
   window.GroupV3TranslationView = Object.freeze({

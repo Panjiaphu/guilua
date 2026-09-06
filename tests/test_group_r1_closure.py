@@ -40,6 +40,33 @@ class Detector(FakeV2Provider):
         self.detections += 1
         return self.resolved
 
+
+def add_member(app, space_id, runtime_id, principal, target, *, participate=True):
+    with app.state.database.session() as db, db.begin():
+        member = GroupMembership(
+            id=str(uuid4()), space_id=space_id, principal_type="member",
+            principal_id=principal, principal_user_id=principal,
+            display_name="QA " + principal, role="member", status="active",
+        )
+        db.add(member)
+        db.flush()
+        db.add(GroupLanguageProfile(
+            id=str(uuid4()), space_id=space_id, membership_id=member.id,
+            spoken_language=target, preferred_output_language=target,
+            auto_translate_enabled=1, auto_read_enabled=1,
+            show_original_enabled=1,
+        ))
+        if participate:
+            db.add(GroupMediaParticipant(
+                id=str(uuid4()), session_id=runtime_id,
+                membership_id=member.id, principal_type="member",
+                principal_id=principal, principal_user_id=principal,
+                display_name=member.display_name,
+                livekit_identity="member-" + principal,
+                invite_status="joined", joined_at=datetime.now(timezone.utc),
+            ))
+        return member.id
+
 @pytest.mark.parametrize("language", ["auto", "vi", "en", "zh-TW"])
 def test_auto_is_request_mode_not_profile_language(language):
     request = TranslationSegmentTextCreate(runtime_kind="video", runtime_id=str(uuid4()),
@@ -126,6 +153,138 @@ async def test_terminal_recipient_projection_never_reports_final_without_text(tm
     assert projected["translated_text"] is None
     assert projected["state"] == "FAILED"
     assert projected["failure_code"] == "group_translation_variant_missing"
+
+
+@pytest.mark.anyio
+async def test_five_member_room_creates_one_shared_variant_per_target_language(tmp_path):
+    app, _, provider, space, runtime = _runtime(tmp_path)
+    with app.state.database.session() as db, db.begin():
+        owner = db.scalar(select(GroupMembership).where(
+            GroupMembership.space_id == space, GroupMembership.principal_id == "42"))
+        db.scalar(select(GroupLanguageProfile).where(
+            GroupLanguageProfile.membership_id == owner.id)).preferred_output_language = "vi"
+    add_member(app, space, runtime, "100", "zh-TW")
+    add_member(app, space, runtime, "101", "en")
+    add_member(app, space, runtime, "102", "en")
+    result = await app.state.group_translation_service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-five-member-shared", source_language="vi",
+        source_text="Xin chào cả nhóm",
+    ))
+    assert sorted(call["target_language"] for call in provider.calls) == ["en", "zh-TW"]
+    assert all(call["principal_id"] == "member:42:42" for call in provider.calls)
+    variants = {item["target_language"]: item for item in result["variants"]}
+    assert variants["zh-TW"]["recipient_count"] == 2
+    assert variants["en"]["recipient_count"] == 2
+    with app.state.database.session() as db:
+        stored = list(db.scalars(select(GroupTranslationVariant).where(
+            GroupTranslationVariant.segment_id == result["id"])).all())
+        assert len(stored) == 2
+
+
+@pytest.mark.anyio
+async def test_late_join_source_history_is_visible_without_automatic_translation(tmp_path):
+    app, _, provider, space, runtime = _runtime(tmp_path)
+    result = await app.state.group_translation_service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-late-source-visible", source_language="vi",
+        source_text="Nguồn lịch sử",
+    ))
+    calls_before_join = len(provider.calls)
+    add_member(app, space, runtime, "late", "en", participate=False)
+    late_actor = actor("late")
+    history = app.state.group_translation_service.v2_history(
+        late_actor, space, None, None, 50)
+    projected = next(item for item in history if item["id"] == result["id"])
+    assert projected["source_text"] == "Nguồn lịch sử"
+    assert len(provider.calls) == calls_before_join
+
+
+@pytest.mark.anyio
+async def test_historical_existing_variant_is_reused_at_zero_provider_cost(tmp_path):
+    app, _, provider, space, runtime = _runtime(tmp_path)
+    result = await app.state.group_translation_service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-history-reuse", source_language="vi",
+        source_text="Dùng lại bản dịch",
+    ))
+    add_member(app, space, runtime, "late-reuse", "zh-TW", participate=False)
+    calls_before = len(provider.calls)
+    projected = await app.state.group_translation_service.retry_variant(
+        actor("late-reuse"), space, result["id"], "zh-TW")
+    assert projected["translated_text"] == "zh-TW:Dùng lại bản dịch"
+    assert len(provider.calls) == calls_before
+
+
+@pytest.mark.anyio
+async def test_historical_same_language_projection_uses_zero_provider_work(tmp_path):
+    app, _, provider, space, runtime = _runtime(tmp_path)
+    result = await app.state.group_translation_service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-history-same-language", source_language="vi",
+        source_text="Không cần dịch",
+    ))
+    add_member(app, space, runtime, "late-same", "vi", participate=False)
+    calls_before = len(provider.calls)
+    projected = await app.state.group_translation_service.retry_variant(
+        actor("late-same"), space, result["id"], "vi")
+    assert projected["translated_text"] == "Không cần dịch"
+    assert projected["state"] == "FINAL"
+    assert len(provider.calls) == calls_before
+
+
+@pytest.mark.anyio
+async def test_historical_missing_variant_is_created_once_and_charged_to_source_author(tmp_path):
+    app, _, provider, space, runtime = _runtime(tmp_path)
+    with app.state.database.session() as db, db.begin():
+        for profile in db.scalars(select(GroupLanguageProfile).where(
+                GroupLanguageProfile.space_id == space)):
+            profile.preferred_output_language = "vi"
+    result = await app.state.group_translation_service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-history-lazy", source_language="vi",
+        source_text="Tạo khi được yêu cầu",
+    ))
+    assert provider.calls == []
+    add_member(app, space, runtime, "late-lazy", "zh-TW", participate=False)
+    before = app.state.group_translation_service.v2_history(
+        actor("late-lazy"), space, None, None, 50)[0]
+    assert before["source_text"] == "Tạo khi được yêu cầu"
+    assert before["translated_text"] is None
+    assert before["failure_code"] == "group_translation_variant_missing"
+    projected = await app.state.group_translation_service.retry_variant(
+        actor("late-lazy"), space, result["id"], "zh-TW")
+    assert projected["translated_text"] == "zh-TW:Tạo khi được yêu cầu"
+    assert len(provider.calls) == 1
+    assert provider.calls[0]["principal_id"] == "member:42:42"
+
+
+@pytest.mark.anyio
+async def test_concurrent_historical_requests_coalesce_shared_variant_provider_work(tmp_path):
+    app, _, provider, space, runtime = _runtime(tmp_path)
+    with app.state.database.session() as db, db.begin():
+        for profile in db.scalars(select(GroupLanguageProfile).where(
+                GroupLanguageProfile.space_id == space)):
+            profile.preferred_output_language = "vi"
+    result = await app.state.group_translation_service.submit_text(actor(), space, dict(
+        runtime_kind="video", runtime_id=runtime,
+        client_segment_id="r1-history-concurrent", source_language="vi",
+        source_text="Một shared variant",
+    ))
+    add_member(app, space, runtime, "late-a", "zh-TW", participate=False)
+    add_member(app, space, runtime, "late-b", "zh-TW", participate=False)
+    first, second = await asyncio.gather(
+        app.state.group_translation_service.retry_variant(actor("late-a"), space, result["id"], "zh-TW"),
+        app.state.group_translation_service.retry_variant(actor("late-b"), space, result["id"], "zh-TW"),
+    )
+    assert first["translated_text"] == second["translated_text"] == "zh-TW:Một shared variant"
+    assert len(provider.calls) == 1
+    with app.state.database.session() as db:
+        variants = list(db.scalars(select(GroupTranslationVariant).where(
+            GroupTranslationVariant.segment_id == result["id"],
+            GroupTranslationVariant.target_language == "zh-TW",
+        )).all())
+        assert len(variants) == 1
 
 class ProviderClient:
     output = '{"language":"vi"}'

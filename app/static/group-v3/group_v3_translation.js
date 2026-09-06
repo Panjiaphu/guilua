@@ -5,6 +5,9 @@
   var activeStates = new Set();
   var autoplayConsumed = window.__groupV3AutoplayConsumed || (window.__groupV3AutoplayConsumed = new Set());
   var autoplayQueued = window.__groupV3AutoplayQueued || (window.__groupV3AutoplayQueued = new Set());
+  var realtimeEligible = window.__groupV3RealtimeEligible || (window.__groupV3RealtimeEligible = new Map());
+  var historySeen = window.__groupV3HistorySeen || (window.__groupV3HistorySeen = new Map());
+  var reconcileRequested = window.__groupV3RealtimeReconcile || (window.__groupV3RealtimeReconcile = new Set());
   var traces = [];
   function trace(state, stage, status, detail, segmentId) {
     // Never retain audio, transcript, credentials or complete response bodies.
@@ -263,6 +266,44 @@
       String(item && (item.display_language || item.target_language) || "") + ":" + String(item && item.state || "FINAL");
   }
 
+  function idSet(store, snapshot) {
+    var key = runtimeKey(snapshot);
+    var values = store.get(key);
+    if (!values) {
+      values = new Set();
+      store.set(key, values);
+    }
+    return values;
+  }
+
+  function observeHistory(segments, snapshot) {
+    if (!snapshot || !snapshot.runtime_id) return;
+    var key = runtimeKey(snapshot);
+    var seen = historySeen.get(key);
+    if (!seen) {
+      seen = idSet(historySeen, snapshot);
+      (segments || []).forEach(function (item) { if (item && item.id) seen.add(String(item.id)); });
+      reconcileRequested.delete(key);
+      return;
+    }
+    var eligible = idSet(realtimeEligible, snapshot);
+    (segments || []).forEach(function (item) {
+      if (!item || !item.id) return;
+      var id = String(item.id);
+      if (reconcileRequested.has(key) && !seen.has(id)) eligible.add(id);
+      seen.add(id);
+    });
+    reconcileRequested.delete(key);
+  }
+
+  function markRealtimeEligible(detail) {
+    var snapshot = runtime();
+    var eventType = String(detail && detail.type || "");
+    var id = String(detail && (detail.resource_id || detail.id) || "");
+    if (!snapshot || !snapshot.runtime_id || !id || eventType === "translation.segment.history_changed") return;
+    idSet(realtimeEligible, snapshot).add(id);
+  }
+
   function setButtonPlayback(panel, text, playing) {
     panel.querySelectorAll("[data-v2-play]").forEach(function (button) {
       if (button.dataset.v2Play === text) button.setAttribute("aria-pressed", String(playing));
@@ -327,10 +368,10 @@
     return accepted;
   }
 
-  // Archive playback is generated from authorized TEXT, never a recorded file.
+  // Archive/Radio playback is generated from authorized TEXT, never a recorded file.
   document.addEventListener("click", function (event) {
-    var button = event.target.closest && event.target.closest("[data-translation-archive] [data-v2-play]");
-    if (!button) return;
+    var button = event.target.closest && event.target.closest("[data-v2-play]");
+    if (!button || button.closest("[data-v2-panel]")) return;
     var snapshot = runtime() || {};
     if (snapshot.device_lost) return;
     var state = stateFor(document.body, snapshot);
@@ -340,11 +381,13 @@
 
   function maybeAutoRead(segments, panel, snapshot) {
     if (!snapshot || !snapshot.auto_read || snapshot.device_lost || snapshot.media_connected === false) return;
+    var eligible = idSet(realtimeEligible, snapshot);
     (segments || []).slice().sort(function (a, b) {
       return (Date.parse(a.created_at) || 0) - (Date.parse(b.created_at) || 0) || String(a.id || "").localeCompare(String(b.id || ""));
     }).forEach(function (item) {
       if (!item || item.state !== "FINAL" || item.author_view || !item.translated_text ||
         String(item.speaker_membership_id || "") === String(snapshot.membership_id || "")) return;
+      if (!eligible.has(String(item.id || ""))) return;
       var playback = playbackKey(snapshot, item);
       if (autoplayConsumed.has(playback) || autoplayQueued.has(playback)) return;
       play(item.translated_text, item.display_language || item.target_language, panel, true, playback);
@@ -356,6 +399,7 @@
     if (!snapshot || snapshot.runtime_kind !== "radio" || !snapshot.runtime_id) return;
     var state = stateFor(document.body, snapshot);
     state.archive = true;
+    observeHistory(segments, snapshot);
     maybeAutoRead(segments, document.body, snapshot);
   }
 
@@ -404,6 +448,7 @@
     return api(endpoint(snapshot, query), {}, state).then(function (payload) {
       if (!isCurrent(panel, state, generation) || sequence !== state.historySequence) return [];
       var segments = payload.segments || [];
+      observeHistory(segments, snapshot);
       if (state.phase === "PROCESSING_STT" && segments.some(function (segment) {
         return segment.client_segment_id === state.pendingSegmentId && segment.source_text;
       })) setStatus(panel, "TRANSLATING");
@@ -789,8 +834,15 @@
       if (!state.disposed && !state.archive) requestHistoryRefresh(state.panel);
     });
   }
-  window.addEventListener("group-v3:translation-segment", reconcileHistories);
-  window.addEventListener("group-v3:translation-reconcile", reconcileHistories);
+  window.addEventListener("group-v3:translation-segment", function (event) {
+    markRealtimeEligible(event.detail || {});
+    reconcileHistories();
+  });
+  window.addEventListener("group-v3:translation-reconcile", function () {
+    var snapshot = runtime();
+    if (snapshot && snapshot.runtime_id) reconcileRequested.add(runtimeKey(snapshot));
+    reconcileHistories();
+  });
   window.addEventListener("group-video-layout:change", mountAll);
   window.addEventListener("group-v3:media-disconnected", cleanup);
   window.addEventListener("pagehide", cleanup, { once: true });

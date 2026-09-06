@@ -918,7 +918,7 @@
     return { readOnly: true, author: t("translationAuthor"), received: t("translationReceived"), original: t("translationOriginal"),
       showOriginal: t("translationShowOriginal"), pending: t("translationPending"), recipients: t("recipients"),
       play: t("translationPlay"), retry: t("translationRetry"), failed: t("translationVariantError"), noRecipients: t("translationNoRecipients"),
-      variants: t("translationVariants") };
+      variants: t("translationVariants"), translate: t("translationTranslate"), onDemand: t("translationOnDemand") };
   }
 
   function renderRadio() {
@@ -960,6 +960,35 @@
         window.GroupV3TranslationController.readRadioHistory((payload.bursts || []).map(function (item) { return item.segment; }).filter(Boolean));
       }
     } catch (_error) { state.radioHistoryError = t("translationHistorySyncError"); }
+  }
+
+  async function translateHistoricalSegment(button) {
+    if (!state.space || !button.dataset.segmentId || !button.dataset.targetLanguage) return;
+    button.disabled = true;
+    try {
+      var segmentId = button.dataset.segmentId;
+      var targetLanguage = button.dataset.targetLanguage;
+      var payload = await api(
+        "/api/group/spaces/" + encodeURIComponent(state.space.id) +
+          "/translation/segments/" + encodeURIComponent(segmentId) +
+          "/variants/" + encodeURIComponent(targetLanguage) + "/retry",
+        json("POST", { target_language: targetLanguage })
+      );
+      if (!payload.segment) return;
+      state.translations = state.translations.map(function (item) {
+        return item.id === segmentId ? payload.segment : item;
+      });
+      state.radioHistory = state.radioHistory.map(function (burst) {
+        return burst.segment && burst.segment.id === segmentId
+          ? Object.assign({}, burst, { segment: payload.segment }) : burst;
+      });
+      // Historical Translate only materializes/reuses shared text.  Speech is
+      // intentionally a separate explicit Play action.
+      render();
+    } catch (error) {
+      notify(publicError(error));
+      if (document.documentElement.contains(button)) button.disabled = false;
+    }
   }
 
   function scheduleAppHistoryConvergence(kind, segments) {
@@ -2007,6 +2036,7 @@
       else if (state.historyTab !== "chat") await loadArchive(true);
       render(); return;
     }
+    if (name === "history-translate") return translateHistoricalSegment(button);
     if (name === "select-space") return selectSpace(button.dataset.id);
     if (name === "show-create-space") {
       state.creatingSpace = true;

@@ -508,7 +508,7 @@ def test_partial_voice_has_variant_error_and_no_duplicate_source(page):
     expect(page.locator('[data-segment-id=partial1] [data-v2-retry]')).to_be_visible()
 
 
-def test_received_final_auto_read_is_local_and_deduplicated(page):
+def test_history_bootstrap_never_auto_reads_and_manual_play_is_explicit(page):
     voice_setup(page)
     page.evaluate("""() => {window.__spoken=[];speechSynthesis.speak=u=>{__spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};speechSynthesis.cancel=()=>{};}""")
     page.locator("[data-v2-auto-read]").check()
@@ -519,8 +519,30 @@ def test_received_final_auto_read_is_local_and_deduplicated(page):
     before=page.evaluate("__mediaCounts.publish")
     for _ in range(2):
         page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
+    assert page.evaluate("__spoken") == []
+    page.evaluate("""() => window.dispatchEvent(new CustomEvent('group-v3:translation-segment',
+      {detail:{type:'translation.segment.history_changed',resource_id:'received1'}}))""")
+    page.wait_for_timeout(50)
+    assert page.evaluate("__spoken") == []
+    page.locator("[data-segment-id=received1] [data-v2-play]").click()
+    page.wait_for_function("__spoken.length === 1")
     assert page.evaluate("__spoken") == ["Translated fixture"]
     assert page.evaluate("__mediaCounts.publish") == before
+
+
+def test_new_realtime_final_auto_reads_once_after_invalidation(page):
+    voice_setup(page)
+    page.evaluate("""() => {window.__spoken=[];speechSynthesis.speak=u=>{__spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};speechSynthesis.cancel=()=>{};}""")
+    page.locator("[data-v2-auto-read]").check()
+    item={"id":"realtime-final","state":"FINAL","translated_text":"Realtime fixture","source_text":"Original",
+        "speaker_membership_id":"m2","display_language":"zh-TW","target_language":"zh-TW","author_view":False}
+    page.route("**/translation/v2-history?*",lambda r:r.fulfill(content_type="application/json",body=json.dumps({"segments":[item]})))
+    page.evaluate("""() => window.dispatchEvent(new CustomEvent('group-v3:translation-segment',
+      {detail:{type:'translation.segment.changed',resource_id:'realtime-final'}}))""")
+    page.wait_for_function("__spoken.length === 1")
+    page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
+    page.wait_for_timeout(50)
+    assert page.evaluate("__spoken") == ["Realtime fixture"]
 
 
 def test_autoread_queues_all_finals_and_consumes_only_after_onstart(page):
@@ -541,12 +563,14 @@ def test_autoread_queues_all_finals_and_consumes_only_after_onstart(page):
       speechSynthesis.cancel=()=>{};
     }""")
     page.locator("[data-v2-auto-read]").check()
+    page.evaluate("""ids => ids.forEach(id => window.dispatchEvent(new CustomEvent('group-v3:translation-segment',
+      {detail:{type:'translation.segment.changed',resource_id:id}})))""", [item["id"] for item in items])
     page.wait_for_function("__spoken.length === 3")
     assert page.evaluate("__spoken") == ["Bản A", "Bản B", "Bản C"]
     assert len(page.evaluate("GroupV3TtsManager.diagnostics().startedKeys.filter(k=>k.includes('received-'))")) == 3
 
 
-def test_autoread_disabled_bootstrap_remains_eligible_when_enabled(page):
+def test_autoread_disabled_history_stays_manual_when_enabled(page):
     voice_setup(page)
     item = {"id":"disabled-bootstrap","state":"FINAL","translated_text":"Play after enable",
         "source_text":"Original","created_at":"2026-09-06T00:00:01Z","speaker_membership_id":"m2",
@@ -559,8 +583,8 @@ def test_autoread_disabled_bootstrap_remains_eligible_when_enabled(page):
     page.wait_for_timeout(50)
     assert page.evaluate("__spoken") == []
     page.locator("[data-v2-auto-read]").check()
-    page.wait_for_function("__spoken.length === 1")
-    assert page.evaluate("__spoken") == ["Play after enable"]
+    page.wait_for_timeout(100)
+    assert page.evaluate("__spoken") == []
 
 
 def test_autoread_start_timeout_is_retryable_and_manual_tts_is_deterministic(page):
@@ -581,6 +605,8 @@ def test_autoread_start_timeout_is_retryable_and_manual_tts_is_deterministic(pag
       };
     }""")
     page.locator("[data-v2-auto-read]").check()
+    page.evaluate("""() => window.dispatchEvent(new CustomEvent('group-v3:translation-segment',
+      {detail:{type:'translation.segment.changed',resource_id:'retryable-final'}}))""")
     page.wait_for_function("__speakAttempts === 1")
     page.wait_for_timeout(100)
     page.evaluate("GroupV3TranslationController.loadHistory(document.querySelector('[data-group-translation-v2]'))")
@@ -721,6 +747,34 @@ def test_archive_manual_tts_failure_is_visible_instead_of_silent(page):
     expect(page.locator("[data-toast]")).to_contain_text("phát giọng")
 
 
+def test_historical_translate_is_on_demand_and_never_auto_speaks(page):
+    boot(page, surface="chat-translation", connected=False)
+    missing = {"id":"history-missing","runtime_kind":"video","state":"FAILED",
+        "failure_code":"group_translation_variant_missing","translated_text":None,
+        "source_text":"Nguồn lịch sử luôn hiển thị","source_language":"vi",
+        "created_at":"2026-09-06T00:00:03Z","speaker_membership_id":"m2",
+        "speaker_display_name":"Trần An","display_language":"zh-TW","target_language":"zh-TW",
+        "author_view":False,"projection":"recipient","show_original_enabled":False}
+    final = dict(missing, state="FINAL", failure_code=None, translated_text="歷史翻譯")
+    page.route("**/translation/v2-history?*", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segments":[missing]})))
+    page.route("**/translation/segments/history-missing/variants/zh-TW/retry", lambda route: route.fulfill(
+        content_type="application/json", body=json.dumps({"segment":final})))
+    page.locator("[data-action=history-tab][data-tab=media]").click()
+    expect(page.locator("[data-segment-id=history-missing]")).to_contain_text("Nguồn lịch sử luôn hiển thị")
+    expect(page.locator("[data-action=history-translate]")).to_be_visible()
+    page.locator("[data-action=toggle-auto-read]").click()
+    page.wait_for_function("GroupV3Runtime.snapshot().auto_read")
+    page.evaluate("""() => {window.__spoken=[];speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{
+      __spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};}""")
+    page.locator("[data-action=history-translate]").click()
+    expect(page.locator("[data-segment-id=history-missing]")).to_contain_text("歷史翻譯")
+    assert page.evaluate("__spoken") == []
+    page.locator("[data-segment-id=history-missing] [data-v2-play]").click()
+    page.wait_for_function("__spoken.length === 1")
+    assert page.evaluate("__spoken") == ["歷史翻譯"]
+
+
 def test_radio_final_remains_autoread_eligible_until_listen_media_connects(page):
     boot(page, surface="radio", connected=False)
     segment = {"id":"radio-remote-final","state":"FINAL","translated_text":"Radio translated",
@@ -734,11 +788,16 @@ def test_radio_final_remains_autoread_eligible_until_listen_media_connects(page)
       GroupV3Runtime.updateProfile({auto_read_enabled:true});window.__spoken=[];
       speechSynthesis.cancel=()=>{};speechSynthesis.speak=u=>{__spoken.push(u.text);queueMicrotask(()=>{u.onstart?.();u.onend?.();});};
     }""")
+    page.evaluate("""() => window.dispatchEvent(new CustomEvent('group-v3:translation-segment',
+      {detail:{type:'translation.segment.changed',resource_id:'radio-remote-final'}}))""")
     page.evaluate("segment => GroupV3TranslationController.readRadioHistory([segment])", segment)
     assert page.evaluate("__spoken") == []
     page.locator(".radio-ptt").click()
     page.wait_for_function("GroupV3Runtime.snapshot().media_connected && __spoken.length === 1")
     assert page.evaluate("__spoken") == ["Radio translated"]
+    page.locator("[data-radio-burst=remote-burst] [data-v2-play]").click()
+    page.wait_for_function("__spoken.length === 2")
+    assert page.evaluate("__spoken") == ["Radio translated", "Radio translated"]
 
 
 @pytest.mark.parametrize("width,height", [(1440,900),(390,844),(844,390)])

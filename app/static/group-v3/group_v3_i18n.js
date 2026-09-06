@@ -393,7 +393,8 @@ Object.assign(copy.vi, {
   translationSttError: "Không nhận dạng được giọng nói. Hãy thử ghi lại.",
   translationVariantError: "Đã lưu nguyên bản; một số bản dịch lỗi. Hãy thử lại bản dịch cần nhận.",
   translationNoRecipients: "Chưa có người nhận", translationVariants: "Kết quả theo ngôn ngữ",
-  autoReadRecipient: "Tự đọc bản dịch nhận được trên thiết bị này"
+  autoReadRecipient: "Tự đọc bản dịch nhận được trên thiết bị này",
+  translationTranslate: "Dịch", translationOnDemand: "Chưa có bản dịch · bấm Dịch khi cần"
 });
 Object.assign(copy.en, {
   translationRecord: "Record", translationStopSave: "Stop & save", translationRecognizing: "Recognizing speech",
@@ -402,7 +403,8 @@ Object.assign(copy.en, {
   translationSttError: "Speech recognition failed. Please record again.",
   translationVariantError: "Original saved; some translations failed. Retry the required language.",
   translationNoRecipients: "No recipients yet", translationVariants: "Results by language",
-  autoReadRecipient: "Read received translations on this device"
+  autoReadRecipient: "Read received translations on this device",
+  translationTranslate: "Translate", translationOnDemand: "No translation yet · translate on demand"
 });
 Object.assign(copy["zh-TW"], {
   translationRecord: "錄音", translationStopSave: "停止並儲存", translationRecognizing: "正在辨識語音",
@@ -411,7 +413,8 @@ Object.assign(copy["zh-TW"], {
   translationSttError: "語音辨識失敗，請重新錄音。",
   translationVariantError: "原文已儲存，部分翻譯失敗，請重試所需語言。",
   translationNoRecipients: "尚無接收者", translationVariants: "各語言結果",
-  autoReadRecipient: "在此裝置朗讀收到的翻譯"
+  autoReadRecipient: "在此裝置朗讀收到的翻譯",
+  translationTranslate: "翻譯", translationOnDemand: "尚無翻譯 · 需要時再翻譯"
 });
 Object.assign(copy["vi"], {
   "translationDetectLanguage": "Phát hiện ngôn ngữ",

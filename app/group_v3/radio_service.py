@@ -440,20 +440,14 @@ class GroupRadioService:
 
     def room_history(self, actor, space_id, translation_service, limit=50, before_id=None):
         with self.database.session() as db:
-            member = self._membership(db, space_id, actor)
-            participated = select(GroupRadioParticipant.radio_session_id).where(
-                GroupRadioParticipant.membership_id == member.id,
-                GroupRadioParticipant.joined_at.is_not(None),
-            )
+            self._membership(db, space_id, actor)
             query = select(GroupRadioBurst).where(
                 GroupRadioBurst.space_id == space_id,
-                GroupRadioBurst.radio_session_id.in_(participated),
             )
             if before_id:
                 cursor = db.get(GroupRadioBurst, before_id)
                 if not cursor or cursor.space_id != space_id:
                     raise GroupServiceError("invalid_history_cursor", 400)
-                translation_service._authorize_v2_history(db, actor, space_id, "radio", cursor.radio_session_id)
                 cursor_time = select(GroupRadioBurst.started_at).where(GroupRadioBurst.id == cursor.id).scalar_subquery()
                 query = query.where(or_(GroupRadioBurst.started_at < cursor_time,
                     and_(GroupRadioBurst.started_at == cursor_time, GroupRadioBurst.id < cursor.id)))
