@@ -17,6 +17,7 @@ from app.group_v3.schemas import (
     ReactionCreate,
     SpaceCreate,
     SpaceUpdate,
+    OwnershipTransfer,
 )
 from app.group_v3.service import GroupServiceError
 from app.integrations.timeblock.client import TimeblockIntegrationError
@@ -148,7 +149,8 @@ async def create_space(
     require_write_origin(request)
     actor = require_group_actor(request, "group.spaces.write")
     result = _service(request).create_space(actor, body.model_dump(), idempotency_key)
-    await _publish(request, result["space"]["id"], "space.created", result["space"]["id"])
+    if not result.get("idempotent"):
+        await _publish(request, result["space"]["id"], "space.created", result["space"]["id"])
     return _json(result, status_code=200 if result.get("idempotent") else 201)
 
 
@@ -169,6 +171,31 @@ async def update_space(request: Request, space_id: str, body: SpaceUpdate) -> JS
     space = _service(request).update_space(actor, normalized_space_id, values)
     await _publish(request, normalized_space_id, "space.updated", normalized_space_id)
     return _json({"space": space})
+
+
+@router.post("/spaces/{space_id}/ownership/transfer")
+async def transfer_ownership(request: Request, space_id: str, body: OwnershipTransfer) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.spaces.write")
+    normalized_space_id = _bounded_id(space_id, "space_id")
+    payload = _service(request).transfer_ownership(
+        actor,
+        normalized_space_id,
+        _bounded_id(body.target_membership_id, "membership_id"),
+        body.version,
+    )
+    await _publish(request, normalized_space_id, "ownership.transferred", body.target_membership_id)
+    return _json({"space": payload})
+
+
+@router.delete("/spaces/{space_id}")
+async def delete_space(request: Request, space_id: str, version: int = Query(..., ge=1)) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.spaces.write")
+    normalized_space_id = _bounded_id(space_id, "space_id")
+    payload = _service(request).delete_space(actor, normalized_space_id, version)
+    await _publish(request, normalized_space_id, "space.deleted", normalized_space_id)
+    return _json({"space": payload})
 
 
 @router.get("/spaces/{space_id}/events")
@@ -256,7 +283,8 @@ async def create_invitation(request: Request, space_id: str, body: InvitationCre
         payload,
     )
     invitation = result["invitation"]
-    await _publish(request, normalized_space_id, "invitation.created", invitation["id"])
+    if not result.get("idempotent"):
+        await _publish(request, normalized_space_id, "invitation.created", invitation["id"])
     return _json(result, status_code=200 if result.get("idempotent") else 201)
 
 
@@ -290,7 +318,8 @@ async def accept_invitation(request: Request, invitation_id: str) -> JSONRespons
         _bounded_id(invitation_id, "invitation_id"),
         accept=True,
     )
-    await _publish(request, result["invitation"]["space_id"], "invitation.accepted", invitation_id)
+    if not result.get("idempotent"):
+        await _publish(request, result["invitation"]["space_id"], "invitation.accepted", invitation_id)
     return _json(result)
 
 
@@ -304,7 +333,8 @@ async def reject_invitation(request: Request, invitation_id: str) -> JSONRespons
         _bounded_id(invitation_id, "invitation_id"),
         accept=False,
     )
-    await _publish(request, result["invitation"]["space_id"], "invitation.rejected", invitation_id)
+    if not result.get("idempotent"):
+        await _publish(request, result["invitation"]["space_id"], "invitation.rejected", invitation_id)
     return _json(result)
 
 
@@ -379,7 +409,8 @@ async def create_message(
         body.model_dump(),
         idempotency_key,
     )
-    await _publish(request, normalized_space_id, "message.created", result["message"]["id"])
+    if not result.get("idempotent"):
+        await _publish(request, normalized_space_id, "message.created", result["message"]["id"])
     return _json(result, status_code=200 if result.get("idempotent") else 201)
 
 
@@ -530,6 +561,40 @@ async def get_attachment(request: Request, space_id: str, attachment_id: str) ->
             "Content-Disposition": f"attachment; filename*=UTF-8''{safe_name}",
             "Content-Length": str(metadata["size_bytes"]),
             "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/spaces/{space_id}/attachments/{attachment_id}/inline")
+async def get_attachment_inline(request: Request, space_id: str, attachment_id: str) -> Response:
+    """Serve a whitelisted media attachment inline for the Group viewer.
+
+    The route keeps the same membership/encryption checks as downloads and
+    refuses active content such as SVG/HTML from being embedded.
+    """
+    actor = require_group_actor(request, "group.messages.read")
+    metadata, payload = _service(request).get_attachment(
+        actor,
+        _bounded_id(space_id, "space_id"),
+        _bounded_id(attachment_id, "attachment_id"),
+    )
+    allowed = {
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm",
+        "video/mp4", "video/ogg", "video/webm",
+    }
+    if metadata["mime_type"] not in allowed:
+        raise HTTPException(status_code=415, detail="inline_media_not_supported")
+    safe_name = quote(metadata["name"], safe="")
+    return Response(
+        payload,
+        media_type=metadata["mime_type"],
+        headers={
+            "Cache-Control": "no-store, private, max-age=0",
+            "Content-Disposition": f"inline; filename*=UTF-8''{safe_name}",
+            "Content-Length": str(metadata["size_bytes"]),
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; img-src 'self'; media-src 'self'",
         },
     )
 

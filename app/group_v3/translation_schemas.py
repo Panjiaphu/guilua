@@ -56,6 +56,32 @@ class TranslationFinalCreate(StrictModel):
     confidence: float | None = Field(default=None, ge=0, le=1)
 
 
+class TranslationSegmentTextCreate(StrictModel):
+    runtime_kind: Literal["call", "video", "radio"]
+    runtime_id: str = Field(min_length=1, max_length=36)
+    client_segment_id: str = Field(min_length=8, max_length=128)
+    source_language: str
+    source_text: str = Field(min_length=1, max_length=12000)
+
+    @field_validator("source_language")
+    @classmethod
+    def validate_source_language(cls, value):
+        if value not in LANGUAGES | {"auto"}:
+            raise ValueError("invalid_language")
+        return value
+
+
+class TranslationVariantRetry(StrictModel):
+    target_language: str
+
+    @field_validator("target_language")
+    @classmethod
+    def validate_target_language(cls, value):
+        if value not in LANGUAGES:
+            raise ValueError("invalid_language")
+        return value
+
+
 class TranslationReservationRelease(StrictModel):
     reservation_id: str = Field(min_length=1, max_length=36)
 

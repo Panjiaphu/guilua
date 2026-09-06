@@ -14,6 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -48,6 +49,13 @@ class GroupMembership(Base):
         CheckConstraint("status IN ('active','left','removed')", name="ck_group_membership_status"),
         Index("ix_group_memberships_principal_status", "principal_type", "principal_id", "principal_user_id", "status"),
         Index("ix_group_memberships_space_status", "space_id", "status", "role"),
+        Index(
+            "uq_group_memberships_active_owner",
+            "space_id",
+            unique=True,
+            sqlite_where=text("status = 'active' AND role = 'owner'"),
+            postgresql_where=text("status = 'active' AND role = 'owner'"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -287,6 +295,26 @@ class GroupAuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class GroupEventOutbox(Base):
+    __tablename__ = "group_event_outbox"
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','published','failed')", name="ck_group_event_outbox_status"),
+        Index("ix_group_event_outbox_delivery", "status", "next_attempt_at", "created_at"),
+        Index("ix_group_event_outbox_space_created", "space_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    space_id: Mapped[str] = mapped_column(String(36), ForeignKey("group_spaces.id", ondelete="CASCADE"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_error: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class GroupIdempotencyRecord(Base):
     __tablename__ = "group_idempotency_records"
     __table_args__ = (
@@ -334,7 +362,12 @@ class GroupMediaParticipant(Base):
         UniqueConstraint("session_id", "membership_id", name="uq_group_media_participant_member"),
         UniqueConstraint("session_id", "livekit_identity", name="uq_group_media_participant_identity"),
         CheckConstraint("invite_status IN ('invited','joined','rejected','left')", name="ck_group_media_participants_invite"),
+        CheckConstraint(
+            "connection_status IN ('not_connected','connecting','connected','reconnecting','failed')",
+            name="ck_group_media_participants_connection",
+        ),
         Index("ix_group_media_participants_session_status", "session_id", "invite_status"),
+        Index("ix_group_media_participants_session_connection", "session_id", "connection_status"),
         Index("ix_group_media_participants_principal", "principal_type", "principal_id", "principal_user_id", "invite_status"),
     )
 
@@ -347,6 +380,8 @@ class GroupMediaParticipant(Base):
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     livekit_identity: Mapped[str] = mapped_column(String(80), nullable=False)
     invite_status: Mapped[str] = mapped_column(String(16), nullable=False, default="invited", server_default="invited")
+    connection_status: Mapped[str] = mapped_column(String(20), nullable=False, default="not_connected", server_default="not_connected")
+    connection_error_code: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
     desired_video_subscriptions_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]", server_default="[]")
     invited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     joined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -478,6 +513,62 @@ class GroupTranslationEvent(Base):
     confidence_millis: Mapped[int | None] = mapped_column(Integer)
     final_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GroupTranslationSegment(Base):
+    """Canonical source unit for the V2 text-first translation pipeline."""
+
+    __tablename__ = "group_translation_segments"
+    __table_args__ = (
+        UniqueConstraint(
+            "space_id", "runtime_kind", "runtime_id", "speaker_membership_id", "client_segment_id",
+            name="uq_group_translation_segment_client",
+        ),
+        CheckConstraint("runtime_kind IN ('call','video','radio')", name="ck_group_translation_segments_runtime"),
+        CheckConstraint("input_kind IN ('text','voice')", name="ck_group_translation_segments_input"),
+        CheckConstraint("state IN ('PROCESSING','FINAL','PARTIAL','FAILED')", name="ck_group_translation_segments_state"),
+        Index("ix_group_translation_segments_runtime", "space_id", "runtime_kind", "runtime_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_segment_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    space_id: Mapped[str] = mapped_column(String(36), ForeignKey("group_spaces.id", ondelete="CASCADE"), nullable=False)
+    runtime_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    runtime_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    speaker_membership_id: Mapped[str] = mapped_column(String(36), ForeignKey("group_memberships.id", ondelete="RESTRICT"), nullable=False)
+    input_kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    source_language: Mapped[str] = mapped_column(String(8), nullable=False)
+    source_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    source_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    encryption_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="PROCESSING", server_default="PROCESSING")
+    failure_code: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class GroupTranslationVariant(Base):
+    """One encrypted translated variant per target language."""
+
+    __tablename__ = "group_translation_variants"
+    __table_args__ = (
+        UniqueConstraint("segment_id", "target_language", name="uq_group_translation_variant_target"),
+        CheckConstraint("state IN ('PROCESSING','FINAL','FAILED')", name="ck_group_translation_variants_state"),
+        Index("ix_group_translation_variants_segment_state", "segment_id", "state"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    segment_id: Mapped[str] = mapped_column(String(36), ForeignKey("group_translation_segments.id", ondelete="CASCADE"), nullable=False)
+    target_language: Mapped[str] = mapped_column(String(8), nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False, default="PROCESSING", server_default="PROCESSING")
+    translated_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary)
+    translated_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
+    encryption_version: Mapped[str | None] = mapped_column(String(32))
+    provider_model: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
+    provider_request_id: Mapped[str] = mapped_column(String(128), nullable=False, default="", server_default="")
+    failure_code: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class GroupTtsJob(Base):

@@ -16,6 +16,8 @@ from app.main import create_app
 from app.models import (
     GroupAuditEvent,
     GroupIdempotencyRecord,
+    GroupMediaParticipant,
+    GroupMediaSession,
     GroupMembership,
     GroupMessage,
     GroupRadioParticipant,
@@ -471,6 +473,348 @@ def test_native_radio_floor_media_grant_stop_and_leave_are_end_to_end(tmp_path):
         assert left.json()["ended_for_all"] is False
 
 
+def test_group_media_join_stays_ringing_until_provider_connection(tmp_path):
+    app = _native_app(
+        tmp_path,
+        group_media_enabled=True,
+        group_livekit_url="wss://group-v3.livekit.cloud",
+        group_livekit_api_key="livekit-api-key",
+        group_livekit_api_secret="livekit-api-secret",
+    )
+    owner_session = app.state.bff_session_store.create_group_session(
+        principal=_handoff_payload("video")["principal"],
+        scope=SCOPES,
+        expires_at=_future(),
+        handoff_id="media-owner-handoff",
+        surface="video",
+        entitlement=AI_ENTITLEMENT,
+    )
+    invitee_principal = {
+        "type": "member",
+        "id": "84",
+        "user_id": "84",
+        "display_name": "Tran An",
+        "locale": "en",
+    }
+    invitee_session = app.state.bff_session_store.create_group_session(
+        principal=invitee_principal,
+        scope=SCOPES,
+        expires_at=_future(),
+        handoff_id="media-invitee-handoff",
+        surface="video",
+        entitlement=AI_ENTITLEMENT,
+    )
+    headers = {"Origin": PUBLIC_ORIGIN}
+
+    with TestClient(app) as client:
+        client.cookies.set(app.state.settings.guilua_session_cookie, owner_session.session_id)
+        created_space = client.post(
+            "/api/group/spaces",
+            json={"title": "Media lifecycle", "description": "Two-phase join"},
+            headers={**headers, "Idempotency-Key": "media-space-0001"},
+        )
+        assert created_space.status_code == 201
+        space_id = created_space.json()["space"]["id"]
+        invitee = client.post(
+            f"/api/group/spaces/{space_id}/memberships",
+            json={
+                "principal_type": "member",
+                "principal_id": "84",
+                "principal_user_id": "84",
+                "display_name": "Tran An",
+                "role": "member",
+            },
+            headers=headers,
+        )
+        assert invitee.status_code == 201
+        invitee_membership_id = invitee.json()["membership"]["id"]
+        created = client.post(
+            f"/api/group/spaces/{space_id}/sessions",
+            json={"media_kind": "video", "title": "Media lifecycle", "participant_membership_ids": [invitee_membership_id]},
+            headers=headers,
+        )
+        assert created.status_code == 201
+        session_id = created.json()["session"]["id"]
+        assert created.json()["session"]["status"] == "ringing"
+        owner_participant = next(item for item in created.json()["session"]["participants"] if item["membership_id"] != invitee_membership_id)
+        assert owner_participant["invite_status"] == "joined"
+        assert owner_participant["connection_status"] == "not_connected"
+
+        client.cookies.set(app.state.settings.guilua_session_cookie, invitee_session.session_id)
+        joined = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/join",
+            headers=headers,
+        )
+        assert joined.status_code == 200
+        assert joined.json()["session"]["status"] == "ringing"
+        invitee_participant = next(item for item in joined.json()["session"]["participants"] if item["membership_id"] == invitee_membership_id)
+        assert invitee_participant["invite_status"] == "joined"
+        assert invitee_participant["connection_status"] == "not_connected"
+
+        connecting = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/connection-state",
+            json={"status": "connecting"},
+            headers=headers,
+        )
+        assert connecting.status_code == 200
+        assert connecting.json()["session"]["status"] == "ringing"
+
+        grant = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/media-grant",
+            headers=headers,
+        )
+        assert grant.status_code == 200
+        assert grant.json()["grant"]["provider"] == "livekit-cloud"
+
+        connected = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/connection-state",
+            json={"status": "connected"},
+            headers=headers,
+        )
+        assert connected.status_code == 200
+        assert connected.json()["session"]["status"] == "active"
+        invitee_participant = next(item for item in connected.json()["session"]["participants"] if item["membership_id"] == invitee_membership_id)
+        assert invitee_participant["connection_status"] == "connected"
+
+
+def _create_two_member_media_scenario(tmp_path, suffix: str):
+    app = _native_app(
+        tmp_path,
+        group_media_enabled=True,
+        group_livekit_url="wss://group-v3.livekit.cloud",
+        group_livekit_api_key="livekit-api-key",
+        group_livekit_api_secret="livekit-api-secret",
+    )
+    owner_session = app.state.bff_session_store.create_group_session(
+        principal=_handoff_payload("video")["principal"],
+        scope=SCOPES,
+        expires_at=_future(),
+        handoff_id=f"media-owner-{suffix}",
+        surface="video",
+        entitlement=AI_ENTITLEMENT,
+    )
+    invitee_session = app.state.bff_session_store.create_group_session(
+        principal={
+            "type": "member",
+            "id": "84",
+            "user_id": "84",
+            "display_name": "Tran An",
+            "locale": "en",
+        },
+        scope=SCOPES,
+        expires_at=_future(),
+        handoff_id=f"media-invitee-{suffix}",
+        surface="video",
+        entitlement=AI_ENTITLEMENT,
+    )
+    return app, owner_session, invitee_session
+
+
+def _seed_two_member_media(client, app, owner_session, suffix: str):
+    headers = {"Origin": PUBLIC_ORIGIN}
+    client.cookies.set(app.state.settings.guilua_session_cookie, owner_session.session_id)
+    created_space = client.post(
+        "/api/group/spaces",
+        json={"title": f"Media {suffix}", "description": "Asynchronous join"},
+        headers={**headers, "Idempotency-Key": f"media-space-{suffix}"},
+    )
+    assert created_space.status_code == 201
+    space_id = created_space.json()["space"]["id"]
+    invitee = client.post(
+        f"/api/group/spaces/{space_id}/memberships",
+        json={
+            "principal_type": "member",
+            "principal_id": "84",
+            "principal_user_id": "84",
+            "display_name": "Tran An",
+            "role": "member",
+        },
+        headers=headers,
+    )
+    assert invitee.status_code == 201
+    invitee_membership_id = invitee.json()["membership"]["id"]
+    created = client.post(
+        f"/api/group/spaces/{space_id}/sessions",
+        json={
+            "media_kind": "video",
+            "title": f"Media {suffix}",
+            "participant_membership_ids": [invitee_membership_id],
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    return space_id, created.json()["session"]["id"], invitee_membership_id
+
+
+def _media_connection_step(client, app, bff_session, space_id: str, session_id: str, status: str):
+    client.cookies.set(app.state.settings.guilua_session_cookie, bff_session.session_id)
+    response = client.post(
+        f"/api/group/spaces/{space_id}/sessions/{session_id}/connection-state",
+        json={"status": status},
+        headers={"Origin": PUBLIC_ORIGIN},
+    )
+    assert response.status_code == 200
+    return response.json()["session"]
+
+
+def _media_grant(client, app, bff_session, space_id: str, session_id: str):
+    client.cookies.set(app.state.settings.guilua_session_cookie, bff_session.session_id)
+    response = client.post(
+        f"/api/group/spaces/{space_id}/sessions/{session_id}/media-grant",
+        headers={"Origin": PUBLIC_ORIGIN},
+    )
+    assert response.status_code == 200
+    return response.json()["grant"]
+
+
+@pytest.mark.parametrize(
+    "connection_order,wait_seconds",
+    [
+        (("owner", "invitee"), 31),
+        (("invitee", "owner"), 31),
+        (("owner", "invitee"), 61),
+        (("invitee", "owner"), 61),
+    ],
+    ids=[
+        "video-join-a-to-b-after-30s",
+        "video-join-b-to-a-after-30s",
+        "video-join-a-to-b-after-60s",
+        "video-join-b-to-a-after-60s",
+    ],
+)
+def test_group_media_connection_order_converges_on_one_room(
+    tmp_path, connection_order, wait_seconds
+):
+    app, owner_session, invitee_session = _create_two_member_media_scenario(
+        tmp_path, connection_order[0]
+    )
+    sessions = {"owner": owner_session, "invitee": invitee_session}
+    with TestClient(app) as client:
+        space_id, session_id, _invitee_membership_id = _seed_two_member_media(
+            client, app, owner_session, connection_order[0]
+        )
+        client.cookies.set(app.state.settings.guilua_session_cookie, invitee_session.session_id)
+        joined = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/join",
+            headers={"Origin": PUBLIC_ORIGIN},
+        )
+        assert joined.status_code == 200
+
+        first_actor, second_actor = connection_order
+        _media_connection_step(
+            client, app, sessions[first_actor], space_id, session_id, "connecting"
+        )
+        rooms = [_media_grant(
+            client, app, sessions[first_actor], space_id, session_id
+        )["room"]]
+        current = _media_connection_step(
+            client, app, sessions[first_actor], space_id, session_id, "connected"
+        )
+        assert current["id"] == session_id
+
+        # Advance the server-visible session age deterministically instead of
+        # sleeping in the suite. The second participant must still reuse the
+        # exact ACTIVE session and LiveKit room after either late interval.
+        old = datetime.now(timezone.utc) - timedelta(seconds=wait_seconds)
+        with app.state.database.session() as db, db.begin():
+            stored = db.get(GroupMediaSession, session_id)
+            stored.created_at = old
+            stored.updated_at = old
+
+        _media_connection_step(
+            client, app, sessions[second_actor], space_id, session_id, "connecting"
+        )
+        rooms.append(_media_grant(
+            client, app, sessions[second_actor], space_id, session_id
+        )["room"])
+        current = _media_connection_step(
+            client, app, sessions[second_actor], space_id, session_id, "connected"
+        )
+        assert current["id"] == session_id
+
+        assert len(set(rooms)) == 1
+        assert current["status"] == "active"
+        assert len(current["participants"]) == 2
+        assert {item["connection_status"] for item in current["participants"]} == {"connected"}
+
+
+def test_group_media_simultaneous_connect_intent_converges_on_one_room(tmp_path):
+    app, owner_session, invitee_session = _create_two_member_media_scenario(tmp_path, "simultaneous")
+    with TestClient(app) as client:
+        space_id, session_id, _invitee_membership_id = _seed_two_member_media(
+            client, app, owner_session, "simultaneous"
+        )
+        client.cookies.set(app.state.settings.guilua_session_cookie, invitee_session.session_id)
+        assert client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/join",
+            headers={"Origin": PUBLIC_ORIGIN},
+        ).status_code == 200
+
+        # Deterministic near-simultaneous interleaving: both clients enter
+        # CONNECTING before either obtains a grant or promotes the session.
+        _media_connection_step(client, app, owner_session, space_id, session_id, "connecting")
+        _media_connection_step(client, app, invitee_session, space_id, session_id, "connecting")
+        owner_grant = _media_grant(client, app, owner_session, space_id, session_id)
+        invitee_grant = _media_grant(client, app, invitee_session, space_id, session_id)
+        first = _media_connection_step(client, app, invitee_session, space_id, session_id, "connected")
+        final = _media_connection_step(client, app, owner_session, space_id, session_id, "connected")
+
+        assert owner_grant["room"] == invitee_grant["room"]
+        assert first["id"] == final["id"] == session_id
+        assert final["status"] == "active"
+        assert len(final["participants"]) == 2
+
+
+def test_group_media_late_join_and_duplicate_join_keep_active_connection(tmp_path):
+    app, owner_session, invitee_session = _create_two_member_media_scenario(tmp_path, "late")
+    with TestClient(app) as client:
+        space_id, session_id, invitee_membership_id = _seed_two_member_media(
+            client, app, owner_session, "late"
+        )
+        _media_connection_step(client, app, owner_session, space_id, session_id, "connecting")
+        owner_grant = _media_grant(client, app, owner_session, space_id, session_id)
+        active = _media_connection_step(client, app, owner_session, space_id, session_id, "connected")
+        assert active["status"] == "active"
+
+        old = datetime.now(timezone.utc) - timedelta(seconds=61)
+        with app.state.database.session() as db, db.begin():
+            stored = db.get(GroupMediaSession, session_id)
+            stored.created_at = old
+            stored.updated_at = old
+
+        client.cookies.set(app.state.settings.guilua_session_cookie, invitee_session.session_id)
+        late_join = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/join",
+            headers={"Origin": PUBLIC_ORIGIN},
+        )
+        assert late_join.status_code == 200
+        assert late_join.json()["session"]["status"] == "active"
+        _media_connection_step(client, app, invitee_session, space_id, session_id, "connecting")
+        late_grant = _media_grant(client, app, invitee_session, space_id, session_id)
+        connected = _media_connection_step(client, app, invitee_session, space_id, session_id, "connected")
+
+        repeated = client.post(
+            f"/api/group/spaces/{space_id}/sessions/{session_id}/join",
+            headers={"Origin": PUBLIC_ORIGIN},
+        )
+        assert repeated.status_code == 200
+        repeated_session = repeated.json()["session"]
+        invitee = next(
+            item for item in repeated_session["participants"]
+            if item["membership_id"] == invitee_membership_id
+        )
+        assert owner_grant["room"] == late_grant["room"]
+        assert connected["id"] == repeated_session["id"] == session_id
+        assert invitee["invite_status"] == "joined"
+        assert invitee["connection_status"] == "connected"
+        assert len(repeated_session["participants"]) == 2
+        with app.state.database.session() as db:
+            assert db.scalar(select(GroupMediaSession).where(GroupMediaSession.id == session_id)) is not None
+            assert len(list(db.scalars(select(GroupMediaParticipant).where(
+                GroupMediaParticipant.session_id == session_id
+            )).all())) == 2
+
+
 def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     app = create_app(Settings(app_env="test", debug=True))
     route_paths = set(app.openapi()["paths"])
@@ -482,7 +826,14 @@ def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     template = (ROOT / "app/templates/group_communication_v3.html").read_text(encoding="utf-8")
     direct_template = (ROOT / "app/templates/communication.html").read_text(encoding="utf-8")
     app_js = (ROOT / "app/static/group-v3/group_v3_app.js").read_text(encoding="utf-8")
+    device_manager_js = (ROOT / "app/static/group-v3/group_device_manager.js").read_text(encoding="utf-8")
+    runtime_css = (ROOT / "app/static/group-v3/group_v3_runtime.css").read_text(encoding="utf-8")
+    group_css = (ROOT / "app/static/group-v3/group_v3.css").read_text(encoding="utf-8")
     translation_js = (ROOT / "app/static/group-v3/group_v3_translation.js").read_text(encoding="utf-8")
+    tts_manager_js = (ROOT / "app/static/group-v3/group_tts_manager.js").read_text(encoding="utf-8")
+    presentation_js = (ROOT / "app/static/group-v3/group_media_presentation.js").read_text(encoding="utf-8")
+    workspace_js = (ROOT / "app/static/group-v3/group_communication_workspace.js").read_text(encoding="utf-8")
+    radio_ui_js = (ROOT / "app/static/group-v3/group_radio_ui.js").read_text(encoding="utf-8")
     i18n_js = (ROOT / "app/static/group-v3/group_v3_i18n.js").read_text(encoding="utf-8")
     radio_router = (ROOT / "app/group_v3/radio_router.py").read_text(encoding="utf-8")
 
@@ -492,18 +843,45 @@ def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     assert "localStorage" not in app_js + translation_js
     assert "sessionStorage" not in app_js + translation_js
     assert "OPENAI_API_KEY" not in app_js + translation_js + template
-    assert "https://api.openai.com/v1/realtime/calls" in translation_js
-    assert "/v1/realtime/translations/calls" not in translation_js
+    assert "https://api.openai.com/v1/realtime/calls" not in translation_js
+    assert "RTCPeerConnection" not in translation_js
+    assert "MediaStream([track])" in translation_js
+    assert "data-group-translation-v2" in app_js
     connect_media = app_js[
         app_js.index("async function connectMedia") : app_js.index("async function connectRadio")
     ]
-    assert connect_media.index('state.mediaSession.status !== "active"') < connect_media.index("connectWithGrant")
-    assert "if (publish)" in app_js and "getUserMedia" in app_js
-    assert "selectAudioOutput" in translation_js
+    assert "state.mediaSession.status !== \"active\" && state.mediaSession.status !== \"ringing\"" in connect_media
+    assert connect_media.index('updateMediaConnectionState("connecting", "", context)') < connect_media.index("connectWithGrant")
+    assert 'return "call:" + String(' in app_js
+    assert "RoomEvent.AudioPlaybackStatusChanged" in app_js
+    assert "room.startAudio()" in app_js
+    assert "group-v3:audio-playback-blocked" in presentation_js
+    assert "resumeAudio" in presentation_js
+    assert 'managerState = "LOCKED"' in tts_manager_js
+    assert 'setManagerState("UNLOCK_REQUIRED"' in tts_manager_js
+    assert 'setManagerState("VOICE_LOADING")' in tts_manager_js
+    assert 'setManagerState("READY")' in tts_manager_js
+    assert 'setManagerState("PLAYING")' in tts_manager_js
+    assert 'setManagerState("UNSUPPORTED"' in tts_manager_js
+    assert '.call-communication-layout' in workspace_js
+    assert "roomPicker: roomPicker" in radio_ui_js
+    select_space = app_js[
+        app_js.index("async function selectSpace") : app_js.index("async function createSpace")
+    ]
+    assert select_space.index('/leave", { method: "POST" }') < select_space.index("disconnectMedia(false)")
+    assert "if (publish)" in app_js and "getUserMedia" in device_manager_js
+    assert "group_device_manager.js?v=20260904-prejoin-1" in template
+    assert "data-media-member-search" in app_js and "data-media-no-results" in app_js
+    assert "data-media-member-search" in app_js[app_js.index("function inviteForm"):app_js.index("function callDock")]
+    assert "width: min(760px, calc(100% - 48px))" in runtime_css
+    assert "max-height: min(38dvh, 300px)" in runtime_css
+    assert ".chat-content.state-active_video { grid-template-rows: minmax(0, 1fr) auto; }" in group_css
+    assert "speechSynthesis" in tts_manager_js
     assert "private_audio_playback\": \"suppressed" in radio_router
     assert radio_router.index("group_radio_floor.release") < radio_router.index("stop_burst_after_floor_release")
-    assert 'data-surface="chat-translation"' in app_js
-    assert 'data-surface="radio-translation"' in app_js
+    assert '["chat-translation", "languages", "chatTranslation"]' in app_js
+    assert 'data-surface="radio-translation"' not in app_js
+    assert '/group/chat-translation?tab=radio' in app_js
     assert 'chatTranslation:' in i18n_js
     assert 'radioTranslation:' in i18n_js
     assert "const vi =" in i18n_js
@@ -514,8 +892,8 @@ def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     assert "AI-COMMUNICATION 會持久保存成員資格" in i18n_js
     assert "Timeblock durably stores" not in i18n_js
     assert "Timeblock lưu bền" not in i18n_js
-    assert 'group_v3_i18n.js?v=20260904-logout-1' in template
-    assert 'group_v3_app.js?v=20260904-logout-1' in template
+    assert 'group_v3_i18n.js?v=20260906-r1-owner-qa-closure-1' in template
+    assert 'group_v3_app.js?v=20260906-r1-owner-qa-closure-1' in template
     assert 'class="logout-navigation"' in app_js
     assert 'mobileLogout: logout' in app_js
     assert "logout: 'Đăng xuất'" in i18n_js
@@ -587,3 +965,39 @@ def test_group_invitation_migration_advances_single_head_and_is_reversible_sourc
     assert 'down_revision = "20260902_0018"' in migration
     assert '"group_invitations"' in migration
     assert 'op.drop_table("group_invitations")' in migration
+
+
+def test_group_media_connection_migration_advances_single_head_and_is_reversible_source():
+    migration = (
+        ROOT / "alembic/versions/20260904_0020_group_media_connection_state.py"
+    ).read_text(encoding="utf-8")
+    assert 'revision = "20260904_0020"' in migration
+    outbox_migration = (
+        ROOT / "alembic/versions/20260904_0021_group_event_outbox.py"
+    ).read_text(encoding="utf-8")
+    assert 'revision = "20260904_0021"' in outbox_migration
+    assert "group_event_outbox" in outbox_migration
+    assert 'down_revision = "20260903_0019"' in migration
+    assert '"connection_status"' in migration
+    assert '"connection_error_code"' in migration
+    assert 'op.create_check_constraint(' in migration
+    assert 'op.drop_constraint(' in migration
+    assert 'op.drop_column("group_media_participants", "connection_status")' in migration
+
+
+def test_group_owner_invariant_migration_is_present_and_reversible_source():
+    migration = (ROOT / "alembic/versions/20260904_0022_group_owner_invariant.py").read_text(encoding="utf-8")
+    assert 'revision = "20260904_0022"' in migration
+    assert 'down_revision = "20260904_0021"' in migration
+    assert "uq_group_memberships_active_owner" in migration
+    assert "sqlite_where" in migration and "postgresql_where" in migration
+    assert 'op.drop_index("uq_group_memberships_active_owner"' in migration
+
+
+def test_group_translation_v2_migration_is_single_head_and_encrypted_source_only():
+    migration = (ROOT / "alembic/versions/20260904_0023_group_translation_v2.py").read_text(encoding="utf-8")
+    assert 'revision = "20260904_0023"' in migration
+    assert 'down_revision = "20260904_0022"' in migration
+    assert "group_translation_segments" in migration
+    assert "group_translation_variants" in migration
+    assert "source_ciphertext" in migration and "translated_ciphertext" in migration

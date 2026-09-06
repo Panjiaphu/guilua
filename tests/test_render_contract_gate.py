@@ -262,7 +262,7 @@ def _group_v3_readiness_app(tmp_path, revision: str | None):
 
 
 def test_group_v3_readiness_reports_native_contract_and_schema(tmp_path):
-    app = _group_v3_readiness_app(tmp_path, "20260903_0019")
+    app = _group_v3_readiness_app(tmp_path, "20260904_0023")
     with TestClient(app) as client:
         ready = client.get("/readyz/")
 
@@ -271,7 +271,7 @@ def test_group_v3_readiness_reports_native_contract_and_schema(tmp_path):
     assert ready.json()["contract_version"] == "3"
     assert ready.json()["identity_authority"] == "timeblock"
     assert ready.json()["identity_contract_version"] == "2"
-    assert ready.json()["schema_revision"] == "20260903_0019"
+    assert ready.json()["schema_revision"] == "20260904_0023"
     assert ready.json()["capabilities"]["group_chat"] is True
 
 
@@ -282,4 +282,4 @@ def test_group_v3_readiness_is_503_when_schema_is_not_at_head(tmp_path):
 
     assert unavailable.status_code == 503
     assert unavailable.json()["dependency"] == "group_v3_schema"
-    assert unavailable.json()["expected_revision"] == "20260903_0019"
+    assert unavailable.json()["expected_revision"] == "20260904_0023"

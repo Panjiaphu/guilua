@@ -16,7 +16,7 @@
   var LANGUAGES = ["vi", "en", "zh-TW"];
   var POLICY_VERSION = runtimeConfig.group_translation_policy_version || "";
   function normalizeSurface(value) {
-    if (value === "plugin") return "chat-translation";
+    if (value === "plugin" || value === "radio-translation") return "chat-translation";
     return SURFACES.indexOf(value) >= 0 ? value : "";
   }
   var ICONS = {
@@ -32,9 +32,24 @@
     paperclip: '<path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
     headphones: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+    "volume-2": '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
     "log-out": '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
     "refresh-cw": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
-    history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>'
+    history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+    settings: '<path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="m19.4 15 .1.1a2 2 0 1 1-2.8 2.8l-.1-.1a2 2 0 0 0-3.4 1.4V19a2 2 0 1 1-4 0v-.2a2 2 0 0 0-3.4-1.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A2 2 0 0 0 1.6 11H1.5a2 2 0 1 1 0-4h.2a2 2 0 0 0 1.4-3.4l-.1-.1A2 2 0 1 1 5.8.7l.1.1A2 2 0 0 0 9.3-.6V-.5a2 2 0 1 1 4 0v.2a2 2 0 0 0 3.4 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A2 2 0 0 0 20.9 7h.1a2 2 0 1 1 0 4h-.2a2 2 0 0 0-1.4 3.4Z" transform="translate(1.5 1.5) scale(.875)"/>'
+    ,search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    minimize: '<path d="M8 3v5H3m18 0h-5V3M3 16h5v5m8 0v-5h5"/>',
+    "chevron-up": '<path d="m6 15 6-6 6 6"/>',
+    "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+    "eye-off": '<path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9 5a10 10 0 0 1 12 7 14 14 0 0 1-3 4M6 6a15 15 0 0 0-3 6c4 8 12 8 15 6"/>',
+    eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2Z"/><path d="M7 3v6h10V3M7 21v-8h10v8"/>',
+    "more-horizontal": '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+    maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+    "panel-right": '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/>',
+    focus: '<circle cx="12" cy="12" r="3"/><path d="M3 8V5a2 2 0 0 1 2-2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M21 16v3a2 2 0 0 1-2 2h-3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/>'
   };
 
   var state = {
@@ -42,7 +57,7 @@
     locale: LANGUAGES.indexOf(runtimeConfig.locale) >= 0 ? runtimeConfig.locale : "vi",
     surface: normalizeSurface(runtimeConfig.initial_surface) || "chat",
     previousSurface: "chat",
-    mobile: window.matchMedia("(max-width: 640px)").matches,
+    mobile: window.matchMedia("(max-width: 640px), (pointer: coarse) and (max-height: 500px) and (max-width: 960px)").matches,
     context: null,
     directAvailable: Boolean(runtimeConfig.direct_available),
     groupAuthorized: Boolean(runtimeConfig.group_authorized),
@@ -53,12 +68,22 @@
     spaceInvitations: [],
     incomingInvitations: [],
     memberManagerOpen: false,
+    settingsOpen: false,
     messages: [],
     chatTranslations: {},
     pins: [],
     profile: null,
     consent: null,
     translations: [],
+    historyTab: new URLSearchParams(window.location.search).get("tab") === "radio" || runtimeConfig.initial_surface === "radio-translation" ? "radio" : "media",
+    archiveError: "",
+    radioHistory: [],
+    radioHistoryError: "",
+    radioPreparing: false,
+    radioMembersOpen: false,
+    radioRoomsOpen: false,
+    mediaRoomsOpen: false,
+    roomsCollapsed: false,
     mediaSession: null,
     radioSession: null,
     radioFloor: null,
@@ -70,24 +95,83 @@
     busy: false,
     error: "",
     mediaConnected: false,
+    audioPlaybackBlocked: false,
     micEnabled: true,
     videoEnabled: true,
-    deviceLost: false
+    deviceLost: false,
+    prejoinOpen: false,
+    prejoinMediaKind: "video",
+    prejoinBusy: false,
+    prejoinError: "",
+    prejoinDevices: { audioInputs: [], videoInputs: [], audioOutputs: [] },
+    prejoinAudioEnabled: true,
+    prejoinVideoEnabled: true,
+    prejoinAudioDeviceId: "",
+    prejoinVideoDeviceId: "",
+    prejoinOutputDeviceId: "",
+    prejoinConfirmed: false,
+    communicationDevices: { audioInputs: [], videoInputs: [], audioOutputs: [] },
+    deviceSettingsLoaded: false,
+    deviceSettingsStatus: "",
+    deviceSettingsError: "",
+    settingsCollapsed: false,
+    attachmentViewer: null,
+    mediaReconnectState: "idle",
+    mediaReconnectAttempts: 0
+    ,moreMediaOpen: false
   };
 
   var mediaRoom = null;
   var localStream = null;
   var heartbeatTimer = 0;
+  var radioOperation = false;
+  var radioLeaving = false;
+  var radioGeneration = 0;
+  var radioClock = 0;
+  if (window.location.pathname === "/group/radio-translation") {
+    window.history.replaceState({}, "", "/group/chat-translation?tab=radio");
+  }
   var toastTimer = 0;
   var refreshQueued = false;
   var groupEventSource = null;
+  var groupEventSpaceId = "";
   var groupEventRefreshTimer = 0;
+  var groupEventRefreshPendingSpaceId = "";
+  var mediaGeneration = 0;
+  var mediaActionInFlight = false;
+  var mediaMutationEpoch = 0;
+  var mediaSessionLoadSequence = 0;
+  var mediaConnectTask = null;
   var chatTranslationSweep = false;
   var chatTranslationInflight = new Set();
   var chatTranslationFailures = new Map();
+  var prejoinMeterStop = null;
+  var mediaReconnectTimer = 0;
+  var mediaReconnectGeneration = 0;
+  var lifecycleCleanupStarted = false;
+  var archiveConvergence = { timer: 0, attempts: 0, deadline: 0, contextKey: "" };
+  var radioConvergence = { timer: 0, attempts: 0, deadline: 0, contextKey: "" };
 
   function t(key) {
     return window.GroupV3I18n.translator(state.locale)(key);
+  }
+
+  function markMediaMutation() {
+    mediaMutationEpoch += 1;
+    return mediaMutationEpoch;
+  }
+
+  function mediaContext() {
+    return {
+      surface: state.surface,
+      spaceId: state.space && state.space.id || "",
+      sessionId: state.mediaSession && state.mediaSession.id || ""
+    };
+  }
+
+  function mediaContextCurrent(context) {
+    return Boolean(context && state.surface === context.surface && state.space &&
+      state.space.id === context.spaceId && state.mediaSession && state.mediaSession.id === context.sessionId);
   }
 
   function esc(value) {
@@ -116,6 +200,9 @@
     size = size || 20;
     return '<svg class="ui-icon" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + ICONS[name] + "</svg>";
   }
+
+  /* Shared by presentation helpers loaded before this module. */
+  window.GroupV3Icon = icon;
 
   function initials(name) {
     return String(name || "?").trim().split(/\s+/).slice(-2).map(function (part) {
@@ -146,6 +233,33 @@
     return '<button type="button" class="icon-button" data-action="' + name + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' + icon(iconName, 19) + "</button>";
   }
 
+  function workspaceButton(actionName, label, iconName, disabled) {
+    return '<button type="button" class="icon-button workspace-control" data-workspace-action="' + actionName + '" aria-label="' + esc(label) + '" title="' + esc(label) + '"' + (disabled ? " disabled" : "") + '>' + icon(iconName, 19) + "</button>";
+  }
+
+  function videoPanelControls() {
+    var workspace = window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot
+      ? window.GroupCommunicationWorkspace.snapshot()
+      : { requestedVideoMode: "STANDARD" };
+    var requested = workspace.requestedVideoMode || (workspace.requested && workspace.requested.mediaMode) || "STANDARD";
+    return '<div class="panel-resize-controls" role="group" aria-label="' + esc(t("videoWorkspaceControls")) + '">' +
+      window.GroupV3VideoLayout.toolbar(t) +
+      workspaceButton("video-minus", t("shrinkVideo"), "minimize", requested === (state.mobile ? "COMPACT" : "STANDARD")) +
+      '<span data-video-mode-label>' + esc(workspace.videoMode || "STANDARD") + '</span>' +
+      workspaceButton("video-plus", t("expandVideo"), "maximize", requested === "MAXIMIZED") + '</div>';
+  }
+
+  function radioPanelControls() {
+    var workspace = window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot
+      ? window.GroupCommunicationWorkspace.snapshot()
+      : { requestedRadioMode: "STANDARD", radioMode: "STANDARD" };
+    var requested = workspace.requestedRadioMode || (workspace.requested && workspace.requested.radioMode) || "STANDARD";
+    return '<div class="panel-resize-controls radio-panel-resize-controls" role="group" aria-label="' + esc(t("radioWorkspaceControls")) + '">' +
+      workspaceButton("radio-minus", t("shrinkRadio"), "minus", requested === "COMPACT") +
+      '<span data-radio-mode-label>' + esc(workspace.radioMode || "STANDARD") + '</span>' +
+      workspaceButton("radio-plus", t("expandRadio"), "plus", requested === "MAXIMIZED") + '</div>';
+  }
+
   function wave(compact) {
     return '<span class="waveform is-active ' + (compact ? "is-compact" : "") + '" aria-hidden="true">' +
       [8, 16, 24, 12, 20, 10, 18].map(function (height) {
@@ -172,6 +286,10 @@
       toast.classList.remove("is-visible");
     }, 2400);
   }
+
+  window.addEventListener("group-v3:tts-error", function () {
+    notify(t("translationTtsUnavailable"));
+  });
 
   function idempotencyKey() {
     return window.crypto && window.crypto.randomUUID
@@ -217,6 +335,7 @@
   function setBusy(busy) {
     state.busy = busy;
     root.toggleAttribute("aria-busy", busy);
+    if (!busy) flushGroupEventRefresh();
   }
 
   function publicError(error) {
@@ -240,6 +359,16 @@
     return (session.participants || []).find(function (item) {
       return item.membership_id === membership.id;
     });
+  }
+
+  function mediaParticipantConnected(person) {
+    if (!person) return false;
+    if (typeof person.media_connected === "boolean") return person.media_connected;
+    if (typeof person.mediaConnected === "boolean") return person.mediaConnected;
+    if (person.media_connection_state) return String(person.media_connection_state).toLowerCase() === "connected";
+    if (person.connection_state) return String(person.connection_state).toLowerCase() === "connected";
+    if (person.connection_status) return String(person.connection_status).toLowerCase() === "connected";
+    return person.invite_status === "joined";
   }
 
   function memberName(id) {
@@ -324,7 +453,7 @@
       api("/api/group/spaces/" + id + "/pins"),
       optional("/api/group/spaces/" + id + "/translation/profile", { profile: null }),
       optional("/api/group/spaces/" + id + "/translation/consent", { consent: null }),
-      optional("/api/group/spaces/" + id + "/translation/history?limit=50", { events: [] }),
+      optional("/api/group/spaces/" + id + "/translation/v2-history?limit=50", { segments: [], failed: true }),
       optional("/api/group/spaces/" + id + "/translation/chat-history?limit=100", { translations: [] })
     ]);
     state.members = results[0].memberships || [];
@@ -338,7 +467,8 @@
       show_original_enabled: true
     };
     state.consent = results[4].consent || null;
-    state.translations = results[5].events || [];
+    state.translations = results[5].segments || [];
+    state.archiveError = results[5].failed ? t("translationHistorySyncError") : "";
     state.chatTranslations = {};
     (results[6].translations || []).forEach(function (item) {
       state.chatTranslations[item.message_id] = item;
@@ -346,6 +476,8 @@
     await loadMembershipManagement();
     if (state.surface === "call" || state.surface === "video") await loadMediaSessions();
     if (state.surface === "radio") await loadRadioSession();
+    if (state.surface === "radio" || state.historyTab === "radio") await loadRadioHistory();
+    if (state.surface === "chat-translation") await loadCommunicationDevices();
     window.setTimeout(translateMissingChatMessages, 0);
   }
 
@@ -390,13 +522,47 @@
     }
   }
 
+  function mergeMediaSessionSnapshot(remote, local) {
+    if (!remote || !local || remote.id !== local.id) return remote;
+    var merged = Object.assign({}, remote);
+    if (local.status === "active" && remote.status === "ringing") merged.status = "active";
+    var localParticipants = new Map((local.participants || []).map(function (participant) {
+      return [String(participant.id || participant.membership_id || ""), participant];
+    }));
+    merged.participants = (remote.participants || []).map(function (participant) {
+      var key = String(participant.id || participant.membership_id || "");
+      var previous = localParticipants.get(key);
+      if (!previous) return participant;
+      var next = Object.assign({}, participant);
+      if (previous.invite_status === "joined" && participant.invite_status === "invited") {
+        next.invite_status = "joined";
+        next.joined_at = previous.joined_at || participant.joined_at;
+      }
+      if (["connecting", "connected", "reconnecting"].indexOf(previous.connection_status) >= 0 &&
+          participant.connection_status === "not_connected") {
+        next.connection_status = previous.connection_status;
+        next.connection_error_code = previous.connection_error_code || "";
+      }
+      return next;
+    });
+    return merged;
+  }
+
   async function loadMediaSessions() {
-    var path = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions?limit=50";
+    if (!state.space || (state.surface !== "call" && state.surface !== "video")) return;
+    var spaceId = state.space.id;
+    var surface = state.surface;
+    var epoch = mediaMutationEpoch;
+    var sequence = ++mediaSessionLoadSequence;
+    var path = "/api/group/spaces/" + encodeURIComponent(spaceId) + "/sessions?limit=50";
     var payload = await optional(path, { sessions: [] });
-    var kind = state.surface === "video" ? "video" : "audio";
-    state.mediaSession = (payload.sessions || []).find(function (item) {
+    if (!state.space || state.space.id !== spaceId || state.surface !== surface ||
+        epoch !== mediaMutationEpoch || sequence !== mediaSessionLoadSequence) return;
+    var kind = surface === "video" ? "video" : "audio";
+    var remote = (payload.sessions || []).find(function (item) {
       return item.media_kind === kind && item.status !== "ended";
     }) || null;
+    state.mediaSession = mergeMediaSessionSnapshot(remote, state.mediaSession);
   }
 
   async function loadRadioSession() {
@@ -424,7 +590,8 @@
       ? '<form class="space-create-form context-create" data-form="create-space"><input name="title" data-group-text-entry maxlength="120" required placeholder="' + esc(t("spaceName")) + '"><button class="action-button action-primary" type="submit">' + esc(t("create")) + "</button></form>"
       : action("show-create-space", t("createSpace"), "users", "secondary", 'class="context-create"');
     return '<aside class="context-rail ' + (state.surface === "radio" ? "radio-context" : "") + '">' +
-      '<div class="context-heading"><span>' + esc(t("rooms")) + "</span><strong>" + esc(t("workspace")) + "</strong></div>" +
+      '<div class="context-heading">' + iconButton("rooms-collapse", t("roomsCollapse"), "panel-right") +
+      '<span>' + esc(t("rooms")) + "</span><strong>" + esc(t("workspace")) + "</strong></div>" +
       '<div class="room-list">' + rows + "</div>" + createForm +
       '<div class="context-foot">' + badge("AI native", "success") + "<p>" + esc(t("encrypted")) + "</p></div></aside>";
   }
@@ -435,8 +602,7 @@
       ["chat-translation", "languages", "chatTranslation"],
       ["call", "phone-call", "groupCall"],
       ["video", "video", "groupVideo"],
-      ["radio", "radio-tower", "groupRadio"],
-      ["radio-translation", "globe", "radioTranslation"]
+      ["radio", "radio-tower", "groupRadio"]
     ];
     var buttons = items.map(function (item) {
       return '<button type="button" data-action="surface" data-surface="' + item[0] + '" ' + (!state.groupAuthorized ? "disabled" : "") + ' class="' + (item[0] === state.surface ? "is-active" : "") + '">' +
@@ -453,18 +619,29 @@
     };
   }
 
-  function closeGroupEvents() {
+  function closeGroupEvents(preservePending) {
     window.clearTimeout(groupEventRefreshTimer);
     groupEventRefreshTimer = 0;
     if (groupEventSource) groupEventSource.close();
     groupEventSource = null;
+    groupEventSpaceId = "";
+    if (!preservePending) groupEventRefreshPendingSpaceId = "";
   }
 
   function queueGroupEventRefresh(spaceId) {
-    if (!state.space || state.space.id !== spaceId || groupEventRefreshTimer) return;
+    if (!state.space || state.space.id !== spaceId) return;
+    groupEventRefreshPendingSpaceId = spaceId;
+    flushGroupEventRefresh();
+  }
+
+  function flushGroupEventRefresh() {
+    var spaceId = groupEventRefreshPendingSpaceId;
+    if (!spaceId || groupEventRefreshTimer || state.busy || !state.space || state.space.id !== spaceId) return;
     groupEventRefreshTimer = window.setTimeout(async function () {
       groupEventRefreshTimer = 0;
-      if (!state.space || state.space.id !== spaceId || state.busy) return;
+      if (!state.space || state.space.id !== spaceId) return;
+      if (state.busy) return flushGroupEventRefresh();
+      groupEventRefreshPendingSpaceId = "";
       try {
         await loadSpaces(spaceId);
         if (!state.space || state.space.id !== spaceId) await disconnectMedia(false);
@@ -476,22 +653,36 @@
           state.error = t("membershipAccessRevoked");
           render();
         }
+      } finally {
+        if (groupEventRefreshPendingSpaceId) flushGroupEventRefresh();
       }
     }, 120);
   }
 
   function connectGroupEvents() {
-    closeGroupEvents();
+    if (groupEventSource && groupEventSpaceId === (state.space && state.space.id || "")) return;
+    closeGroupEvents(true);
     if (!state.groupAuthorized || !state.space || !("EventSource" in window)) return;
     var spaceId = state.space.id;
+    groupEventSpaceId = spaceId;
     groupEventSource = new EventSource(
       "/api/group/spaces/" + encodeURIComponent(spaceId) + "/events",
       { withCredentials: true }
     );
+    groupEventSource.addEventListener("open", function () {
+      if (!state.space || state.space.id !== spaceId) return;
+      window.dispatchEvent(new CustomEvent("group-v3:translation-reconcile", { detail: { space_id: spaceId, reason: "sse-open" } }));
+      queueGroupEventRefresh(spaceId);
+    });
     groupEventSource.addEventListener("group-change", function (event) {
       try {
         var payload = JSON.parse(event.data || "{}");
-        if (payload.space_id === spaceId) queueGroupEventRefresh(spaceId);
+        if (payload.space_id === spaceId) {
+          if (String(payload.type || "").indexOf("translation.segment.") === 0) {
+            window.dispatchEvent(new CustomEvent("group-v3:translation-segment", { detail: payload }));
+            if (state.surface === "radio" || state.surface === "chat-translation") queueGroupEventRefresh(spaceId);
+          } else queueGroupEventRefresh(spaceId);
+        }
       } catch (_error) {}
     });
   }
@@ -504,6 +695,7 @@
   }
 
   function mobileLanguageBar() {
+    if (state.surface === "chat-translation" || state.surface === "radio") return "";
     var profile = state.profile || {};
     return '<div class="mobile-language-bar"><button type="button" class="' + (profile.auto_read_enabled ? "is-active" : "") + '" data-action="toggle-auto-read" aria-pressed="' + Boolean(profile.auto_read_enabled) + '">' +
       icon("headphones", 16) + "<span>" + esc(t("autoRead")) + "</span><strong>" + (profile.auto_read_enabled ? "ON" : "OFF") + "</strong></button>" +
@@ -598,12 +790,39 @@
       '</div></section></div>';
   }
 
+  function renderGroupSettings() {
+    if (!state.settingsOpen || !state.space) return "";
+    var mine = myMembership();
+    if (!mine || ["owner", "admin"].indexOf(mine.role) < 0) return "";
+    var canTransfer = mine.role === "owner";
+    var targets = state.members.filter(function (item) {
+      return item.status === "active" && item.id !== mine.id;
+    }).map(function (item) {
+      return '<option value="' + esc(item.id) + '">' + esc(item.display_name) + " · " + esc(t(item.role === "admin" ? "moderator" : "member")) + "</option>";
+    }).join("");
+    var transferBlock = canTransfer
+      ? '<section><h3>' + esc(t("transferOwnership")) + '</h3><p>' + esc(t("transferOwnershipNote")) + '</p><div class="group-settings-transfer"><select data-setting="transfer-target"><option value="">' + esc(t("chooseMember")) + "</option>" + targets + '</select>' + action("transfer-ownership", t("transferOwnership"), "users", "secondary") + "</div></section>"
+      : "";
+    var deleteBlock = canTransfer
+      ? '<section class="group-settings-danger"><h3>' + esc(t("dangerZone")) + '</h3><p>' + esc(t("deleteGroupNote")) + '</p>' + action("delete-group", t("deleteGroup"), "log-out", "danger") + "</section>"
+      : "";
+    return '<div class="member-manager-backdrop" data-action="close-settings"><section class="member-manager group-settings" role="dialog" aria-modal="true" aria-labelledby="group-settings-title" data-member-manager>' +
+      '<header><div><strong id="group-settings-title">' + esc(t("groupSettings")) + '</strong><small>' + esc(state.space.title) + '</small></div>' + iconButton("close-settings", t("close"), "log-out") + '</header><div class="member-manager-scroll">' +
+      '<form class="settings-form group-space-settings" data-form="save-group-settings"><label><span>' + esc(t("spaceName")) + '</span><input name="title" value="' + esc(state.space.title) + '" minlength="2" maxlength="120" required></label><label><span>' + esc(t("spaceDescription")) + '</span><textarea name="description" maxlength="500">' + esc(state.space.description || "") + '</textarea><small>' + esc(t("settingsVersion")) + ": " + esc(state.space.version) + '</small><button type="submit" class="action-button action-primary">' + icon("settings", 17) + '<span>' + esc(t("saveSettings")) + '</span></button></form>' + transferBlock + deleteBlock + '</div></section></div>';
+  }
+
   function renderMessage(message) {
     var mine = message.sender
       && message.sender.type === state.context.principal.type
       && message.sender.id === state.context.principal.id
       && message.sender.user_id === state.context.principal.user_id;
     var attachments = (message.attachments || []).map(function (item) {
+      if (item.is_image) {
+        return '<button type="button" class="attachment-image" data-action="open-attachment" data-src="' + esc(item.inline_url || item.download_url) + '" data-download="' + esc(item.download_url) + '" data-name="' + esc(item.name) + '" data-mime="' + esc(item.mime_type) + '"><img src="' + esc(item.inline_url || item.download_url) + '" alt="' + esc(item.name) + '" loading="lazy"><span>' + esc(item.name) + '</span></button>';
+      }
+      if (item.is_audio || item.is_video) {
+        return '<button type="button" class="attachment-chip attachment-media" data-action="open-attachment" data-src="' + esc(item.inline_url || item.download_url) + '" data-download="' + esc(item.download_url) + '" data-name="' + esc(item.name) + '" data-mime="' + esc(item.mime_type) + '">' + icon(item.is_video ? "video" : "headphones", 14) + "<span>" + esc(item.name) + "</span></button>";
+      }
       return '<a class="attachment-chip" href="' + esc(item.download_url) + '" download>' + icon("paperclip", 14) + "<span>" + esc(item.name) + "</span></a>";
     }).join("");
     var time = message.created_at ? formatTime(message.created_at) : "";
@@ -641,57 +860,92 @@
       esc(t("send")) + '">' + icon("send", 17) + "<span>" + esc(t("send")) + "</span></button></form></section>" + renderParticipants(false) + "</div>";
   }
 
+  function mediaRoomsButton(extraClass) {
+    return '<button type="button" class="icon-button media-room-picker-toggle ' + esc(extraClass || "") +
+      '" data-action="media-rooms" aria-label="' + esc(t("openGroupSpaces")) + '" title="' +
+      esc(t("openGroupSpaces")) + '">' + icon("panel-right", 20) + '</button>';
+  }
+
+  function mediaRoomPicker() {
+    if (!window.GroupV3RadioUi || !window.GroupV3RadioUi.roomPicker) return "";
+    return window.GroupV3RadioUi.roomPicker(state.spaces, state.space && state.space.id, {
+      roomsOpen: state.mediaRoomsOpen,
+      pickerClass: "media-room-picker",
+      rowClass: "media-room-picker-row",
+      toggleAction: "media-rooms"
+    }, t);
+  }
+
+  function audioPlaybackRecovery() {
+    if (!state.audioPlaybackBlocked) return "";
+    return '<aside class="media-audio-recovery" role="alert"><span>' + esc(t("roomAudioBlocked")) +
+      '</span>' + action("enable-room-audio", t("enableRoomAudio"), "volume-2", "primary") + '</aside>';
+  }
+
   function inviteForm(kind) {
     var mine = myMembership();
     var others = state.members.filter(function (member) {
       return member.status === "active" && (!mine || member.id !== mine.id);
     });
     var labels = others.map(function (member) {
-      return '<label><input type="checkbox" name="participant" value="' + esc(member.id) + '"> ' +
+      var searchText = String(member.display_name || "") + " " + String(member.principal_id || "");
+      return '<label data-media-member data-member-name="' + esc(searchText) + '"><input type="checkbox" name="participant" value="' + esc(member.id) + '"> ' +
         avatar(member.display_name, "mint", "sm", true) + "<span>" + esc(member.display_name) + "</span></label>";
     }).join("");
     var title = kind === "radio" ? t("startRadio") : kind === "video" ? t("startVideoCall") : t("startAudioCall");
     var iconName = kind === "radio" ? "radio-tower" : kind === "video" ? "video" : "phone-call";
-    return '<div class="runtime-empty"><span>' + icon(iconName, 28) + "</span><h2>" + esc(t("noActiveSession")) + "</h2><p>" +
-      esc(others.length ? t("chooseParticipants") : t("creatorNeedsInvitee")) + '</p><form class="media-start-form" data-form="' +
-      (kind === "radio" ? "create-radio" : "create-media") + '" data-kind="' + kind + '"><fieldset>' + labels +
-      '</fieldset><button type="submit" class="action-button action-primary" ' + (others.length ? "" : "disabled") + ">" +
+    return '<div class="runtime-empty media-start-empty"><header class="media-start-intro"><span>' + icon(iconName, 28) +
+      '</span><div><h2>' + esc(t("noActiveSession")) + '</h2><p>' +
+      esc(others.length ? t("chooseParticipants") : t("creatorNeedsInvitee")) + '</p></div>' +
+      (kind === "radio" ? "" : mediaRoomsButton("media-start-room-button")) + '</header>' +
+      (kind === "radio" ? "" : mediaRoomPicker()) + '<form class="media-start-form" data-form="' +
+      (kind === "radio" ? "create-radio" : "create-media") + '" data-kind="' + kind + '">' +
+      (others.length ? '<label class="media-member-search"><span>' + icon("search", 15) + '<span class="sr-only">' + esc(t("searchMembers")) + '</span><input type="search" data-media-member-search autocomplete="off" placeholder="' + esc(t("searchMembers")) + '"></label>' : "") +
+      '<div class="media-member-list"><fieldset>' + labels + '</fieldset><p class="media-member-empty" data-media-no-results hidden>' + esc(t("noEligibleContacts")) + '</p></div><button type="submit" class="action-button action-primary" ' + (others.length ? "" : "disabled") + ">" +
       icon(iconName, 17) + "<span>" + esc(title) + "</span></button></form></div>";
   }
 
   function callDock(kind) {
+    var moreMenu = state.moreMediaOpen
+      ? '<div class="media-more-menu" data-more-menu><div>' + esc(t("more")) + '</div>' + action("end-media", t("endForAll"), "phone-call", "ghost", 'class="end-for-all"') + '</div>'
+      : "";
     return '<div class="call-control-dock">' +
       (state.mediaConnected
         ? action("toggle-mic", state.micEnabled ? t("micOn") : t("micOff"), "mic", state.micEnabled ? "secondary" : "danger")
-        : action("connect-media", t("join"), kind === "video" ? "video" : "phone-call", "primary")) +
+        : action("connect-media", state.deviceLost ? t("reconnect") : state.mediaReconnectState === "reconnecting" ? t("reconnectingMedia") : t("join"), kind === "video" ? "video" : "phone-call", "primary")) +
       (kind === "video" && state.mediaConnected
         ? action("toggle-video", state.videoEnabled ? t("videoOn") : t("videoOff"), "video", state.videoEnabled ? "secondary" : "danger")
         : "") +
-      action("leave-media", t("leaveCall"), "log-out", "danger") +
-      action("end-media", t("endForAll"), "phone-call", "ghost", 'class="end-for-all"') + "</div>";
+      action("more-media", t("more"), "more-horizontal", "secondary") +
+      action("leave-media", t("leaveCall"), "log-out", "danger") + moreMenu + "</div>";
   }
 
   function translationDock() {
-    var item = state.translations[0];
-    var content = item
-      ? "<div>" + avatar(memberName(item.speaker_membership_id), "teal", "sm", true) + "<span><strong>" +
-        esc(memberName(item.speaker_membership_id)) + "</strong><small>" + esc(item.source_language) + " · " + esc(formatTime(item.final_at)) +
-        "</small></span>" + badge(t("final"), "success") + "</div><p>" + esc(item.original_text) + "</p><strong>" +
-        esc(item.translated_text) + "</strong><small>" + icon("headphones", 13) + esc(t("textBeforeAudio")) + "</small>"
-      : "<p>" + esc(t("historyEmpty")) + "</p>";
-    return '<aside class="translation-dock"><div class="panel-title"><span>' + icon("languages", 18) + esc(t("translationPlugin")) +
-      "</span>" + badge(item ? t("final") : "READY", "success") + '</div><label class="language-select is-compact"><span>' +
-      icon("languages", 14) + esc(t("targetLanguage")) + '</span><select data-change="target-language">' +
-      languageOptions(state.profile && state.profile.preferred_output_language || "zh-TW") + '</select></label><div class="live-caption-card">' +
-      content + "</div>" + toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(state.profile && state.profile.auto_read_enabled)) + "</aside>";
+    var workspace = window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot ? window.GroupCommunicationWorkspace.snapshot() : { translationMode: "COLLAPSED" };
+    var mode = workspace.effectiveTranslationMode || workspace.translationMode || "COLLAPSED";
+    var mediaKind = state.surface === "video" ? "video" : "audio";
+    var safety = (state.surface === "video" || state.surface === "call") && state.mediaSession
+      ? '<div class="translation-safety-layer" aria-label="' + esc(t("mediaSafetyControls")) + '"><span class="translation-live-status">' + badge("LIVE", "success") + '</span><span class="translation-video-mini">' + icon(mediaKind === "video" ? "video" : "phone-call", 16) + '<span>' + esc(t(mediaKind === "video" ? "activeVideo" : "activeAudio")) + '</span></span>' +
+        mediaRoomsButton("translation-room-button") +
+        action("toggle-mic", state.micEnabled ? t("micOn") : t("micOff"), "mic", state.micEnabled ? "secondary" : "danger") +
+        (mediaKind === "video" ? action("toggle-video", state.videoEnabled ? t("videoOn") : t("videoOff"), "video", state.videoEnabled ? "secondary" : "danger") : "") +
+        action("more-media", t("more"), "more-horizontal", "secondary") + action("leave-media", t("leaveCall"), "log-out", "danger") +
+        (mediaKind === "video" ? workspaceButton("video-restore", t("shrinkVideo"), "panel-right", false) : "") + '</div>'
+      : "";
+    return '<aside class="translation-dock" data-translation-mode="' + esc(mode) + '" data-translation-requested-mode="' + esc(workspace.requestedTranslationMode || workspace.translationMode || "COLLAPSED") + '"><header class="translation-dock__bar"><strong>' + esc(t("translationPlugin")) + '</strong><span data-translation-mode-label>' + esc(workspace.desktopTranslationMode || mode) + '</span><div>' +
+      workspaceButton("translation-minus", t("shrinkTranslation"), "chevron-down", mode === "COLLAPSED") +
+      '<button type="button" class="icon-button workspace-control" data-workspace-action="translation-plus" aria-label="' + esc(t("expandTranslation")) + '" title="' + esc(t("translationPlugin")) + '"><span class="translation-open-icon">' + icon("languages", 20) + '</span><span class="translation-open-chevron">' + icon("chevron-up", 20) + '</span></button>' +
+      '</div></header><div class="translation-dock__body" data-group-translation-v2></div>' + safety + '</aside>';
   }
 
   function renderMedia() {
     var session = state.mediaSession;
     var kind = state.surface === "video" ? "video" : "audio";
-    if (!session) return '<div class="chat-content state-active_' + kind + ' surface-content">' + inviteForm(kind) + renderParticipants(true) + "</div>";
+    if (!session) return '<div class="chat-content state-active_' + kind + ' media-start-layout surface-content">' + inviteForm(kind) + renderParticipants(true) + "</div>";
     var me = selfParticipant(session);
-    if (me && me.invite_status === "invited" && session.status === "ringing") {
+    // Keep the invite action visible until this participant joins. The first
+    // participant can promote the session to ACTIVE before the invitee refreshes.
+    if (me && me.invite_status === "invited" && session.status !== "ended") {
       return '<div class="chat-content state-ringing_audio surface-content"><div class="call-stage incoming-stage"><div class="incoming-orbit">' +
         avatar(session.participants[0] && session.participants[0].display_name || session.title, "teal", "xl", true) +
         "<i></i><i></i></div>" + badge("RINGING", "warning") + "<h1>" + esc(kind === "video" ? t("groupVideo") : t("incomingAudio")) +
@@ -706,183 +960,262 @@
         "</p>" + callDock(kind) + "</div>" + renderParticipants(true) + "</div>";
     }
     if (kind === "video") {
-      var people = (session.participants || []).filter(function (person) { return person.invite_status === "joined"; });
-      var tiles = people.map(function (person, index) {
-        return '<article class="video-tile ' + (index === 0 ? "is-featured is-speaking" : "tone-mint") + '" data-video-identity="' +
-          esc(person.livekit_identity) + '">' + avatar(person.display_name, index === 0 ? "teal" : "mint", index === 0 ? "xl" : "lg", true) +
-          "<div><strong>" + esc(person.display_name) + "</strong>" + (index === 0 ? wave(true) : "") + "</div></article>";
-      }).join("");
-      return '<div class="video-call-layout ' + (state.profile && state.profile.auto_translate_enabled ? "with-translation" : "") +
+      var people = (session.participants || []).filter(mediaParticipantConnected);
+      var layout = window.GroupV3VideoLayout && window.GroupV3VideoLayout.snapshot ? window.GroupV3VideoLayout.snapshot() : { activeSpeakerIdentity: "", focusedIdentity: "", hiddenIdentities: [] };
+      var featuredIdentity = layout.focusedIdentity || layout.activeSpeakerIdentity || "";
+      var workspaceSnapshot = window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot ? window.GroupCommunicationWorkspace.snapshot() : {};
+      var compact = workspaceSnapshot.effective && workspaceSnapshot.effective.mediaMode === "COMPACT";
+      var visiblePeople = people; // Keep media destinations mounted in every layout mode.
+      if (compact && !visiblePeople.length && people.length) visiblePeople = people.slice(0, 1);
+      var hiddenCount = Math.max(0, people.length - 1);
+      var tiles = visiblePeople.map(function (person, index) {
+        var identity = String(person.livekit_identity || person.id || "");
+        var featured = featuredIdentity ? identity === featuredIdentity : people.length === 1;
+        var hidden = (layout.hiddenIdentities || []).indexOf(identity) >= 0;
+        return '<article class="video-tile ' + (featured ? "is-featured " : "") + (identity === layout.activeSpeakerIdentity ? "is-speaking " : "") + (hidden ? "is-presentation-hidden " : "") + (index % 2 ? "tone-mint" : "tone-teal") + '" data-video-identity="' + esc(identity) + '" data-video-name="' + esc(person.display_name) + '">' +
+          avatar(person.display_name, featured ? "teal" : "mint", featured ? "xl" : "lg", true) + '<div><strong>' + esc(person.display_name) + '</strong>' + (identity === layout.activeSpeakerIdentity ? wave(true) : "") + '</div>' +
+          '<div class="video-tile-actions"><button type="button" data-video-focus="' + esc(identity) + '" aria-label="' + esc(t("focusParticipant")) + '">' + icon("focus", 15) + '</button><button type="button" data-video-hide="' + esc(identity) + '" aria-label="' + esc(t("hideParticipant")) + '">' + icon("eye-off", 15) + '</button><button type="button" data-video-fit-toggle aria-label="' + esc(t("videoFit") + " / " + t("videoFill")) + '">' + icon("maximize", 15) + '</button><button type="button" data-video-drag aria-label="' + esc(t("videoMove")) + '" title="' + esc(t("videoCustomHint")) + '">' + icon("more-horizontal", 15) + '</button></div></article>';
+      }).join("") + (hiddenCount ? '<button type="button" class="video-compact-summary" data-action="members" aria-label="' + esc(t("participants")) + '"><span>+' + esc(String(hiddenCount)) + '</span><small>' + esc(t("participantsShort")) + '</small></button>' : "");
+      var drawer = '<aside class="group-participant-drawer" data-participant-drawer hidden></aside>';
+      var gridClass = window.GroupV3VideoLayout && window.GroupV3VideoLayout.layoutClass ? window.GroupV3VideoLayout.layoutClass(people.length) : "count-" + people.length;
+      return '<div class="video-call-layout with-translation' +
         ' surface-content"><div class="video-stage"><div class="call-status-line">' + badge("LIVE", "success") + "<span>" +
-        esc(t("activeVideo")) + '</span></div><div class="video-grid" data-video-grid>' + tiles + "</div>" + callDock(kind) +
-        '<div class="audio-host" data-audio-host></div></div>' + (state.profile && state.profile.auto_translate_enabled ? translationDock() : "") + "</div>";
+        esc(t("activeVideo")) + '</span><small class="media-participant-count">' + esc(String(people.length)) + " " + esc(t("participantsShort")) + '</small><span class="video-layout-mode" data-video-mode-label>' + esc((window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot().videoMode) || "STANDARD") + '</span>' + mediaRoomsButton("active-media-room-button") + '<button type="button" class="icon-button" data-action="toggle-participant-drawer" aria-label="' + esc(t("participants")) + '">' + icon("users", 17) + '</button></div>' + audioPlaybackRecovery() + '<div class="video-grid ' + gridClass + '" data-video-grid>' + tiles + "</div>" +
+        '<div class="video-panel-toolbar">' + videoPanelControls() + '</div>' + callDock(kind) +
+        '<div class="audio-host" data-audio-host></div></div>' + drawer + translationDock() + mediaRoomPicker() + "</div>";
     }
     var speaker = (session.participants || []).find(function (person) { return person.invite_status === "joined"; }) || me;
     var peopleRow = (session.participants || []).filter(function (person) { return person.invite_status === "joined"; }).slice(0, 4).map(function (person) {
       return "<div>" + avatar(person.display_name, "mint", "lg", true) + "<span>" + esc(person.display_name) + "</span></div>";
     }).join("");
-    return '<div class="chat-content state-active_audio surface-content"><div class="call-stage audio-stage"><div class="call-status-line">' +
-      badge("LIVE", "success") + "<span>" + esc(t("activeAudio")) + '</span></div><div class="speaker-hero"><span class="speaker-ring">' +
+    return '<div class="call-communication-layout with-translation surface-content"><div class="call-workspace-stage"><div class="call-stage audio-stage"><div class="call-status-line">' +
+      badge("LIVE", "success") + "<span>" + esc(t("activeAudio")) + '</span>' + mediaRoomsButton("active-media-room-button") + '</div>' + audioPlaybackRecovery() + '<div class="speaker-hero"><span class="speaker-ring">' +
       avatar(speaker && speaker.display_name, "teal", "xl", true) + "</span><h1>" + esc(speaker && speaker.display_name || state.space.title) +
       "</h1><p>" + esc(t("speaking")) + "</p>" + wave(false) + '</div><div class="audio-participant-row">' + peopleRow + "</div>" +
-      callDock(kind) + '<div class="audio-host" data-audio-host></div></div>' + renderParticipants(true) + "</div>";
+      callDock(kind) + '<div class="audio-host" data-audio-host></div></div>' + renderParticipants(true) + '</div>' + translationDock() + mediaRoomPicker() + "</div>";
   }
 
   function radioState() {
-    if (!state.radioSession) return "IDLE";
-    if (state.radioSession.status === "ended") return "ENDED";
     if (state.radioStopping) return "STOPPING";
-    if (state.deviceLost || state.burst && state.burst.state === "device_lost") return "DEVICE_LOST";
-    if (state.burst && state.burst.state === "talking" && state.floorToken) return "TALKING";
-    if (state.burst && state.burst.state === "finalizing") return "FINALIZING_BURST";
-    if (state.burst && state.burst.state === "final") return "TRANSLATION_HISTORY";
+    if (state.radioPreparing) return "PREPARING";
+    if (state.deviceLost) return "DEVICE_LOST";
+    if (state.floorToken) return "TALKING";
     if (state.radioFloor) return "FLOOR_BUSY";
-    if (!state.mediaConnected) return "DISCONNECTED";
+    if (!state.mediaConnected || !state.radioSession) return "DISCONNECTED";
     return "READY";
   }
 
-  function radioRoster() {
-    var participants = state.radioSession && state.radioSession.participants || [];
-    var rows = participants.map(function (person) {
-      var speaking = state.radioFloor && state.radioFloor.participant_id === person.id;
-      return '<div class="' + (speaking ? "is-speaking" : "") + '">' + avatar(person.display_name, "mint", "sm", person.status === "joined") +
-        "<span><strong>" + esc(person.display_name) + "</strong><small>" + esc(person.status) + "</small></span>" +
-        (speaking ? wave(true) : "<i></i>") + "</div>";
-    }).join("");
-    var latest = state.translations.find(function (item) { return item.runtime_kind === "radio"; }) || state.translations[0];
-    var translation = latest
-      ? '<article class="radio-final-card"><div>' + avatar(memberName(latest.speaker_membership_id), "teal", "sm", true) +
-        "<span><strong>" + esc(memberName(latest.speaker_membership_id)) + "</strong><small>" + esc(latest.source_language) + " · " +
-        esc(formatTime(latest.final_at)) + "</small></span></div><p>" + esc(latest.original_text) + "</p><strong>" +
-        esc(latest.translated_text) + "</strong><small>" + icon("headphones", 13) + esc(t("textBeforeAudio")) + "</small></article>"
-      : '<p class="member-empty">' + esc(t("historyEmpty")) + "</p>";
-    return '<aside class="radio-inspector"><section class="radio-members-card"><div class="panel-title"><span>' +
-      icon("users", 18) + esc(t("participants")) + "</span>" + badge(String(participants.length), "mint") +
-      '</div><div class="radio-members">' + rows + '</div></section><section class="radio-translation-card"><div class="panel-title"><span>' +
-      icon("languages", 18) + esc(t("translationPlugin")) + "</span>" + badge(latest ? t("final") : "READY", "success") +
-      "</div>" + translation + toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(state.profile && state.profile.auto_read_enabled)) +
-      "</section>" + action("leave-radio", t("leaveRadio"), "log-out", "secondary", 'class="desktop-leave"') + "</aside>";
-  }
-
-  function radioStage() {
-    var current = radioState();
-    if (current === "FLOOR_BUSY") return '<div class="radio-primary-stage busy-stage">' + avatar(state.radioFloor && state.radioFloor.display_name, "teal", "xl", true) +
-      badge("FLOOR_BUSY", "warning") + "<h1>" + esc(state.radioFloor && state.radioFloor.display_name || t("floorOwner")) + "</h1>" + wave(false) +
-      '<button class="action-button action-disabled ptt-main-button" disabled>' + icon("mic", 17) + "<span>" + esc(t("floorBusy")) +
-      "</span></button><p>" + esc(t("requestQueued")) + "</p></div>";
-    if (current === "TALKING") return '<div class="radio-primary-stage talking-stage"><div class="live-mic">' + icon("mic", 40) + "<i></i></div>" +
-      badge("TALKING", "danger") + "<h1>" + esc(t("talkingNow")) + "</h1>" + wave(false) + '<div class="partial-transcript">' +
-      badge(t("partial"), "warning") + "<p>" + esc(t("liveTranscript")) + "</p><small>" + esc(t("partialNotSaved")) +
-      "</small></div>" + action("stop-radio", t("stopBurst"), "mic", "danger", 'class="ptt-main-button"') + "</div>";
-    if (current === "STOPPING") return '<div class="radio-primary-stage finalizing-stage">' +
-      badge("STOPPING", "warning") + "<h1>" + esc(t("stoppingBurst")) + "</h1><p>" + esc(t("releasingFloor")) + "</p></div>";
-    if (current === "FINALIZING_BURST") return '<div class="radio-primary-stage finalizing-stage">' +
-      badge("FINALIZING_BURST", "info") + "<h1>" + esc(t("finalizingBurst")) + "</h1><p>" + esc(t("finalizingNote")) +
-      '</p><div class="sequence-list"><div class="sequence-step is-done"><span><i></i></span><strong>' + esc(t("floorReleased")) +
-      '</strong></div><div class="sequence-step is-active"><span><i></i></span><strong>' + esc(t("sttProcessing")) +
-      '</strong></div><div class="sequence-step is-queued"><span><i></i></span><strong>' + esc(t("translationQueued")) +
-      '</strong></div><div class="sequence-step is-queued"><span><i></i></span><strong>' + esc(t("ttsAfterFinal")) +
-      '</strong></div></div><div class="floor-release-proof">' + icon("radio-tower", 18) + "<span><strong>" +
-      esc(t("floorReleasedFirst")) + "</strong><small>" + esc(t("floorAvailable")) + "</small></span></div></div>";
-    if (current === "DEVICE_LOST") return '<div class="radio-primary-stage device-lost-stage"><span class="device-alert-icon">' +
-      icon("headphones", 36) + "</span>" + badge("DEVICE_LOST", "danger") + "<h1>" + esc(t("deviceLostTitle")) + "</h1><p>" +
-      esc(t("devicePrivacy")) + '</p><div class="audio-privacy-proof">' + icon("headphones", 20) + "<span><strong>" +
-      esc(t("privateAudioSuppressed")) + "</strong><small>" + esc(t("deviceLostAction")) + "</small></span></div>" +
-      action("reconnect-radio", t("reconnectDevice"), "refresh-cw", "primary") + "</div>";
-    if (current === "DISCONNECTED") return '<div class="radio-primary-stage device-lost-stage">' +
-      badge("DISCONNECTED", "warning") + "<h1>" + esc(t("radioDisconnected")) + "</h1><p>" +
-      esc(t("radioReconnectNote")) + "</p>" + action("reconnect-radio", t("reconnect"), "refresh-cw", "primary") + "</div>";
-    if (current === "ENDED") return '<div class="radio-primary-stage history-stage">' +
-      badge("ENDED", "muted") + "<h1>" + esc(t("endedForAll")) + "</h1></div>";
-    if (current === "TRANSLATION_HISTORY") {
-      var item = state.translations.find(function (event) { return event.runtime_kind === "radio"; }) || state.translations[0];
-      return '<div class="radio-primary-stage history-stage">' + badge(t("final"), "success") + "<h1>" + esc(t("translationReady")) +
-        "</h1><p>" + esc(t("textBeforeAudio")) + "</p>" + (item ? '<article class="history-featured"><div>' +
-        avatar(memberName(item.speaker_membership_id), "teal", "md", true) + "<span><strong>" + esc(memberName(item.speaker_membership_id)) +
-        "</strong><small>" + esc(formatTime(item.final_at)) + " · " + esc(item.source_language) + " → " + esc(item.target_language) +
-        "</small></span></div><p>" + esc(item.original_text) + "</p><strong>" + esc(item.translated_text) + "</strong></article>" : "") + "</div>";
-    }
-    return '<div class="radio-primary-stage ready-stage"><div class="ptt-orbit"><span>' + icon("mic", 38) +
-      "</span><i></i><i></i></div><h1>" + esc(t("floorAvailable")) + "</h1><p>" + esc(t("startTalking")) + "</p>" +
-      action("start-radio", t("startTalking"), "mic", "primary", 'class="ptt-main-button"') +
-      '<span class="radio-listen-state"><i></i>' + esc(t("listenMode")) + "</span></div>";
+  function translationLabels() {
+    return { readOnly: true, author: t("translationAuthor"), received: t("translationReceived"), original: t("translationOriginal"),
+      showOriginal: t("translationShowOriginal"), pending: t("translationPending"), recipients: t("recipients"),
+      play: t("translationPlay"), retry: t("translationRetry"), failed: t("translationVariantError"), noRecipients: t("translationNoRecipients"),
+      variants: t("translationVariants"), translate: t("translationTranslate"), onDemand: t("translationOnDemand") };
   }
 
   function renderRadio() {
-    if (!state.radioSession) return '<div class="radio-content surface-content"><main class="radio-center">' + inviteForm("radio") + '</main><aside class="radio-inspector"></aside></div>';
-    var me = selfParticipant(state.radioSession, true);
-    if (me && me.status === "invited") {
-      return '<div class="radio-content surface-content"><main class="radio-center"><div class="call-stage incoming-stage">' +
-        badge("RINGING", "warning") + "<h1>" + esc(t("groupRadio")) + "</h1><p>" + esc(state.radioSession.title || state.space.title) +
-        '</p><div class="privacy-note">' + icon("mic", 18) + "<strong>" + esc(t("mediaPolicy")) + '</strong></div><div class="incoming-actions">' +
-        action("join-radio", t("join"), "radio-tower", "primary") + action("reject-radio", t("reject"), "log-out", "danger") +
-        '</div></div><div class="radio-mobile-dock">' + action("stop-radio", t("stopBurst"), "mic", "danger", "disabled") +
-        action("reject-radio", t("reject"), "log-out", "secondary") + "</div></main>" + radioRoster() + "</div>";
+    return window.GroupV3RadioUi.room({
+      t: t, icon: icon, state: radioState(), title: state.space.title,
+      floor: state.radioFloor, burst: state.burst, history: state.radioHistory,
+      error: state.radioHistoryError, membersOpen: state.radioMembersOpen,
+      roomsOpen: state.radioRoomsOpen, spaces: state.spaces, spaceId: state.space && state.space.id,
+      audioBlocked: state.audioPlaybackBlocked,
+      participants: state.radioSession && state.radioSession.participants || [],
+      labels: translationLabels()
+    });
+  }
+
+  async function loadArchive(more) {
+    if (!state.space) return;
+    var spaceId = state.space.id;
+    var last = more && state.translations[state.translations.length - 1];
+    try {
+      var payload = await api("/api/group/spaces/" + encodeURIComponent(spaceId) +
+        "/translation/v2-history?limit=50" + (last ? "&before_id=" + encodeURIComponent(last.id) : ""));
+      if (!state.space || state.space.id !== spaceId) return;
+      state.translations = more ? state.translations.concat(payload.segments || []) : payload.segments || [];
+      state.archiveError = "";
+      scheduleAppHistoryConvergence("archive", state.translations);
+    } catch (_error) { state.archiveError = t("translationHistorySyncError"); }
+  }
+
+  async function loadRadioHistory(more) {
+    if (!state.space) return;
+    var spaceId = state.space.id;
+    var last = more && state.radioHistory[state.radioHistory.length - 1];
+    try {
+      var payload = await api("/api/group/spaces/" + encodeURIComponent(spaceId) +
+        "/radio/history?limit=50" + (last ? "&before_id=" + encodeURIComponent(last.id) : ""));
+      if (!state.space || state.space.id !== spaceId) return;
+      state.radioHistory = more ? state.radioHistory.concat(payload.bursts || []) : payload.bursts || [];
+      state.radioHistoryError = "";
+      scheduleAppHistoryConvergence("radio", state.radioHistory.map(function (item) { return item.segment; }).filter(Boolean));
+      if (!more && state.surface === "radio" && window.GroupV3TranslationController) {
+        window.GroupV3TranslationController.readRadioHistory((payload.bursts || []).map(function (item) { return item.segment; }).filter(Boolean));
+      }
+    } catch (_error) { state.radioHistoryError = t("translationHistorySyncError"); }
+  }
+
+  async function translateHistoricalSegment(button) {
+    if (!state.space || !button.dataset.segmentId || !button.dataset.targetLanguage) return;
+    button.disabled = true;
+    try {
+      var segmentId = button.dataset.segmentId;
+      var targetLanguage = button.dataset.targetLanguage;
+      var payload = await api(
+        "/api/group/spaces/" + encodeURIComponent(state.space.id) +
+          "/translation/segments/" + encodeURIComponent(segmentId) +
+          "/variants/" + encodeURIComponent(targetLanguage) + "/retry",
+        json("POST", { target_language: targetLanguage })
+      );
+      if (!payload.segment) return;
+      state.translations = state.translations.map(function (item) {
+        return item.id === segmentId ? payload.segment : item;
+      });
+      state.radioHistory = state.radioHistory.map(function (burst) {
+        return burst.segment && burst.segment.id === segmentId
+          ? Object.assign({}, burst, { segment: payload.segment }) : burst;
+      });
+      // Historical Translate only materializes/reuses shared text.  Speech is
+      // intentionally a separate explicit Play action.
+      render();
+    } catch (error) {
+      notify(publicError(error));
+      if (document.documentElement.contains(button)) button.disabled = false;
     }
-    var current = radioState();
-    return '<div class="radio-content state-' + current.toLowerCase() + ' surface-content"><main class="radio-center"><section class="floor-summary floor-' +
-      current.toLowerCase() + '"><div class="floor-copy"><span class="floor-indicator"><i></i></span><span><strong>' +
-      esc(current === "FLOOR_BUSY" ? t("floorBusy") : current === "TALKING" ? t("talkingNow") : t("floorAvailable")) +
-      "</strong><small>" + esc(current) + '</small></span></div><div class="floor-level"><span style="width:' +
-      (current === "TALKING" ? 78 : current === "FLOOR_BUSY" ? 56 : 18) + '%"></span></div></section>' + radioStage() +
-      '<div class="radio-mobile-dock">' + action("stop-radio", t("stopBurst"), "mic", "danger", current === "TALKING" ? "" : "disabled") +
-      action("leave-radio", t("leaveRadio"), "log-out", "secondary") + "</div></main>" + radioRoster() + "</div>";
+  }
+
+  function scheduleAppHistoryConvergence(kind, segments) {
+    var tracker = kind === "radio" ? radioConvergence : archiveConvergence;
+    var visible = kind === "radio"
+      ? state.surface === "radio" || (state.surface === "chat-translation" && state.historyTab === "radio")
+      : state.surface === "chat-translation";
+    var contextKey = state.space ? state.space.id + "|" + state.surface + "|" + state.historyTab : "";
+    window.clearTimeout(tracker.timer);
+    tracker.timer = 0;
+    if (!visible || tracker.contextKey && tracker.contextKey !== contextKey) {
+      tracker.attempts = 0;
+      tracker.deadline = 0;
+    }
+    tracker.contextKey = contextKey;
+    if (!visible) return;
+    var pending = (segments || []).some(function (item) { return item && item.state === "PROCESSING"; });
+    if (!pending) {
+      tracker.attempts = 0;
+      tracker.deadline = 0;
+      return;
+    }
+    if (!tracker.deadline) tracker.deadline = Date.now() + 15000;
+    if (Date.now() >= tracker.deadline || tracker.attempts >= 6) return;
+    var delays = [400, 800, 1400, 2200, 3200, 4500];
+    var delay = delays[Math.min(tracker.attempts, delays.length - 1)];
+    tracker.attempts += 1;
+    tracker.timer = window.setTimeout(function () {
+      if (!state.space || tracker.contextKey !== state.space.id + "|" + state.surface + "|" + state.historyTab) {
+        tracker.attempts = 0;
+        tracker.deadline = 0;
+        tracker.timer = 0;
+        return;
+      }
+      var request = kind === "radio" ? loadRadioHistory() : loadArchive();
+      Promise.resolve(request).then(render).catch(function () {});
+    }, delay);
+  }
+
+  async function loadCommunicationDevices() {
+    if (!window.GroupV3DeviceManager) {
+      state.deviceSettingsLoaded = true;
+      state.deviceSettingsError = "browser_unsupported";
+      return;
+    }
+    try {
+      state.communicationDevices = await window.GroupV3DeviceManager.enumerate();
+      state.prejoinAudioDeviceId = window.GroupV3DeviceManager.remembered("audioInput") || "";
+      state.prejoinVideoDeviceId = window.GroupV3DeviceManager.remembered("videoInput") || "";
+      state.prejoinOutputDeviceId = window.GroupV3DeviceManager.remembered("audioOutput") || "";
+      state.deviceSettingsError = "";
+      state.deviceSettingsStatus = "devicePreferencesReady";
+    } catch (error) {
+      state.deviceSettingsError = error.code || "device_error";
+    } finally {
+      state.deviceSettingsLoaded = true;
+    }
+  }
+
+  function communicationDeviceSettings() {
+    var devices = state.communicationDevices || {};
+    var manager = window.GroupV3DeviceManager;
+    var outputSupported = Boolean(manager && manager.outputSelectionSupported && manager.outputSelectionSupported());
+    var statusKey = state.deviceSettingsError ? "" : state.deviceSettingsStatus || (state.deviceSettingsLoaded ? "devicePreferencesReady" : "devicePreferencesLoading");
+    var status = state.deviceSettingsError ? deviceErrorText(state.deviceSettingsError) : t(statusKey);
+    return '<section class="communication-device-settings"><h3>' + icon("headphones", 17) + '<span>' + esc(t("communicationDevices")) + '</span></h3><p>' + esc(t("communicationDevicesNote")) + '</p>' +
+      '<div class="communication-device-grid"><label><span>' + esc(t("microphone")) + '</span><select data-change="device-pref-audio">' + deviceOptions(devices.audioInputs, state.prejoinAudioDeviceId) + '</select></label>' +
+      '<label><span>' + esc(t("camera")) + '</span><select data-change="device-pref-video">' + deviceOptions(devices.videoInputs, state.prejoinVideoDeviceId) + '</select></label>' +
+      (outputSupported
+        ? '<label><span>' + esc(t("speaker")) + '</span><select data-change="device-pref-output">' + deviceOptions(devices.audioOutputs, state.prejoinOutputDeviceId) + '</select></label>'
+        : '<div class="device-output-managed"><span>' + esc(t("speaker")) + '</span><strong>' + esc(t("deviceOutputOsManaged")) + '</strong></div>') +
+      '</div><div class="communication-device-actions">' +
+      action("test-microphone", t("testMicrophone"), "mic", "secondary") +
+      action("test-device-voice", t("testVoice"), "headphones", "secondary") +
+      '</div><div class="communication-device-status" role="status"><i data-device-test-meter></i><span>' + esc(status) + '</span></div></section>';
   }
 
   function renderPlugin() {
     var profile = state.profile || {};
-    var chatMode = state.surface !== "radio-translation";
-    var chatItems = Object.keys(state.chatTranslations).map(function (key) {
-      return state.chatTranslations[key];
-    }).filter(function (item) { return item && item.state === "FINAL"; });
-    var chatHistory = chatItems.length ? chatItems.map(function (item) {
-      var message = state.messages.find(function (candidate) { return candidate.id === item.message_id; }) || {};
-      var sender = message.sender && message.sender.display_name || t("groupChat");
-      return "<article><div>" + avatar(sender, "mint", "md", true) + "<span><strong>" + esc(sender) +
-        "</strong><small>" + esc(item.source_language) + " → " + esc(item.target_language) + " · " +
-        esc(formatTime(item.final_at)) + "</small></span>" + badge(t("final"), "success") + "</div><p>" +
-        esc(message.content || "") + "</p><strong>" + esc(item.translated_text) + "</strong><small>" +
-        icon("languages", 13) + esc(t("chatTranslationLinked")) + "</small></article>";
-    }).join("") : '<article class="is-empty">' + esc(t("historyEmpty")) + "</article>";
-    var radioItems = state.translations.filter(function (item) {
-      return item.runtime_kind === "radio";
-    });
-    var radioHistory = radioItems.length ? radioItems.map(function (item) {
-      return "<article><div>" + avatar(memberName(item.speaker_membership_id), "mint", "md", true) + "<span><strong>" +
-        esc(memberName(item.speaker_membership_id)) + "</strong><small>" + esc(item.source_language) + " → " + esc(item.target_language) +
-        " · " + esc(formatTime(item.final_at)) + "</small></span>" + badge(t("final"), "success") + "</div><p>" +
-        esc(item.original_text) + "</p><strong>" + esc(item.translated_text) + "</strong><small>" + icon("headphones", 13) +
-        esc(t("textBeforeAudio")) + "</small></article>";
-    }).join("") : '<article class="is-empty">' + esc(t("historyEmpty")) + "</article>";
-    var history = chatMode ? chatHistory : radioHistory;
-    return '<div class="plugin-workspace surface-content"><div class="plugin-heading"><div><span>' +
-      esc(t(chatMode ? "chatTranslation" : "radioTranslation")) +
-      "</span><h1>" + esc(t("translationHistory")) + "</h1></div>" + badge("VI · EN · ZH-TW", "mint") +
-      '</div><div class="segmented-control"><button type="button" data-action="surface" data-surface="chat-translation" class="' +
-      (chatMode ? "is-active" : "") + '">' + icon("languages", 15) + esc(t("chatTranslation")) +
-      '</button><button type="button" data-action="surface" data-surface="radio-translation" class="' +
-      (!chatMode ? "is-active" : "") + '">' + icon("globe", 15) + esc(t("radioTranslation")) +
-      '</button></div><div class="history-list is-focused">' +
-      history + '</div><form class="settings-form" data-form="save-profile"><div class="settings-title">' + icon("languages", 17) +
-      "<strong>" + esc(t("translationSettings")) + '</strong></div><label class="language-select"><span>' + esc(t("sourceLanguage")) +
+    var tab = state.historyTab;
+    var labels = translationLabels();
+    var items = state.translations.filter(function (item) { return item.runtime_kind !== "radio"; });
+    var history = items.map(function (item) { return window.GroupV3TranslationView.historyItem(item, labels); }).join("");
+    if (tab === "chat") {
+      history = Object.keys(state.chatTranslations).map(function (id) {
+        var item = state.chatTranslations[id];
+        var message = state.messages.find(function (candidate) { return candidate.id === id; }) || {};
+        return window.GroupV3TranslationView.historyItem(Object.assign({}, item, {
+          id: "chat-" + id, source_text: message.content || "", created_at: item.final_at,
+          speaker_display_name: message.sender && message.sender.display_name || t("groupChat"),
+          show_original_enabled: true
+        }), labels);
+      }).join("");
+    }
+    if (tab === "radio") history = window.GroupV3RadioUi.timeline(state.radioHistory, labels, t);
+    var tabs = [["chat", "groupChat"], ["media", "callVideoHistory"], ["radio", "groupRadio"]].map(function (item) {
+      return '<button type="button" data-action="history-tab" data-tab="' + item[0] + '" aria-pressed="' +
+        (tab === item[0]) + '" class="' + (tab === item[0] ? "is-active" : "") + '">' + esc(t(item[1])) + '</button>';
+    }).join("");
+    var error = tab === "radio" ? state.radioHistoryError : state.archiveError;
+    var settingsBody = '<label class="language-select"><span>' + esc(t("sourceLanguage")) +
       '</span><select name="spoken_language">' + languageOptions(profile.spoken_language || state.locale) +
       '</select></label><label class="language-select"><span>' + esc(t("targetLanguage")) +
       '</span><select name="preferred_output_language">' + languageOptions(profile.preferred_output_language || "zh-TW") +
-      "</select></label>" + toggle("toggle-auto-translate", t("autoTranslate"), "", Boolean(profile.auto_translate_enabled)) +
-      toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(profile.auto_read_enabled)) +
+      '</select></label>' + toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(profile.auto_read_enabled)) +
+      '<details><summary>' + esc(t("translationPrivacy")) + '</summary>' +
       toggle("toggle-consent", t("consent"), t("consentDetail"), state.consent && state.consent.status === "granted") +
-      '<button type="submit" class="action-button action-primary">' + icon("languages", 17) + "<span>" +
-      esc(t("saveSettings")) + "</span></button></form></div>";
+      '</details>' + communicationDeviceSettings() + '<button type="submit" class="action-button action-primary">' + icon("languages", 17) +
+      '<span>' + esc(t("saveSettings")) + '</span></button>';
+    return '<div class="plugin-workspace surface-content"><div class="plugin-heading"><h1>' + esc(t("translationHistory")) +
+      '</h1></div><div class="segmented-control">' + tabs + '</div><div class="history-list is-focused" data-translation-archive>' +
+      (error ? '<p role="alert">' + esc(error) + '</p>' : "") +
+      (history || '<p class="is-empty">' + esc(t("historyEmpty")) + '</p>') +
+      (state.historyTab === "chat" ? "" : action("history-more", t("historyOlder"), "history", "secondary")) +
+      '</div><form class="settings-form ' + (state.settingsCollapsed ? "is-collapsed" : "") + '" data-form="save-profile">' +
+      '<header class="settings-form-heading"><h2>' + esc(t("translationSettings")) + '</h2>' +
+      '<button type="button" class="icon-button settings-collapse-control" data-action="settings-collapse" aria-expanded="' +
+      String(!state.settingsCollapsed) + '" aria-label="' + esc(state.settingsCollapsed ? t("expandTranslation") : t("shrinkTranslation")) + '">' +
+      icon(state.settingsCollapsed ? "plus" : "minus", 18) + '</button></header>' +
+      '<div class="settings-form-body" ' + (state.settingsCollapsed ? "hidden" : "") + '>' + settingsBody + '</div></form></div>';
   }
 
   function header() {
     var title = state.space ? state.space.title : t("rooms");
     var status = state.surface === "radio" ? radioState() : state.mediaSession ? state.mediaSession.status.toUpperCase() : "ACTIVE";
+    var mine = myMembership();
+    var settingsButton = mine && ["owner", "admin"].indexOf(mine.role) >= 0
+      ? iconButton("settings", t("groupSettings"), "settings")
+      : "";
     return '<header class="group-header"><div class="group-identity">' +
       (state.surface === "radio" ? '<span class="radio-mark">' + icon("radio-tower", 21) + "</span>" : avatar(title, "teal", "lg", true)) +
       "<span><strong>" + esc(title) + "</strong><small>" + esc(activeMemberCount()) + " " + esc(t("membersLabel")) +
       '</small></span></div><div class="group-header-actions"><span class="surface-status">' + esc(status) + "</span>" +
-      iconButton("members", t("manageMembers"), "users") + iconButton("refresh", t("refreshData"), "refresh-cw") + iconButton("plugin", t("translationPlugin"), "languages") + "</div></header>";
+      iconButton("members", t("manageMembers"), "users") + settingsButton + iconButton("refresh", t("refreshData"), "refresh-cw") + iconButton("plugin", t("translationPlugin"), "languages") + "</div></header>";
   }
 
   function surface() {
@@ -898,8 +1231,147 @@
     return renderPlugin();
   }
 
+  function deviceErrorText(code) {
+    if (code === "permission_denied") return t("permissionDenied");
+    if (code === "device_not_found") return t("deviceNotFound");
+    if (code === "device_busy") return t("deviceBusy");
+    if (code === "browser_unsupported") return t("browserUnsupported");
+    if (code === "tts_error") return t("translationTtsUnavailable");
+    return t("deviceError");
+  }
+
+  function deviceOptions(items, selected) {
+    var options = (items || []).map(function (item) {
+      var label = item.label || t("deviceDefault");
+      return '<option value="' + esc(item.deviceId) + '" ' + (item.deviceId === selected ? "selected" : "") + ">" + esc(label) + "</option>";
+    }).join("");
+    return '<option value="">' + esc(t("deviceDefault")) + "</option>" + options;
+  }
+
+  function renderPrejoin() {
+    if (!state.prejoinOpen) return "";
+    var kind = state.prejoinMediaKind === "video" ? "video" : "audio";
+    var devices = state.prejoinDevices || {};
+    var error = state.prejoinError ? '<div class="prejoin-error" role="alert">' + icon("refresh-cw", 16) + "<span>" + esc(deviceErrorText(state.prejoinError)) + "</span></div>" : "";
+    var preview = localStream
+      ? '<video class="prejoin-preview-media" data-prejoin-video autoplay playsinline muted></video>'
+      : '<div class="prejoin-preview-placeholder">' + icon(kind === "video" ? "video" : "mic", 42) + "<span>" + esc(t("permissionRequired")) + "</span></div>";
+    return '<div class="prejoin-backdrop"><section class="prejoin-dialog" role="dialog" aria-modal="true" aria-labelledby="prejoin-title">' +
+      '<header><div><span class="prejoin-kicker">' + esc(t("preview")) + '</span><h2 id="prejoin-title">' + esc(t("prejoinTitle")) + '</h2></div>' +
+      iconButton("cancel-prejoin", t("cancel"), "log-out") + '</header><p class="prejoin-note">' + esc(t("prejoinNote")) + '</p>' +
+      '<div class="prejoin-layout"><div class="prejoin-preview">' + preview + '<div class="prejoin-meter"><span>' + esc(t("audioLevel")) + '</span><i data-prejoin-meter></i></div></div>' +
+      '<div class="prejoin-controls"><label><span>' + icon("mic", 16) + esc(t("microphone")) + '</span><select data-change="prejoin-audio-device">' + deviceOptions(devices.audioInputs, state.prejoinAudioDeviceId) + '</select></label>' +
+      (kind === "video" ? '<label><span>' + icon("video", 16) + esc(t("camera")) + '</span><select data-change="prejoin-video-device">' + deviceOptions(devices.videoInputs, state.prejoinVideoDeviceId) + '</select></label>' : '') +
+      '<label><span>' + icon("headphones", 16) + esc(t("speaker")) + '</span><select data-change="prejoin-output-device">' + deviceOptions(devices.audioOutputs, state.prejoinOutputDeviceId) + '</select></label>' +
+      '<button type="button" class="prejoin-toggle ' + (state.prejoinAudioEnabled ? "is-on" : "") + '" data-action="toggle-prejoin-mic" aria-pressed="' + Boolean(state.prejoinAudioEnabled) + '">' + icon("mic", 16) + '<span>' + esc(state.prejoinAudioEnabled ? t("micOn") : t("micOff")) + '</span></button>' +
+      (kind === "video" ? '<button type="button" class="prejoin-toggle ' + (state.prejoinVideoEnabled ? "is-on" : "") + '" data-action="toggle-prejoin-video" aria-pressed="' + Boolean(state.prejoinVideoEnabled) + '">' + icon("video", 16) + '<span>' + esc(state.prejoinVideoEnabled ? t("videoOn") : t("videoOff")) + '</span></button>' : '') +
+      error + '<div class="prejoin-actions">' + action("prepare-prejoin", localStream ? t("retryDevice") : t("startPreview"), "refresh-cw", "secondary", state.prejoinBusy ? "disabled" : "") +
+      action("confirm-prejoin", t("confirmJoin"), kind === "video" ? "video" : "phone-call", "primary", (!localStream || state.prejoinBusy) ? "disabled" : "") + '</div></div></div>' +
+      '<small class="prejoin-status">' + esc(state.prejoinBusy ? t("prejoinChecking") : localStream ? t("prejoinReady") : t("permissionRequired")) + '</small></section></div>';
+  }
+
+  async function testCommunicationMicrophone() {
+    if (!window.GroupV3DeviceManager) return;
+    state.deviceSettingsStatus = "deviceMicrophoneTesting";
+    state.deviceSettingsError = "";
+    render();
+    var meterStop = null;
+    try {
+      var stream = await window.GroupV3DeviceManager.acquire({
+        mediaKind: "audio", audioEnabled: true, videoEnabled: false,
+        audioDeviceId: state.prejoinAudioDeviceId
+      });
+      var meter = root.querySelector("[data-device-test-meter]");
+      meterStop = window.GroupV3DeviceManager.startMeter(stream, function (level) {
+        if (meter) meter.style.setProperty("--meter-level", Math.round(level * 100) + "%");
+      });
+      await new Promise(function (resolve) { window.setTimeout(resolve, 900); });
+      if (window.GroupV3DeviceManager.markReady) window.GroupV3DeviceManager.markReady("audio");
+      state.deviceSettingsStatus = "deviceMicrophoneReady";
+    } catch (error) {
+      state.deviceSettingsError = error.code || error.deviceError && error.deviceError.code || "device_error";
+    } finally {
+      if (meterStop) meterStop();
+      window.GroupV3DeviceManager.stop();
+      localStream = null;
+      render();
+    }
+  }
+
+  function testCommunicationVoice() {
+    var manager = window.GroupV3TtsManager;
+    if (!manager || !manager.supported()) {
+      state.deviceSettingsError = "browser_unsupported";
+      render();
+      return;
+    }
+    state.deviceSettingsError = "";
+    state.deviceSettingsStatus = "deviceVoiceTesting";
+    render();
+    manager.playManual({
+      key: "device-voice-test",
+      text: t("deviceVoiceSample"),
+      language: state.profile && state.profile.preferred_output_language || state.locale,
+      onState: function (playbackState, detail) {
+        if (playbackState === "STARTED") state.deviceSettingsStatus = "deviceVoicePlaying";
+        if (playbackState === "COMPLETED") state.deviceSettingsStatus = "deviceVoiceReady";
+        if (playbackState === "FAILED" && detail !== "tts_cancelled") state.deviceSettingsError = "tts_error";
+        render();
+      }
+    });
+  }
+
+  function renderAttachmentViewer() {
+    var item = state.attachmentViewer;
+    if (!item) return "";
+    var mime = String(item.mime || "");
+    var media = mime.indexOf("image/") === 0
+      ? '<img class="attachment-viewer-media" src="' + esc(item.src) + '" alt="' + esc(item.name) + '">'
+      : mime.indexOf("video/") === 0
+        ? '<video class="attachment-viewer-media" src="' + esc(item.src) + '" controls autoplay playsinline></video>'
+        : '<audio class="attachment-viewer-audio" src="' + esc(item.src) + '" controls autoplay></audio>';
+    return '<div class="attachment-viewer-backdrop" data-action="close-attachment"><section class="attachment-viewer" role="dialog" aria-modal="true" aria-label="' + esc(item.name) + '">' +
+      '<header><strong>' + esc(item.name) + '</strong>' + iconButton("close-attachment", t("close"), "log-out") + '</header><div class="attachment-viewer-stage">' + media + '</div>' +
+      '<a class="action-button action-secondary attachment-viewer-download" href="' + esc(item.download || item.src) + '" download>' + icon("paperclip", 16) + '<span>' + esc(t("downloadAttachment")) + '</span></a></section></div>';
+  }
+
+  function syncIncomingRingtone() {
+    if (!window.GroupV3IncomingRingtone) return;
+    var participant = state.mediaSession && selfParticipant(state.mediaSession);
+    if (participant && participant.invite_status === "invited" && state.mediaSession.status === "ringing") {
+      window.GroupV3IncomingRingtone.start(state.mediaSession.id);
+    } else {
+      window.GroupV3IncomingRingtone.stop();
+    }
+  }
+
+  function syncCallerRingback() {
+    if (!window.GroupV3Ringback) return;
+    var participant = state.mediaSession && selfParticipant(state.mediaSession);
+    var outgoing = participant && participant.invite_status === "joined" &&
+      state.mediaSession.initiated_by_membership_id === participant.membership_id &&
+      state.mediaSession.status === "ringing" && !state.mediaConnected;
+    if (outgoing) window.GroupV3Ringback.start(state.mediaSession.id);
+    else window.GroupV3Ringback.stop();
+  }
+
+  function presentationRuntimeKey() {
+    if (state.surface === "video") {
+      return "video:" + String(state.mediaSession && state.mediaSession.id || state.space && state.space.id || "none");
+    }
+    if (state.surface === "call") {
+      return "call:" + String(state.mediaSession && state.mediaSession.id || state.space && state.space.id || "none");
+    }
+    if (state.surface === "radio") {
+      return "radio:" + String(state.radioSession && state.radioSession.id || state.space && state.space.id || "none");
+    }
+    return String(state.surface || "chat") + ":" + String(state.space && state.space.id || "none");
+  }
+
   function render() {
     if (state.status !== "READY" && state.status !== "HANDOFF_REQUIRED") {
+      if (window.GroupV3IncomingRingtone) window.GroupV3IncomingRingtone.stop();
+      if (window.GroupV3Ringback) window.GroupV3Ringback.stop();
       var failed = state.status === "FAILED";
       root.innerHTML = '<section class="group-v3-bootstrap ' + (failed ? "is-error" : "") +
         '"><img src="/static/group-v3/timeblock-chat.svg" width="56" height="56" alt=""><strong>AI-COMMUNICATION</strong><span>' +
@@ -908,18 +1380,51 @@
         "</section>";
       return;
     }
+    if (prejoinMeterStop) prejoinMeterStop();
+    prejoinMeterStop = null;
     var nav = navigation();
+    var previousNative = root.querySelector(".native-app");
+    var previousPanel = previousNative && previousNative.dataset.runtimeKey === presentationRuntimeKey() &&
+      previousNative.dataset.state === state.surface && previousNative.dataset.locale === state.locale ?
+      root.querySelector("[data-group-translation-v2]") : null;
+    var focusedControl = previousPanel && previousPanel.contains(document.activeElement) ? document.activeElement : null;
     var banner = state.error ? '<div class="runtime-banner is-error">' + icon("refresh-cw", 15) + "<span>" + esc(state.error) + "</span></div>" : "";
     root.innerHTML = '<div class="native-app native-' + (state.mobile ? "mobile" : "desktop") + '" data-state="' + esc(state.surface) +
-      '" data-locale="' + esc(state.locale) + '">' + nav.desktop +
+      '" data-locale="' + esc(state.locale) + '" data-runtime-key="' + esc(presentationRuntimeKey()) + '">' + nav.desktop +
       '<header class="mobile-app-header"><div class="app-logo"><span class="app-logo-mark"><img src="/static/group-v3/timeblock-chat.svg" alt=""></span><span><strong>AI-COMMUNICATION</strong><small>' +
       esc(t("nativeGroupApp")) + '</small></span></div><div class="mobile-header-actions">' + nav.mobileLogout + '<span class="mobile-state-dot"></span></div></header>' + renderRooms() +
       '<section class="native-main ' + (banner ? "has-banner" : "") + '"><div class="session-strip"><span><i></i>' +
       esc(t("signedIn")) + "</span><span>" + esc(state.groupAuthorized ? t("groupSession") : t("handoffRequiredTitle")) + "</span></div>" + banner + (state.groupAuthorized ? header() : "") + mobileLanguageBar() + surface() +
-      "</section>" + nav.mobile + "</div>" + renderMemberManager();
+      "</section>" + nav.mobile + "</div>" + renderMemberManager() + renderGroupSettings() + renderPrejoin() + renderAttachmentViewer();
     root.dataset.runtimeState = "READY";
+    root.querySelector(".native-app").classList.toggle("rooms-collapsed", state.roomsCollapsed);
+    var nextPanel = root.querySelector("[data-group-translation-v2]");
+    if (previousPanel && nextPanel) {
+      nextPanel.replaceWith(previousPanel);
+      if (focusedControl) focusedControl.focus({ preventScroll: true });
+    }
+    if (window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.apply) window.GroupCommunicationWorkspace.apply(root);
+    var participantDrawer = root.querySelector("[data-participant-drawer]");
+    if (participantDrawer && window.GroupV3ParticipantDrawer && state.mediaSession) {
+      window.GroupV3ParticipantDrawer.render(participantDrawer, (state.mediaSession.participants || []).filter(mediaParticipantConnected), {
+        title: t("participants"), close: t("close"), member: t("member"), focus: t("focusParticipant"), hide: t("hideParticipant"), restore: t("restoreParticipant")
+      });
+    }
+    syncIncomingRingtone();
+    syncCallerRingback();
     syncMediaElements();
+    if (state.prejoinOpen && localStream) {
+      var preview = root.querySelector("[data-prejoin-video]");
+      if (preview) preview.srcObject = localStream;
+      var meter = root.querySelector("[data-prejoin-meter]");
+      if (meter && !prejoinMeterStop && window.GroupV3DeviceManager && window.GroupV3DeviceManager.startMeter) {
+        prejoinMeterStop = window.GroupV3DeviceManager.startMeter(localStream, function (level) {
+          meter.style.setProperty("--meter-level", String(Math.round(level * 100)) + "%");
+        });
+      }
+    }
     resizeTextEntry(root.querySelector("textarea[data-group-text-entry]"));
+    window.dispatchEvent(new CustomEvent("group-v3:rendered"));
   }
 
   async function refreshAll() {
@@ -937,7 +1442,6 @@
       }
       await loadSpaces(state.space && state.space.id || "");
       render();
-      if (state.profile && state.profile.auto_read_enabled) processTtsJobs();
     } catch (error) {
       if (error.status === 401) state.status = window.opener ? "WAITING" : "FAILED";
       else state.error = publicError(error);
@@ -954,17 +1458,22 @@
   function updateSurface(next) {
     next = normalizeSurface(next);
     if (SURFACES.indexOf(next) < 0 || next === state.surface) return;
-    if (state.floorToken) {
-      notify(t("stopBurst"));
+    if (state.surface === "radio" && (state.mediaConnected || state.floorToken || state.radioPreparing)) {
+      leaveRadio(next);
       return;
     }
     if (next === "chat-translation" || next === "radio-translation") state.previousSurface = state.surface;
+    closePrejoin(true);
     disconnectMedia(false);
     state.surface = next;
     state.mediaSession = null;
     state.radioSession = null;
     state.radioFloor = null;
     state.burst = null;
+    state.radioRoomsOpen = false;
+    state.mediaRoomsOpen = false;
+    state.radioMembersOpen = false;
+    state.moreMediaOpen = false;
     state.error = "";
     if (window.location.pathname.indexOf("/group") === 0) {
       window.history.pushState({ groupSurface: next }, "", "/group/" + encodeURIComponent(next));
@@ -972,7 +1481,7 @@
     render();
     if (!state.space) return;
     setBusy(true);
-    var loader = next === "call" || next === "video" ? loadMediaSessions() : next === "radio" ? loadRadioSession() : Promise.resolve();
+    var loader = next === "call" || next === "video" ? loadMediaSessions() : next === "radio" ? Promise.all([loadRadioSession(), loadRadioHistory()]) : next === "chat-translation" ? Promise.all([loadArchive(), loadRadioHistory(), loadCommunicationDevices()]) : Promise.resolve();
     loader.catch(function (error) {
       state.error = publicError(error);
     }).finally(function () {
@@ -982,20 +1491,61 @@
   }
 
   async function selectSpace(id) {
-    if (state.floorToken) {
-      notify(t("stopBurst"));
+    id = String(id || "");
+    if (!id || !state.space) return;
+    if (id === state.space.id) {
+      state.radioRoomsOpen = false;
+      state.mediaRoomsOpen = false;
+      render();
       return;
     }
+    var oldSpaceId = state.space.id;
+    var oldMediaSession = state.mediaSession;
+    var oldRadioBase = state.radioSession && radioBase();
+    var oldMediaParticipant = oldMediaSession && selfParticipant(oldMediaSession);
+    var mustLeaveMedia = Boolean(oldMediaSession && oldMediaSession.status !== "ended" &&
+      oldMediaParticipant && oldMediaParticipant.invite_status === "joined");
+    var mustLeaveRadio = Boolean(state.surface === "radio" && state.radioSession);
+    if ((mustLeaveMedia || mustLeaveRadio || state.mediaConnected || state.floorToken) &&
+        !window.confirm(t("switchMediaRoomConfirm"))) return;
     setBusy(true);
     state.error = "";
     try {
-      await disconnectMedia(false);
+      state.radioRoomsOpen = false;
+      state.mediaRoomsOpen = false;
+      markMediaMutation();
+      if (mustLeaveRadio) {
+        radioLeaving = true;
+        ++radioGeneration;
+        if (state.floorToken) await stopRadio();
+        if (state.floorToken) throw new Error("group_radio_floor_release_failed");
+        await window.GroupV3RadioRecording.stop(true);
+        // Server lifecycle changes before transport teardown.
+        await radioRequest(oldRadioBase + "/leave", { method: "POST" });
+        await disconnectMedia(false);
+        state.radioSession = null;
+        state.radioFloor = null;
+        state.burst = null;
+        state.radioPreparing = state.radioStopping = state.deviceLost = false;
+      } else if (mustLeaveMedia) {
+        var mediaBase = "/api/group/spaces/" + encodeURIComponent(oldSpaceId) + "/sessions/" +
+          encodeURIComponent(oldMediaSession.id);
+        // A room switch is a semantic Leave, not merely a LiveKit disconnect.
+        await api(mediaBase + "/leave", { method: "POST" });
+        closePrejoin(true);
+        await disconnectMedia(false);
+        state.mediaSession = null;
+      } else {
+        closePrejoin(true);
+        await disconnectMedia(false);
+      }
       await loadSpaces(id);
       render();
     } catch (error) {
       state.error = publicError(error);
       render();
     } finally {
+      radioLeaving = false;
       setBusy(false);
     }
   }
@@ -1173,7 +1723,6 @@
       notify(t("profileSavedReal"));
       await loadSpace();
       render();
-      if (state.profile.auto_read_enabled) processTtsJobs();
     } catch (error) {
       notify(publicError(error));
     }
@@ -1202,79 +1751,248 @@
     });
   }
 
+  async function openPrejoin(kind) {
+    if (!state.mediaSession) return;
+    state.prejoinMediaKind = kind === "video" ? "video" : "audio";
+    state.prejoinOpen = true;
+    state.prejoinConfirmed = false;
+    state.prejoinError = "";
+    state.prejoinBusy = true;
+    render();
+    try {
+      if (!window.GroupV3DeviceManager) throw Object.assign(new Error("device_manager_unavailable"), { code: "browser_unsupported" });
+      state.prejoinDevices = await window.GroupV3DeviceManager.enumerate();
+      state.prejoinAudioDeviceId = window.GroupV3DeviceManager.remembered("audioInput") || state.prejoinAudioDeviceId;
+      state.prejoinVideoDeviceId = window.GroupV3DeviceManager.remembered("videoInput") || state.prejoinVideoDeviceId;
+      state.prejoinOutputDeviceId = window.GroupV3DeviceManager.remembered("audioOutput") || state.prejoinOutputDeviceId;
+    } catch (error) {
+      state.prejoinError = error.code || "browser_unsupported";
+    } finally {
+      state.prejoinBusy = false;
+      render();
+    }
+  }
+
+  async function trySavedDeviceStream(kind) {
+    var manager = window.GroupV3DeviceManager;
+    if (!manager || !manager.isReady || !manager.isReady(kind)) return false;
+    try {
+      if (manager.enumerate) {
+        state.prejoinDevices = await manager.enumerate();
+        state.prejoinAudioDeviceId = manager.remembered("audioInput") || state.prejoinAudioDeviceId;
+        state.prejoinVideoDeviceId = manager.remembered("videoInput") || state.prejoinVideoDeviceId;
+        state.prejoinOutputDeviceId = manager.remembered("audioOutput") || state.prejoinOutputDeviceId;
+      }
+      localStream = await manager.acquire({
+        mediaKind: kind === "video" ? "video" : "audio",
+        audioEnabled: true,
+        videoEnabled: kind === "video",
+        audioDeviceId: state.prejoinAudioDeviceId || manager.remembered("audioInput") || "",
+        videoDeviceId: state.prejoinVideoDeviceId || manager.remembered("videoInput") || ""
+      });
+      state.prejoinConfirmed = true;
+      state.prejoinOpen = false;
+      state.prejoinError = "";
+      return true;
+    } catch (_error) {
+      if (localStream) {
+        localStream.getTracks().forEach(function (track) { track.stop(); });
+        localStream = null;
+      }
+      state.prejoinConfirmed = false;
+      return false;
+    }
+  }
+
+  async function saveGroupSettings(form) {
+    if (!state.space || !form) return;
+    var data = new FormData(form);
+    try {
+      var payload = await api("/api/group/spaces/" + encodeURIComponent(state.space.id), json("PATCH", {
+        title: String(data.get("title") || "").trim(),
+        description: String(data.get("description") || "").trim(),
+        version: state.space.version
+      }));
+      state.space = payload.space;
+      var room = state.spaces.find(function (item) { return item.id === state.space.id; });
+      if (room) Object.assign(room, state.space);
+      notify(t("settingsSaved"));
+      render();
+    } catch (error) {
+      notify(publicError(error));
+      if (error && error.status === 409) await loadSpaces(state.space.id).catch(function () {});
+      render();
+    }
+  }
+
+  async function transferOwnership(button) {
+    if (!state.space) return;
+    var select = root.querySelector('[data-setting="transfer-target"]');
+    var target = select && select.value;
+    if (!target) {
+      notify(t("chooseMember"));
+      return;
+    }
+    if (!window.confirm(t("transferOwnershipConfirm"))) return;
+    try {
+      await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/ownership/transfer", json("POST", {
+        target_membership_id: target,
+        version: state.space.version
+      }));
+      state.settingsOpen = false;
+      await loadSpaces(state.space.id);
+      notify(t("ownershipTransferred"));
+      render();
+    } catch (error) {
+      notify(publicError(error));
+    }
+  }
+
+  async function deleteGroup() {
+    if (!state.space) return;
+    if (!window.confirm(t("deleteGroupConfirm"))) return;
+    var deletingId = state.space.id;
+    try {
+      await disconnectMedia(false);
+      await api("/api/group/spaces/" + encodeURIComponent(deletingId) + "?version=" + encodeURIComponent(state.space.version), { method: "DELETE" });
+      state.settingsOpen = false;
+      state.memberManagerOpen = false;
+      await loadSpaces("");
+      notify(t("groupDeleted"));
+      render();
+    } catch (error) {
+      notify(publicError(error));
+    }
+  }
+
+  function closePrejoin(releaseStream) {
+    state.prejoinOpen = false;
+    state.prejoinBusy = false;
+    state.prejoinError = "";
+    state.prejoinConfirmed = false;
+    if (prejoinMeterStop) prejoinMeterStop();
+    prejoinMeterStop = null;
+    if (releaseStream && window.GroupV3DeviceManager) window.GroupV3DeviceManager.stop();
+    if (releaseStream) localStream = null;
+  }
+
+  async function preparePrejoin() {
+    if (!state.mediaSession || !window.GroupV3DeviceManager) return;
+    state.prejoinBusy = true;
+    state.prejoinError = "";
+    render();
+    try {
+      localStream = await window.GroupV3DeviceManager.acquire({
+        mediaKind: state.prejoinMediaKind,
+        audioEnabled: state.prejoinAudioEnabled,
+        videoEnabled: state.prejoinVideoEnabled,
+        audioDeviceId: state.prejoinAudioDeviceId,
+        videoDeviceId: state.prejoinVideoDeviceId
+      });
+      state.prejoinDevices = await window.GroupV3DeviceManager.enumerate();
+      var audio = localStream.getAudioTracks()[0];
+      var video = localStream.getVideoTracks()[0];
+      state.prejoinAudioDeviceId = audio && audio.getSettings().deviceId || state.prejoinAudioDeviceId;
+      state.prejoinVideoDeviceId = video && video.getSettings().deviceId || state.prejoinVideoDeviceId;
+      state.micEnabled = state.prejoinAudioEnabled;
+      state.videoEnabled = state.prejoinVideoEnabled;
+    } catch (error) {
+      localStream = null;
+      state.prejoinError = error.code || error.deviceError && error.deviceError.code || "device_error";
+    } finally {
+      state.prejoinBusy = false;
+      render();
+    }
+  }
+
+  async function confirmPrejoin() {
+    if (!localStream || state.prejoinBusy) return preparePrejoin();
+    state.prejoinConfirmed = true;
+    state.prejoinOpen = false;
+    if (prejoinMeterStop) prejoinMeterStop();
+    prejoinMeterStop = null;
+    render();
+    try {
+      await connectMedia();
+    } catch (error) {
+      state.prejoinOpen = true;
+      state.prejoinConfirmed = false;
+      state.prejoinError = error.code || "device_error";
+      render();
+    }
+  }
+
   async function createMedia(form) {
+    if (mediaActionInFlight) return;
     var participants = selectedParticipants(form);
     if (!participants.length) {
       notify(t("inviteRequired"));
       return;
     }
     var kind = form.dataset.kind === "video" ? "video" : "audio";
+    mediaActionInFlight = true;
     try {
       var payload = await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions", json("POST", {
         media_kind: kind,
         title: state.space.title,
         participant_membership_ids: participants
       }));
+      markMediaMutation();
       state.mediaSession = payload.session;
       render();
+      if (await trySavedDeviceStream(kind)) await connectMedia();
+      else await openPrejoin(kind);
     } catch (error) {
       notify(publicError(error));
+    } finally {
+      mediaActionInFlight = false;
     }
   }
 
   async function mediaAction(name) {
-    if (!state.mediaSession) return;
+    if (!state.mediaSession || mediaActionInFlight) return;
+    mediaActionInFlight = true;
     var base = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions/" + encodeURIComponent(state.mediaSession.id);
     try {
       if (name === "join-media") {
         var joined = await api(base + "/join", { method: "POST" });
+        markMediaMutation();
         state.mediaSession = joined.session;
         render();
-        await connectMedia();
+        if (await trySavedDeviceStream(state.mediaSession.media_kind)) await connectMedia();
+        else await openPrejoin(state.mediaSession.media_kind);
       } else if (name === "reject-media") {
         var rejected = await api(base + "/reject", { method: "POST" });
+        markMediaMutation();
         state.mediaSession = rejected.session.status === "ended" ? null : rejected.session;
         render();
       } else if (name === "leave-media") {
-        await disconnectMedia(false);
         var left = await api(base + "/leave", { method: "POST" });
+        markMediaMutation();
+        closePrejoin(true);
+        await disconnectMedia(false);
         state.mediaSession = left.session.status === "ended" ? null : left.session;
         notify(t("leaveComplete"));
         render();
       } else if (name === "end-media") {
         if (!window.confirm(t("endForAllConfirm"))) return;
-        await disconnectMedia(false);
         await api(base + "/end-for-all", { method: "POST" });
+        markMediaMutation();
+        closePrejoin(true);
+        await disconnectMedia(false);
         state.mediaSession = null;
         notify(t("endedForAll"));
         render();
       } else if (name === "connect-media") {
-        await connectMedia();
+        if (!state.prejoinOpen && !state.prejoinConfirmed) {
+          if (await trySavedDeviceStream(state.mediaSession.media_kind)) await connectMedia();
+          else await openPrejoin(state.mediaSession.media_kind);
+        } else await connectMedia();
       }
     } catch (error) {
       notify(publicError(error));
-    }
-  }
-
-  async function createRadio(form) {
-    var participants = selectedParticipants(form);
-    if (!participants.length) {
-      notify(t("inviteRequired"));
-      return;
-    }
-    try {
-      if (window.GroupV3SafeAudio && window.GroupV3SafeAudio.chooseOutput) {
-        await window.GroupV3SafeAudio.chooseOutput();
-      }
-      var payload = await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/radio/sessions", json("POST", {
-        title: state.space.title,
-        participant_membership_ids: participants
-      }));
-      state.radioSession = payload.session;
-      render();
-      await connectRadio("listen");
-    } catch (error) {
-      notify(publicError(error));
+    } finally {
+      mediaActionInFlight = false;
     }
   }
 
@@ -1282,51 +2000,96 @@
     return "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/radio/sessions/" + encodeURIComponent(state.radioSession.id);
   }
 
+  async function radioRequest(path, options) {
+    var controller = new AbortController();
+    var timer = window.setTimeout(function () { controller.abort(); }, 10000);
+    try { return await api(path, Object.assign({}, options || {}, { signal: controller.signal })); }
+    finally { window.clearTimeout(timer); }
+  }
+
+  async function createRadio() { return joinRadio(); }
+
   async function joinRadio() {
+    if (radioOperation || radioLeaving) return;
+    radioOperation = true;
+    var generation = ++radioGeneration;
+    state.radioPreparing = true;
+    var spaceId = state.space.id;
+    render();
     try {
-      if (window.GroupV3SafeAudio && window.GroupV3SafeAudio.chooseOutput) {
-        await window.GroupV3SafeAudio.chooseOutput();
+      if (window.GroupV3SafeAudio && window.GroupV3SafeAudio.chooseOutput) await window.GroupV3SafeAudio.chooseOutput();
+      if (generation !== radioGeneration) return;
+      var payload = await radioRequest("/api/group/spaces/" + encodeURIComponent(spaceId) + "/radio/room/join", { method: "POST" });
+      if (generation !== radioGeneration) {
+        await radioRequest("/api/group/spaces/" + encodeURIComponent(spaceId) + "/radio/sessions/" + encodeURIComponent(payload.session.id) + "/leave", { method: "POST" });
+        return;
       }
-      var payload = await api(radioBase() + "/join", { method: "POST" });
       state.radioSession = payload.session;
       state.deviceLost = false;
-      render();
-      await connectRadio("listen");
-    } catch (error) {
-      notify(publicError(error));
+      state.burst = null;
+      await connectRadio("listen", generation);
+      await loadRadioHistory();
+    } catch (error) { if (generation === radioGeneration) notify(publicError(error)); }
+    finally {
+      radioOperation = false;
+      if (generation === radioGeneration) { state.radioPreparing = false; render(); }
     }
   }
 
-  async function rejectRadio() {
-    try {
-      await api(radioBase() + "/reject", { method: "POST" });
-      state.radioSession = null;
-      render();
-    } catch (error) {
-      notify(publicError(error));
-    }
-  }
+  async function rejectRadio() { return leaveRadio(); }
 
   async function startRadio() {
-    if (!state.radioSession || state.floorToken) return;
+    if (!state.radioSession || state.floorToken || radioOperation || radioLeaving || state.deviceLost) return;
+    if (!state.consent || state.consent.status !== "granted") {
+      notify(t("radioConsentRequired"));
+      return;
+    }
+    radioOperation = true;
+    state.radioPreparing = true;
+    var generation = ++radioGeneration;
+    var base = radioBase();
+    render();
     try {
-      var source = state.profile.spoken_language;
-      var target = state.profile.preferred_output_language;
-      var result = await api(radioBase() + "/floor/acquire", json("POST", {
-        source_language: source,
-        target_languages: state.profile.auto_translate_enabled && target !== source ? [target] : []
+      var track = localStream && localStream.getAudioTracks()[0];
+      if (!track || track.readyState !== "live") {
+        var prepared = await window.GroupV3DeviceManager.acquire({
+          mediaKind: "audio", audioEnabled: true, videoEnabled: false,
+          audioDeviceId: state.prejoinAudioDeviceId || window.GroupV3DeviceManager.remembered("audioInput") || ""
+        });
+        if (generation !== radioGeneration) {
+          prepared.getTracks().forEach(function (ownedTrack) { ownedTrack.stop(); });
+          return;
+        }
+        localStream = prepared;
+        track = localStream.getAudioTracks()[0];
+      }
+      track.enabled = true;
+      var result = await radioRequest(base + "/floor/acquire", json("POST", {
+        source_language: state.profile.spoken_language, target_languages: []
       }));
+      if (generation !== radioGeneration) {
+        await radioRequest(base + "/floor/stop", json("POST", { floor_token: result.floor_token }));
+        return;
+      }
       state.floorToken = result.floor_token;
       state.burst = result.burst;
       state.radioFloor = null;
-      render();
-      await connectRadio("talk");
+      await connectRadio("talk", generation);
+      if (generation !== radioGeneration) return;
+      window.GroupV3RadioRecording.begin(localStream && localStream.getAudioTracks()[0]);
       startHeartbeat();
+      window.clearInterval(radioClock);
+      radioClock = window.setInterval(function () {
+        var node = root.querySelector("[data-radio-elapsed]");
+        if (node && state.burst) node.textContent = Math.max(0, Math.floor((Date.now() - Date.parse(state.burst.started_at)) / 1000)) + "s";
+      }, 1000);
     } catch (error) {
-      if (state.floorToken) await radioDeviceLost();
-      await loadRadioSession();
-      render();
-      notify(publicError(error));
+      await window.GroupV3RadioRecording.stop(true);
+      if (generation === radioGeneration && state.floorToken) await stopRadio();
+      if (generation === radioGeneration) notify(publicError(error));
+    } finally {
+      radioOperation = false;
+      if (generation === radioGeneration) { state.radioPreparing = false; render(); }
     }
   }
 
@@ -1335,94 +2098,137 @@
     heartbeatTimer = window.setInterval(async function () {
       if (!state.floorToken || !state.radioSession) return;
       try {
-        var payload = await api(radioBase() + "/floor/heartbeat", json("POST", { floor_token: state.floorToken }));
-        if (payload.floor_released) {
-          state.floorToken = "";
-          state.burst = payload.burst;
-          window.clearInterval(heartbeatTimer);
-          await disconnectMedia(false);
-          render();
-          window.dispatchEvent(new CustomEvent("group-v3:radio-stopped", { detail: { burst_id: state.burst.id } }));
-          await connectRadio("listen").catch(function () {});
-        }
-      } catch (_error) {
-        await radioDeviceLost();
-      }
+        var payload = await radioRequest(radioBase() + "/floor/heartbeat", json("POST", { floor_token: state.floorToken }));
+        if (payload.floor_released) await stopRadio();
+      } catch (_error) { await radioDeviceLost(); }
     }, 10000);
   }
 
-  async function stopRadio() {
-    if (!state.floorToken) return;
-    window.clearInterval(heartbeatTimer);
-    if (localStream) localStream.getAudioTracks().forEach(function (track) { track.enabled = false; });
-    var token = state.floorToken;
-    state.radioStopping = true;
-    render();
-    try {
-      var payload = await api(radioBase() + "/floor/stop", json("POST", { floor_token: token }));
-      state.floorToken = "";
-      state.radioStopping = false;
-      state.radioFloor = null;
-      state.burst = payload.burst;
-      await disconnectMedia(false);
-      render();
-      window.dispatchEvent(new CustomEvent("group-v3:radio-stopped", { detail: { burst_id: state.burst.id } }));
-      await connectRadio("listen");
-      notify(t("floorReleasedFirst"));
-    } catch (error) {
-      state.radioStopping = false;
-      if (state.floorToken) await radioDeviceLost();
-      notify(publicError(error));
+  function finalizeRadioClip(context, clip) {
+    if (!clip) {
+      notify(t("translationEmptyAudio"));
+      return radioRequest(context.base + "/bursts/" + encodeURIComponent(context.burst.id) + "/discard", { method: "POST" })
+        .finally(function () { loadRadioHistory().then(render); }).catch(function () {});
     }
+    var form = new FormData();
+    form.append("audio", clip.blob, "radio." + clip.extension);
+    form.append("duration_seconds", String(clip.seconds));
+    form.append("source_language", context.source);
+    // Deliberately not tied to the floor or current surface. A legitimate Leave
+    // does not abort finalization of a previously released, authenticated burst.
+    return api(context.base + "/bursts/" + encodeURIComponent(context.burst.id) + "/transcribe", {
+      method: "POST", headers: { "Idempotency-Key": context.burst.id }, body: form
+    }).catch(function (error) { notify(publicError(error)); }).finally(async function () {
+      if (state.space && state.space.id === context.spaceId) {
+        await loadRadioHistory();
+        if (state.surface === "radio" || state.surface === "chat-translation") render();
+      }
+    });
+  }
+
+  var radioStopTask = null;
+  async function stopRadio() {
+    if (radioStopTask) return radioStopTask;
+    if (!state.floorToken || !state.radioSession) return;
+    var context = { base: radioBase(), token: state.floorToken, burst: state.burst, spaceId: state.space.id,
+      source: state.profile.spoken_language };
+    state.radioStopping = true;
+    window.clearInterval(heartbeatTimer);
+    window.clearInterval(radioClock);
+    render();
+    radioStopTask = (async function () {
+      // Calling stop starts recorder finalization, but the floor release must not
+      // wait for MediaRecorder to emit its final Blob.
+      var clipPromise = window.GroupV3RadioRecording.stop(false);
+      if (localStream) localStream.getAudioTracks().forEach(function (track) { track.enabled = false; });
+      try {
+        var payload = await radioRequest(context.base + "/floor/stop", json("POST", { floor_token: context.token }));
+        state.floorToken = "";
+        state.radioFloor = null;
+        state.burst = payload.burst;
+        state.radioStopping = false;
+        render();
+        await disconnectMedia(false);
+        if (!radioLeaving && state.surface === "radio") await connectRadio("listen", radioGeneration);
+        // STT is detached from floor ownership and runs exactly once by burst ID.
+        clipPromise.then(function (clip) { return finalizeRadioClip(context, clip); }).catch(function () {
+          notify(t("translationRecordingError"));
+        });
+      } catch (error) {
+        await disconnectMedia(false);
+        notify(publicError(error));
+      } finally {
+        state.radioStopping = false;
+        render();
+      }
+    }());
+    try { await radioStopTask; } finally { radioStopTask = null; }
   }
 
   async function radioDeviceLost() {
-    if (!state.floorToken || !state.radioSession) {
-      state.deviceLost = true;
-      await disconnectMedia(false);
-      render();
-      return;
-    }
-    var token = state.floorToken;
-    state.floorToken = "";
+    if (window.GroupV3TranslationController) window.GroupV3TranslationController.stopPlayback();
+    ++radioGeneration;
     window.clearInterval(heartbeatTimer);
-    try {
-      var payload = await api(radioBase() + "/floor/device-lost", json("POST", { floor_token: token }));
-      state.burst = payload.burst;
-    } catch (_error) {
-      state.burst = { state: "device_lost" };
+    window.clearInterval(radioClock);
+    await window.GroupV3RadioRecording.stop(true);
+    if (state.floorToken && state.radioSession) {
+      try { await radioRequest(radioBase() + "/floor/device-lost", json("POST", { floor_token: state.floorToken })); }
+      catch (_error) { /* Expiring floor lease remains the offline safety net. */ }
     }
+    state.floorToken = "";
+    state.radioPreparing = false;
     state.deviceLost = true;
-    window.dispatchEvent(new CustomEvent("group-v3:radio-device-lost", { detail: { burst_id: state.burst && state.burst.id || "" } }));
     await disconnectMedia(false);
+    await loadRadioHistory();
     render();
   }
 
-  async function reconnectRadio() {
-    state.deviceLost = false;
-    state.burst = null;
-    await joinRadio();
-  }
+  async function reconnectRadio() { return joinRadio(); }
 
-  async function leaveRadio() {
-    if (state.floorToken) {
-      notify(t("stopBurst"));
-      return;
-    }
+  async function leaveRadio(next) {
+    if (radioLeaving) return;
+    if (state.floorToken && !window.confirm(t("radioLeaveConfirm"))) return;
+    if (window.GroupV3TranslationController) window.GroupV3TranslationController.stopPlayback();
+    radioLeaving = true;
+    ++radioGeneration;
+    var base = state.radioSession && radioBase();
     try {
+      if (state.floorToken) await stopRadio();
+      await window.GroupV3RadioRecording.stop(true);
+      if (base) await radioRequest(base + "/leave", { method: "POST" });
       await disconnectMedia(false);
-      await api(radioBase() + "/leave", { method: "POST" });
+    } catch (_error) { notify(t("radioExitOffline")); }
+    finally {
+      window.clearInterval(heartbeatTimer);
+      window.clearInterval(radioClock);
+      state.floorToken = "";
       state.radioSession = null;
       state.radioFloor = null;
-      notify(t("leaveComplete"));
-      render();
-    } catch (error) {
-      notify(publicError(error));
+      state.burst = null;
+      state.radioPreparing = state.radioStopping = state.deviceLost = false;
+      radioLeaving = false;
+      updateSurface(typeof next === "string" ? next : "chat");
     }
   }
 
   async function handleAction(name, button) {
     if (name === "surface") return updateSurface(button.dataset.surface);
+    if (name === "rooms-collapse") { state.roomsCollapsed = !state.roomsCollapsed; render(); return; }
+    if (name === "radio-members") { state.radioMembersOpen = !state.radioMembersOpen; render(); return; }
+    if (name === "radio-rooms") { state.radioRoomsOpen = !state.radioRoomsOpen; render(); return; }
+    if (name === "media-rooms") { state.mediaRoomsOpen = !state.mediaRoomsOpen; render(); return; }
+    if (name === "settings-collapse") { state.settingsCollapsed = !state.settingsCollapsed; render(); return; }
+    if (name === "history-tab") {
+      state.historyTab = button.dataset.tab;
+      window.history.replaceState({}, "", "/group/chat-translation?tab=" + encodeURIComponent(state.historyTab));
+      await Promise.all([loadArchive(), loadRadioHistory()]); render(); return;
+    }
+    if (name === "history-more") {
+      if (state.surface === "radio" || state.historyTab === "radio") await loadRadioHistory(true);
+      else if (state.historyTab !== "chat") await loadArchive(true);
+      render(); return;
+    }
+    if (name === "history-translate") return translateHistoricalSegment(button);
     if (name === "select-space") return selectSpace(button.dataset.id);
     if (name === "show-create-space") {
       state.creatingSpace = true;
@@ -1434,7 +2240,15 @@
     if (name === "refresh") return refreshAll();
     if (name === "members") {
       state.memberManagerOpen = true;
+      state.settingsOpen = false;
       await loadMembershipManagement();
+      render();
+      return;
+    }
+    if (name === "settings") {
+      state.settingsOpen = true;
+      state.memberManagerOpen = false;
+      await loadSpace();
       render();
       return;
     }
@@ -1443,12 +2257,26 @@
       render();
       return;
     }
+    if (name === "close-settings") {
+      state.settingsOpen = false;
+      render();
+      return;
+    }
+    if (name === "more-media") {
+      state.moreMediaOpen = !state.moreMediaOpen;
+      var menu = root.querySelector("[data-more-menu]");
+      if (menu) menu.hidden = !state.moreMediaOpen;
+      else render();
+      return;
+    }
     if (name === "invite-contact") return inviteContact(button);
     if (name === "cancel-invitation") return cancelInvitation(button);
     if (name === "accept-invitation") return decideInvitation(button, true);
     if (name === "reject-invitation") return decideInvitation(button, false);
     if (name === "toggle-member-role") return updateMember(button, { role: button.dataset.role });
     if (name === "remove-member") return updateMember(button, { status: "removed" });
+    if (name === "transfer-ownership") return transferOwnership(button);
+    if (name === "delete-group") return deleteGroup();
     if (name === "plugin") return updateSurface("chat-translation");
     if (name === "pin-message") return pinMessage(button);
     if (name === "toggle-auto-translate") {
@@ -1462,6 +2290,42 @@
       return saveProfile();
     }
     if (name === "toggle-consent") return toggleConsent();
+    if (name === "test-microphone") return testCommunicationMicrophone();
+    if (name === "test-device-voice") return testCommunicationVoice();
+    if (name === "open-attachment") {
+      state.attachmentViewer = {
+        src: button.dataset.src || "",
+        download: button.dataset.download || button.dataset.src || "",
+        name: button.dataset.name || t("attach"),
+        mime: button.dataset.mime || "application/octet-stream"
+      };
+      render();
+      return;
+    }
+    if (name === "close-attachment") {
+      state.attachmentViewer = null;
+      render();
+      return;
+    }
+    if (name === "prepare-prejoin" || name === "retry-prejoin") return preparePrejoin();
+    if (name === "confirm-prejoin") return confirmPrejoin();
+    if (name === "cancel-prejoin") {
+      closePrejoin(true);
+      render();
+      return;
+    }
+    if (name === "toggle-prejoin-mic") {
+      state.prejoinAudioEnabled = !state.prejoinAudioEnabled;
+      if (localStream) localStream.getAudioTracks().forEach(function (track) { track.enabled = state.prejoinAudioEnabled; });
+      render();
+      return;
+    }
+    if (name === "toggle-prejoin-video") {
+      state.prejoinVideoEnabled = !state.prejoinVideoEnabled;
+      if (localStream) localStream.getVideoTracks().forEach(function (track) { track.enabled = state.prejoinVideoEnabled; });
+      render();
+      return;
+    }
     if (["join-media", "reject-media", "leave-media", "end-media", "connect-media"].indexOf(name) >= 0) return mediaAction(name);
     if (name === "toggle-mic") {
       state.micEnabled = !state.micEnabled;
@@ -1481,6 +2345,11 @@
     if (name === "stop-radio") return stopRadio();
     if (name === "leave-radio") return leaveRadio();
     if (name === "reconnect-radio") return reconnectRadio();
+    if (name === "enable-room-audio") {
+      return resumeRoomAudio().then(function (ready) {
+        if (ready) notify(t("roomAudioReady"));
+      }).catch(function () { notify(t("roomAudioBlocked")); });
+    }
   }
 
   async function handleForm(form) {
@@ -1489,6 +2358,7 @@
     if (form.dataset.form === "create-media") return createMedia(form);
     if (form.dataset.form === "create-radio") return createRadio(form);
     if (form.dataset.form === "save-profile") return saveProfile(form);
+    if (form.dataset.form === "save-group-settings") return saveGroupSettings(form);
   }
 
   async function handleChange(control) {
@@ -1505,6 +2375,45 @@
       return;
     }
     if (control.dataset.change === "attachment") return uploadAttachment(control.files && control.files[0]);
+    if (control.dataset.change === "prejoin-audio-device") {
+      state.prejoinAudioDeviceId = control.value;
+      if (window.GroupV3DeviceManager && window.GroupV3DeviceManager.remember) window.GroupV3DeviceManager.remember("audioInput", control.value);
+      return preparePrejoin();
+    }
+    if (control.dataset.change === "prejoin-video-device") {
+      state.prejoinVideoDeviceId = control.value;
+      if (window.GroupV3DeviceManager && window.GroupV3DeviceManager.remember) window.GroupV3DeviceManager.remember("videoInput", control.value);
+      return preparePrejoin();
+    }
+    if (control.dataset.change === "prejoin-output-device") {
+      state.prejoinOutputDeviceId = control.value;
+      if (window.GroupV3DeviceManager && window.GroupV3DeviceManager.remember) window.GroupV3DeviceManager.remember("audioOutput", control.value);
+      var outputs = root.querySelectorAll("[data-group-v3-media], [data-prejoin-video]");
+      return Promise.all(Array.from(outputs).map(function (element) {
+        return window.GroupV3DeviceManager && window.GroupV3DeviceManager.setOutput(element, control.value);
+      }));
+    }
+    if (control.dataset.change === "device-pref-audio") {
+      state.prejoinAudioDeviceId = control.value;
+      if (window.GroupV3DeviceManager) window.GroupV3DeviceManager.remember("audioInput", control.value);
+      state.deviceSettingsStatus = "devicePreferencesSaved";
+      render();
+      return;
+    }
+    if (control.dataset.change === "device-pref-video") {
+      state.prejoinVideoDeviceId = control.value;
+      if (window.GroupV3DeviceManager) window.GroupV3DeviceManager.remember("videoInput", control.value);
+      state.deviceSettingsStatus = "devicePreferencesSaved";
+      render();
+      return;
+    }
+    if (control.dataset.change === "device-pref-output") {
+      state.prejoinOutputDeviceId = control.value;
+      if (window.GroupV3DeviceManager) window.GroupV3DeviceManager.remember("audioOutput", control.value);
+      state.deviceSettingsStatus = "devicePreferencesSaved";
+      render();
+      return;
+    }
   }
 
   var disconnecting = false;
@@ -1512,46 +2421,12 @@
 
   function attachTrack(track, participantIdentity) {
     if (!track || state.deviceLost && state.surface === "radio") return;
-    var kind = String(track.kind || "");
-    var element = track.attach ? track.attach() : null;
-    if (!element) return;
-    element.autoplay = true;
-    element.playsInline = true;
-    element.dataset.groupV3Media = "true";
-    if (kind === "video") {
-      var tile = root.querySelector('[data-video-identity="' + CSS.escape(String(participantIdentity || "")) + '"]');
-      if (!tile) tile = root.querySelector(".video-tile");
-      if (tile) {
-        element.className = "remote-media";
-        tile.appendChild(element);
-      }
-    } else {
-      var host = root.querySelector("[data-audio-host]");
-      if (host) host.appendChild(element);
-      var mediaTrack = track.mediaStreamTrack || track;
-      if (state.profile && state.profile.auto_translate_enabled && state.consent && state.consent.status === "granted") {
-        window.dispatchEvent(new CustomEvent("group-v3:remote-audio", {
-          detail: {
-            track: mediaTrack,
-            participant_identity: String(participantIdentity || "")
-          }
-        }));
-      }
-    }
+    window.GroupMediaPresentation.remote(track, participantIdentity);
   }
 
   function syncMediaElements() {
     if (localStream && state.surface === "video") {
-      var tile = root.querySelector('[data-video-identity="' + CSS.escape(currentGrantIdentity) + '"]') || root.querySelector(".video-tile");
-      if (tile) {
-        var video = document.createElement("video");
-        video.className = "local-media";
-        video.autoplay = true;
-        video.playsInline = true;
-        video.muted = true;
-        video.srcObject = localStream;
-        tile.appendChild(video);
-      }
+      window.GroupMediaPresentation.local(localStream, currentGrantIdentity);
     }
     if (!mediaRoom) return;
     mediaRoom.remoteParticipants.forEach(function (participant) {
@@ -1561,12 +2436,83 @@
     });
   }
 
-  async function connectWithGrant(grant, publish) {
+  function setAudioPlaybackBlocked(blocked) {
+    blocked = Boolean(blocked);
+    if (state.audioPlaybackBlocked === blocked) return;
+    state.audioPlaybackBlocked = blocked;
+    render();
+  }
+
+  function resumeRoomAudio() {
+    var room = mediaRoom;
+    var attempts = [];
+    try {
+      if (room && typeof room.startAudio === "function") {
+        // LiveKit requires startAudio() itself to run in the click/tap stack.
+        attempts.push(Promise.resolve(room.startAudio()).then(function () { return true; }));
+      }
+      if (window.GroupMediaPresentation && window.GroupMediaPresentation.resumeAudio) {
+        attempts.push(Promise.resolve(window.GroupMediaPresentation.resumeAudio()));
+      }
+    } catch (error) {
+      setAudioPlaybackBlocked(true);
+      return Promise.reject(error);
+    }
+    return Promise.all(attempts).then(function (results) {
+      var ready = results.every(function (value) { return value !== false; });
+      if (room === mediaRoom) setAudioPlaybackBlocked(!ready);
+      return ready;
+    }).catch(function (error) {
+      if (room === mediaRoom) setAudioPlaybackBlocked(true);
+      throw error;
+    });
+  }
+
+  function clearMediaReconnect() {
+    window.clearTimeout(mediaReconnectTimer);
+    mediaReconnectTimer = 0;
+    mediaReconnectGeneration += 1;
+    state.mediaReconnectAttempts = 0;
+    if (state.mediaReconnectState === "reconnecting") state.mediaReconnectState = "idle";
+  }
+
+  function scheduleMediaReconnect() {
+    if (state.surface === "radio" || !state.mediaSession || state.mediaConnected || state.deviceLost || mediaReconnectTimer) return;
+    if (state.mediaReconnectAttempts >= 3) {
+      if (state.mediaReconnectState !== "reconnecting") state.mediaReconnectState = "failed";
+      state.error = t("mediaReconnectFailed");
+      render();
+      return;
+    }
+    var generation = mediaReconnectGeneration;
+    var attempt = state.mediaReconnectAttempts;
+    var delay = Math.min(4000, 750 * Math.pow(2, attempt));
+    state.mediaReconnectAttempts += 1;
+    state.mediaReconnectState = "reconnecting";
+    mediaReconnectTimer = window.setTimeout(function () {
+      mediaReconnectTimer = 0;
+      if (generation !== mediaReconnectGeneration || !state.mediaSession || state.mediaConnected || state.deviceLost) return;
+      connectMedia().then(function () {
+        state.mediaReconnectAttempts = 0;
+        state.mediaReconnectState = "idle";
+      }).catch(function () {
+        scheduleMediaReconnect();
+      });
+    }, delay);
+    render();
+  }
+
+  async function connectWithGrant(grant, publish, options) {
+    options = options || {};
     var library = window.LivekitClient;
     if (!library || !library.Room || !grant || grant.provider !== "livekit-cloud" || !grant.url || !grant.token) {
       throw new Error("group_media_client_unavailable");
     }
-    await disconnectMedia(false);
+    await disconnectMedia(false, {
+      preserveStream: Boolean(options.preserveStream && localStream),
+      keepReconnect: state.mediaReconnectState === "reconnecting"
+    });
+    var generation = mediaGeneration;
     disconnecting = false;
     currentGrantIdentity = String(grant.participant_identity || "");
     var room = new library.Room({
@@ -1580,75 +2526,215 @@
       attachTrack(track, participant && participant.identity);
     });
     room.on(library.RoomEvent.TrackUnsubscribed, function (track) {
-      if (track && track.detach) track.detach().forEach(function (element) { element.remove(); });
+      window.GroupMediaPresentation.unsubscribe(track);
     });
+    if (library.RoomEvent.AudioPlaybackStatusChanged) {
+      room.on(library.RoomEvent.AudioPlaybackStatusChanged, function () {
+        if (room !== mediaRoom || generation !== mediaGeneration) return;
+        setAudioPlaybackBlocked(room.canPlaybackAudio === false);
+      });
+    }
+    [library.RoomEvent.TrackMuted, library.RoomEvent.TrackUnmuted].filter(Boolean).forEach(function (eventName) {
+      room.on(eventName, function () { if (room === mediaRoom) syncMediaElements(); });
+    });
+    var activeSpeakerEvent = library.RoomEvent.ActiveSpeakersChanged || library.RoomEvent.ActiveSpeakerChanged;
+    if (activeSpeakerEvent) {
+      room.on(activeSpeakerEvent, function (speakers) {
+        if (room !== mediaRoom || generation !== mediaGeneration || !window.GroupV3VideoLayout) return;
+        var first = Array.isArray(speakers) ? speakers[0] : speakers;
+        window.GroupV3VideoLayout.setActiveSpeaker(first && (first.identity || first.sid || first.livekit_identity) || "");
+      });
+    }
+    if (library.RoomEvent.Reconnecting) {
+      room.on(library.RoomEvent.Reconnecting, function () {
+        if (room !== mediaRoom || generation !== mediaGeneration) return;
+        state.mediaConnected = false;
+        state.mediaReconnectState = "reconnecting";
+        render();
+        if (state.surface !== "radio") {
+          updateMediaConnectionState("reconnecting").catch(function () {});
+          scheduleMediaReconnect();
+        }
+      });
+    }
+    if (library.RoomEvent.Reconnected) {
+      room.on(library.RoomEvent.Reconnected, function () {
+        if (room !== mediaRoom || generation !== mediaGeneration) return;
+        state.mediaConnected = true;
+        clearMediaReconnect();
+        state.mediaReconnectState = "idle";
+        render();
+        if (state.surface !== "radio") {
+          updateMediaConnectionState("connected").catch(function () {});
+        }
+      });
+    }
     room.on(library.RoomEvent.Disconnected, function () {
       if (room !== mediaRoom || disconnecting) return;
       state.mediaConnected = false;
+      clearMediaReconnect();
       if (state.surface === "radio") radioDeviceLost();
       else {
-        state.error = t("mediaUnavailable");
-        render();
-      }
-    });
-    await room.connect(grant.url, grant.token);
-    if (publish) {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("group_media_unavailable");
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: grant.media_kind === "video" ? { facingMode: "user" } : false
-      });
-      for (var mediaTrack of localStream.getTracks()) {
-        mediaTrack.addEventListener("ended", function () {
-          if (state.surface === "radio" && state.floorToken) radioDeviceLost();
-        }, { once: true });
-        await room.localParticipant.publishTrack(mediaTrack, {
-          source: mediaTrack.kind === "video" ? library.Track.Source.Camera : library.Track.Source.Microphone
+        updateMediaConnectionState("failed", "provider_disconnected").catch(function () {}).finally(function () {
+          disconnectMedia(false).catch(function () {});
+          state.error = t("mediaUnavailable");
+          render();
         });
       }
-    }
-    state.mediaConnected = true;
-    state.micEnabled = true;
-    state.videoEnabled = true;
-    render();
-    syncMediaElements();
-    if (state.surface === "radio" && publish && localStream) {
-      var audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        window.dispatchEvent(new CustomEvent("group-v3:local-radio-audio", {
-          detail: { track: audioTrack, burst_id: state.burst && state.burst.id || "" }
-        }));
+    });
+    try {
+      if (publish) {
+        if (!localStream) {
+          if (!window.GroupV3DeviceManager) throw new Error("group_media_client_unavailable");
+          localStream = await window.GroupV3DeviceManager.acquire({
+            mediaKind: grant.media_kind,
+            audioEnabled: state.micEnabled,
+            videoEnabled: state.videoEnabled,
+            audioDeviceId: state.prejoinAudioDeviceId,
+            videoDeviceId: state.prejoinVideoDeviceId
+          });
+        }
+        if (generation !== mediaGeneration) throw new Error("group_media_stale_attempt");
       }
+      await room.connect(grant.url, grant.token);
+      if (generation !== mediaGeneration) throw new Error("group_media_stale_attempt");
+      if (room.canPlaybackAudio === false) setAudioPlaybackBlocked(true);
+      if (publish && localStream) {
+        for (var mediaTrack of localStream.getTracks()) {
+          mediaTrack.addEventListener("ended", function () {
+            if (state.surface === "radio" && state.floorToken) radioDeviceLost();
+            else if (state.surface !== "radio" && mediaRoom === room && !disconnecting) {
+              state.deviceLost = true;
+              state.prejoinConfirmed = false;
+              state.error = t("deviceLost");
+              clearMediaReconnect();
+              disconnectMedia(false).catch(function () {});
+              render();
+            }
+          }, { once: true });
+          await room.localParticipant.publishTrack(mediaTrack, {
+            source: mediaTrack.kind === "video" ? library.Track.Source.Camera : library.Track.Source.Microphone
+          });
+          if (generation !== mediaGeneration) throw new Error("group_media_stale_attempt");
+        }
+      }
+      state.mediaConnected = true;
+      state.micEnabled = Boolean(localStream && localStream.getAudioTracks().some(function (track) { return track.enabled && track.readyState === "live"; }));
+      state.videoEnabled = Boolean(localStream && localStream.getVideoTracks().some(function (track) { return track.enabled && track.readyState === "live"; }));
+      render();
+      syncMediaElements();
+    } catch (error) {
+      if (generation === mediaGeneration && mediaRoom === room) {
+        await disconnectMedia(false, { keepReconnect: state.mediaReconnectState === "reconnecting" });
+      }
+      else if (localStream && generation !== mediaGeneration) {
+        localStream.getTracks().forEach(function (track) { track.stop(); });
+      }
+      throw error;
     }
+  }
+
+  async function updateMediaConnectionState(status, failureCode, context) {
+    context = context || mediaContext();
+    if (!context.sessionId || context.surface === "radio") return null;
+    var path = "/api/group/spaces/" + encodeURIComponent(context.spaceId) + "/sessions/" +
+      encodeURIComponent(context.sessionId) + "/connection-state";
+    var payload = await api(path, json("POST", {
+      status: status,
+      failure_code: failureCode || ""
+    }));
+    if (payload.session && mediaContextCurrent(context)) {
+      markMediaMutation();
+      state.mediaSession = mergeMediaSessionSnapshot(payload.session, state.mediaSession);
+    }
+    return payload.session || null;
   }
 
   async function connectMedia() {
-    if (!state.mediaSession || state.mediaSession.status !== "active") {
+    if (mediaConnectTask) return mediaConnectTask;
+    var task = connectMediaOnce();
+    mediaConnectTask = task;
+    try { return await task; }
+    finally { if (mediaConnectTask === task) mediaConnectTask = null; }
+  }
+
+  async function connectMediaOnce() {
+    if (!state.mediaSession) {
       notify(t("mediaPolicy"));
       return;
     }
-    var path = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions/" +
-      encodeURIComponent(state.mediaSession.id) + "/media-grant";
-    var payload = await api(path, { method: "POST" });
-    await connectWithGrant(payload.grant, true);
+    var participant = selfParticipant(state.mediaSession);
+    if (!participant || participant.invite_status !== "joined") {
+      notify(t("mediaPolicy"));
+      return;
+    }
+    if (state.mediaSession.status !== "active" && state.mediaSession.status !== "ringing") {
+      notify(t("mediaPolicy"));
+      return;
+    }
+    if (state.deviceLost) {
+      state.deviceLost = false;
+      state.mediaReconnectState = "idle";
+      state.prejoinConfirmed = false;
+      await openPrejoin(state.mediaSession.media_kind);
+      return;
+    }
+    if (!state.prejoinConfirmed && !localStream) {
+      await openPrejoin(state.mediaSession.media_kind);
+      return;
+    }
+    var context = mediaContext();
+    markMediaMutation();
+    var path = "/api/group/spaces/" + encodeURIComponent(context.spaceId) + "/sessions/" +
+      encodeURIComponent(context.sessionId) + "/media-grant";
+    await updateMediaConnectionState("connecting", "", context);
+    try {
+      if (!mediaContextCurrent(context)) throw new Error("group_media_stale_attempt");
+      var payload = await api(path, { method: "POST" });
+      if (!mediaContextCurrent(context)) throw new Error("group_media_stale_attempt");
+      await connectWithGrant(payload.grant, true, { preserveStream: Boolean(localStream) });
+      if (!mediaContextCurrent(context)) {
+        await disconnectMedia(false);
+        throw new Error("group_media_stale_attempt");
+      }
+      await updateMediaConnectionState("connected", "", context);
+      clearMediaReconnect();
+      state.mediaReconnectState = "idle";
+      render();
+    } catch (error) {
+      state.mediaReconnectState = "failed";
+      if (mediaContextCurrent(context)) {
+        await updateMediaConnectionState("failed", String(error && error.message || "media_connect_failed").slice(0, 80), context).catch(function () {});
+      }
+      throw error;
+    }
   }
 
-  async function connectRadio(mode) {
+  async function connectRadio(mode, generation) {
     if (!state.radioSession) return;
     var body = { mode: mode, floor_token: mode === "talk" ? state.floorToken : "" };
-    var payload = await api(radioBase() + "/media-grant", json("POST", body));
-    await connectWithGrant(payload.grant, mode === "talk");
+    var payload = await radioRequest(radioBase() + "/media-grant", json("POST", body));
+    if (generation !== undefined && generation !== radioGeneration) return;
+    await connectWithGrant(payload.grant, mode === "talk", { preserveStream: mode === "talk" });
   }
 
-  async function disconnectMedia(emitEvent) {
+  async function disconnectMedia(emitEvent, options) {
+    options = options || {};
+    if (!options.keepReconnect) clearMediaReconnect();
+    mediaGeneration += 1;
     disconnecting = true;
     var room = mediaRoom;
     mediaRoom = null;
     var stream = localStream;
-    localStream = null;
+    if (!options.preserveStream) localStream = null;
     state.mediaConnected = false;
+    state.audioPlaybackBlocked = false;
     currentGrantIdentity = "";
-    if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
+    window.GroupMediaPresentation.clear();
+    if (stream && !options.preserveStream) {
+      if (window.GroupV3DeviceManager) window.GroupV3DeviceManager.stop();
+      else stream.getTracks().forEach(function (track) { track.stop(); });
+    }
     root.querySelectorAll("[data-group-v3-media], .local-media, .remote-media").forEach(function (element) {
       try {
         element.pause();
@@ -1664,27 +2750,6 @@
     } catch (_error) {}
     if (emitEvent !== false) window.dispatchEvent(new CustomEvent("group-v3:media-disconnected"));
     disconnecting = false;
-  }
-
-  async function processTtsJobs() {
-    if (!state.space || !state.profile || !state.profile.auto_read_enabled || state.deviceLost) return;
-    if (!window.GroupV3SafeAudio || typeof window.GroupV3SafeAudio.playTtsJob !== "function") return;
-    try {
-      var claim = await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/translation/tts-jobs/claim", { method: "POST" });
-      if (!claim.job) return;
-      var visible = state.translations.some(function (item) { return item.id === claim.job.final_visible_event_id; });
-      if (!visible) {
-        var history = await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/translation/history?limit=50");
-        state.translations = history.events || [];
-        render();
-      }
-      var status = await window.GroupV3SafeAudio.playTtsJob(claim.job);
-      await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/translation/tts-jobs/" +
-        encodeURIComponent(claim.job.id) + "/ack", json("POST", {
-          status: status === "completed" ? "completed" : status === "suppressed" ? "suppressed" : "failed",
-          failure_code: status === "completed" ? "" : String(status || "safe_audio_unavailable").slice(0, 80)
-        }));
-    } catch (_error) {}
   }
 
   window.addEventListener("group:handoff-ready", function () {
@@ -1710,7 +2775,7 @@
     refreshAll();
   });
 
-  var mediaQuery = window.matchMedia("(max-width: 640px)");
+  var mediaQuery = window.matchMedia("(max-width: 640px), (pointer: coarse) and (max-height: 500px) and (max-width: 960px)");
   if (mediaQuery.addEventListener) {
     mediaQuery.addEventListener("change", function (event) {
       state.mobile = event.matches;
@@ -1721,15 +2786,59 @@
   root.addEventListener("click", function (event) {
     var button = event.target.closest("[data-action]");
     if (!button || button.disabled) return;
+    if (window.GroupV3IncomingRingtone) window.GroupV3IncomingRingtone.arm();
+    if (window.GroupV3Ringback) window.GroupV3Ringback.arm();
     if (button.classList.contains("member-manager-backdrop") && event.target.closest("[data-member-manager]")) return;
+    if (button.classList.contains("attachment-viewer-backdrop") && event.target.closest(".attachment-viewer")) return;
     handleAction(button.dataset.action, button);
   });
 
+  window.addEventListener("group-v3:audio-playback-blocked", function () {
+    setAudioPlaybackBlocked(true);
+  });
+  window.addEventListener("group-v3:audio-playback-ready", function () {
+    setAudioPlaybackBlocked(false);
+  });
+
+  root.addEventListener("pointerdown", function (event) {
+    if (window.GroupV3TtsManager && window.GroupV3TtsManager.unlock) window.GroupV3TtsManager.unlock();
+    if (event.target.closest && event.target.closest('[data-action="enable-room-audio"]')) return;
+    if (mediaRoom && state.audioPlaybackBlocked) {
+      resumeRoomAudio().catch(function () {});
+    }
+    else if (window.GroupMediaPresentation && window.GroupMediaPresentation.resumeAudio) window.GroupMediaPresentation.resumeAudio();
+  }, { passive: true });
+
   root.addEventListener("input", function (event) {
+    var memberSearch = event.target.closest("[data-media-member-search]");
+    if (memberSearch) {
+      var query = String(event.target.value || "").trim().toLocaleLowerCase();
+      var visible = 0;
+      root.querySelectorAll("[data-media-member]").forEach(function (member) {
+        var haystack = String(member.dataset.memberName || member.textContent || "").toLocaleLowerCase();
+        var matches = !query || haystack.indexOf(query) >= 0;
+        member.hidden = !matches;
+        if (matches) visible += 1;
+      });
+      var empty = root.querySelector("[data-media-no-results]");
+      if (empty) empty.hidden = visible > 0;
+      return;
+    }
     if (isTextEntry(event.target)) resizeTextEntry(event.target);
   });
 
   root.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && state.attachmentViewer) {
+      state.attachmentViewer = null;
+      render();
+      return;
+    }
+    if (event.key === "Escape" && (state.settingsOpen || state.memberManagerOpen)) {
+      state.settingsOpen = false;
+      state.memberManagerOpen = false;
+      render();
+      return;
+    }
     var editor = event.target;
     if (!editor || editor.tagName !== "TEXTAREA" || !editor.matches("[data-group-text-entry]")) return;
     if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
@@ -1754,12 +2863,28 @@
 
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
     navigator.mediaDevices.addEventListener("devicechange", function () {
-      if (state.surface === "radio" && state.radioSession) radioDeviceLost();
+      if (state.prejoinOpen) {
+        if (window.GroupV3DeviceManager) window.GroupV3DeviceManager.enumerate().then(function (devices) {
+          state.prejoinDevices = devices;
+          render();
+        }).catch(function () {});
+      } else if (state.surface === "chat-translation") {
+        loadCommunicationDevices().then(render).catch(function () {});
+      } else if (state.surface === "radio" && state.radioSession) radioDeviceLost();
+      else if (state.mediaSession && state.mediaConnected) {
+        state.deviceLost = true;
+        state.error = t("deviceLost");
+        render();
+      }
     });
   }
 
-  window.addEventListener("pagehide", function () {
+  function cleanupOnExit() {
+    if (lifecycleCleanupStarted) return;
+    lifecycleCleanupStarted = true;
     window.clearInterval(heartbeatTimer);
+    window.clearTimeout(archiveConvergence.timer);
+    window.clearTimeout(radioConvergence.timer);
     closeGroupEvents();
     if (state.floorToken && state.radioSession && state.space) {
       window.fetch(radioBase() + "/floor/device-lost", {
@@ -1770,8 +2895,13 @@
         body: JSON.stringify({ floor_token: state.floorToken })
       }).catch(function () {});
     }
+    window.GroupV3RadioRecording.stop(true);
+    closePrejoin(false);
     disconnectMedia(false);
-  });
+  }
+
+  window.addEventListener("pagehide", cleanupOnExit);
+  window.addEventListener("beforeunload", cleanupOnExit);
 
   window.GroupV3Runtime = Object.freeze({
     snapshot: function () {
@@ -1779,8 +2909,9 @@
         space_id: state.space && state.space.id || "",
         runtime_kind: state.surface === "video" ? "video" : state.surface === "radio" ? "radio" : "call",
         runtime_id: state.surface === "radio"
-          ? state.burst && state.burst.id || ""
+          ? state.radioSession && state.radioSession.id || ""
           : state.mediaSession && state.mediaSession.id || "",
+        locale: state.locale,
         spoken_language: state.profile && state.profile.spoken_language || state.locale,
         target_language: state.profile && state.profile.preferred_output_language || "",
         auto_translate: Boolean(state.profile && state.profile.auto_translate_enabled),
@@ -1800,14 +2931,23 @@
         burst_id: state.burst && state.burst.id || "",
         radio_target_languages: state.burst && state.burst.target_languages || [],
         device_lost: state.deviceLost
+        ,media_connected: state.mediaConnected
       };
+    },
+    getLocalAudioTrack: function () {
+      if (!localStream) return null;
+      return localStream.getAudioTracks()[0] || null;
+    },
+    updateProfile: function (profile) {
+      if (!profile || typeof profile !== "object") return null;
+      state.profile = Object.assign({}, state.profile || {}, profile);
+      window.dispatchEvent(new CustomEvent("group-v3:profile-updated", { detail: state.profile }));
+      return Object.assign({}, state.profile);
     },
     translationFinal: async function () {
       if (!state.space) return;
-      var payload = await optional("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/translation/history?limit=50", { events: [] });
-      state.translations = payload.events || [];
+      await loadArchive();
       render();
-      if (state.profile && state.profile.auto_read_enabled) processTtsJobs();
     }
   });
 

@@ -104,6 +104,8 @@
       standalone: standalone
     };
 
+    window.dispatchEvent(new CustomEvent("group-v3:viewport", { detail: lastSnapshot }));
+
     if (keyboardOpen && activeEditor && scrollPinned) {
       window.requestAnimationFrame(function () {
         var scroll = root.querySelector(".thread-scroll");
@@ -114,7 +116,8 @@
 
   function syncVisualViewport() {
     if (viewportFrame) window.cancelAnimationFrame(viewportFrame);
-    viewportFrame = window.requestAnimationFrame(applyVisualViewport);
+    viewportFrame = 0;
+    applyVisualViewport();
   }
 
   function restoreClosedKeyboardLayout() {
@@ -128,12 +131,8 @@
   function scheduleRestore() {
     if (!isStandalone()) return;
     if (restoreFrame) window.cancelAnimationFrame(restoreFrame);
-    restoreFrame = window.requestAnimationFrame(function () {
-      restoreFrame = window.requestAnimationFrame(function () {
-        restoreFrame = 0;
-        restoreClosedKeyboardLayout();
-      });
-    });
+    restoreFrame = 0;
+    restoreClosedKeyboardLayout();
   }
 
   function handleFocusIn(event) {

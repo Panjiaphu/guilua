@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.group_v3.auth import require_group_actor, require_write_origin
 from app.group_v3.radio_schemas import RadioFloorAcquire, RadioFloorToken, RadioMediaGrant, RadioSessionCreate
 from app.group_v3.service import GroupServiceError
+from app.group_v3.voice_input import read_voice_form
 
 
 router = APIRouter(prefix="/api/group", tags=["group-v3-radio"])
@@ -29,6 +30,16 @@ async def list_radio_sessions(request: Request, space_id: str, status: str | Non
         raise HTTPException(status_code=400, detail="invalid_radio_status")
     sessions = request.app.state.group_radio_service.list_sessions(actor, _id(space_id, "space_id"), status, limit)
     return _json({"sessions": sessions})
+
+
+@router.post("/spaces/{space_id}/radio/room/join")
+async def open_radio_room(request: Request, space_id: str) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.radio.use")
+    normalized = _id(space_id, "space_id")
+    session = request.app.state.group_radio_service.open_room(actor, normalized)
+    await request.app.state.group_event_broker.publish(normalized, "radio.participant_joined", resource_id=session["id"])
+    return _json({"session": session})
 
 
 @router.post("/spaces/{space_id}/radio/sessions")
@@ -79,10 +90,8 @@ async def leave_radio_session(request: Request, space_id: str, session_id: str) 
     actor = require_group_actor(request, "group.radio.use")
     normalized_space = _id(space_id, "space_id")
     normalized_session = _id(session_id, "session_id")
-    _session, participant = request.app.state.group_radio_service.floor_context(actor, normalized_space, normalized_session)
-    floor = await request.app.state.group_radio_floor.snapshot(normalized_session)
-    if floor and floor.get("participant_id") == participant["id"]:
-        raise HTTPException(status_code=409, detail="group_radio_stop_burst_before_leave")
+    member_id = request.app.state.group_radio_service.leave_context(actor, normalized_space, normalized_session)
+    await request.app.state.group_radio_floor.release_membership(normalized_session, member_id)
     session = request.app.state.group_radio_service.leave(actor, normalized_space, normalized_session)
     await request.app.state.group_event_broker.publish(normalized_space, "radio.participant_left", resource_id=normalized_session)
     return _json({"session": session, "ended_for_all": False})
@@ -198,3 +207,40 @@ async def radio_history(request: Request, space_id: str, session_id: str, limit:
     actor = require_group_actor(request, "group.radio.use")
     bursts = request.app.state.group_radio_service.history(actor, _id(space_id, "space_id"), _id(session_id, "session_id"), limit)
     return _json({"bursts": bursts})
+
+
+@router.get("/spaces/{space_id}/radio/history")
+async def radio_room_history(request: Request, space_id: str,
+                             limit: int = Query(default=50, ge=1, le=100),
+                             before_id: str | None = Query(default=None, max_length=36)) -> JSONResponse:
+    actor = require_group_actor(request, "group.radio.use")
+    result = request.app.state.group_radio_service.room_history(
+        actor, _id(space_id, "space_id"), request.app.state.group_translation_service, limit, before_id
+    )
+    return _json({"bursts": result})
+
+
+@router.post("/spaces/{space_id}/radio/sessions/{session_id}/bursts/{burst_id}/transcribe")
+async def transcribe_radio_burst(request: Request, space_id: str, session_id: str, burst_id: str) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.radio.use")
+    fields, audio, filename, content_type = await read_voice_form(request)
+    normalized_burst = _id(burst_id, "burst_id")
+    if request.headers.get("Idempotency-Key", normalized_burst) != normalized_burst:
+        raise HTTPException(400, "group_translation_idempotency_mismatch")
+    result = await request.app.state.group_translation_service.submit_radio_voice(
+        actor, _id(space_id, "space_id"), _id(session_id, "session_id"), normalized_burst,
+        fields, audio, filename, content_type,
+    )
+    return _json({"segment": result})
+
+
+@router.post("/spaces/{space_id}/radio/sessions/{session_id}/bursts/{burst_id}/discard")
+async def discard_radio_clip(request: Request, space_id: str, session_id: str, burst_id: str) -> JSONResponse:
+    require_write_origin(request)
+    actor = require_group_actor(request, "group.radio.use")
+    request.app.state.group_translation_service.discard_radio_clip(
+        actor, _id(space_id, "space_id"), _id(session_id, "session_id"), _id(burst_id, "burst_id")
+    )
+    await request.app.state.group_event_broker.publish(space_id, "radio.message_changed", resource_id=burst_id)
+    return _json({"discarded": True})
