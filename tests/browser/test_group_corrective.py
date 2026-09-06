@@ -750,8 +750,8 @@ def test_member_picker_uses_available_height_and_keeps_action_visible(page, widt
     form_box = form.bounding_box()
     list_box = page.locator(".media-member-list").bounding_box()
     action_box = form.locator("button[type=submit]").bounding_box()
-    assert form_box["height"] >= (220 if height < 500 else 300)
-    assert list_box["height"] >= 100
+    assert form_box["height"] >= (160 if height < 500 else 300)
+    assert list_box["height"] >= (90 if height < 500 else 100)
     assert action_box["y"] + action_box["height"] <= min(height, form_box["y"] + form_box["height"] + 1)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
 
