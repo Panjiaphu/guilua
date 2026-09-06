@@ -597,7 +597,7 @@ def test_autoread_start_timeout_is_retryable_and_manual_tts_is_deterministic(pag
     page.wait_for_function("__spoken.length === 2")
     assert page.evaluate("__spoken") == ["Retry me", "Retry me"]
     assert page.evaluate("__manualWasSynchronous") is True
-    page.evaluate("speechSynthesis.speak=utterance=>{queueMicrotask(()=>utterance.onerror?.({error:'not-allowed'}));}")
+    page.evaluate("speechSynthesis.speak=utterance=>{const fail=utterance&&utterance.onerror;queueMicrotask(()=>fail?.({error:'not-allowed'}));}")
     page.locator("[data-segment-id=retryable-final] [data-v2-play]").click()
     expect(page.locator("[data-v2-error]")).to_have_attribute("data-error-category", "TTS_ERROR")
 
@@ -638,7 +638,7 @@ def test_processing_history_converges_and_sse_open_reconciles(page):
     expect(page.locator("[data-segment-id=eventual-final]")).to_contain_text("Converged")
     before = calls["history"]
     page.evaluate("__eventSources[0].emit('open')")
-    page.wait_for_function("value => window.GroupV3TranslationController && document.querySelector('[data-segment-id=eventual-final]')", before)
+    page.wait_for_function("() => window.GroupV3TranslationController && document.querySelector('[data-segment-id=eventual-final]')")
     page.wait_for_timeout(250)
     assert calls["history"] > before
 
@@ -718,7 +718,7 @@ def test_archive_manual_tts_failure_is_visible_instead_of_silent(page):
       queueMicrotask(()=>u.onerror?.({error:'not-allowed'}));};}""")
     page.locator("[data-translation-archive] [data-v2-play]").click()
     expect(page.locator("[data-toast]")).to_have_class("toast is-visible")
-    expect(page.locator("[data-toast]")).to_contain_text("giọng đọc")
+    expect(page.locator("[data-toast]")).to_contain_text("phát giọng")
 
 
 def test_radio_final_remains_autoread_eligible_until_listen_media_connects(page):

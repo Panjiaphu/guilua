@@ -174,5 +174,15 @@ body.group-communication-immersive .native-mobile .video-panel-toolbar {
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
-  .media-start-empty .media-start-form { height: min(66dvh, 300px); min-height: 220px; }
+  .chat-content > .media-start-empty {
+    display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
+    gap: 6px; padding: 8px 12px; overflow: hidden;
+  }
+  .media-start-empty > span, .media-start-empty > p { display: none; }
+  .media-start-empty > h2 { flex: 0 0 auto; font-size: 18px; }
+  .media-start-empty .media-start-form {
+    flex: 1 1 auto; width: min(720px, 100%); height: auto; min-height: 0; max-height: 100%;
+    gap: 6px; padding: 8px;
+  }
+  .media-start-form .media-member-list { min-height: 100px; }
 }
