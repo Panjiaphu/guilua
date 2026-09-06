@@ -431,7 +431,7 @@ def test_multipart_clip_never_spools_to_disk_and_dedupes(tmp_path, monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_radio_failed_claim_is_terminal_and_invite_is_not_history_access(tmp_path):
+async def test_radio_failed_claim_is_terminal_and_space_history_is_visible_to_member(tmp_path):
     app, _, _, space, _ = _runtime(tmp_path, group_radio_v3_enabled=True)
     service, translation = app.state.group_radio_service, app.state.group_translation_service
     consent(app, space)
@@ -456,7 +456,8 @@ async def test_radio_failed_claim_is_terminal_and_invite_is_not_history_access(t
     assert provider.stt_calls == 1
     with pytest.raises(GroupServiceError, match="participant_required"):
         translation.v2_history(actor("99"), space, "radio", sid, 10)
-    assert service.room_history(actor("99"), space, translation) == []
+    guest_row = service.room_history(actor("99"), space, translation)[0]
+    assert guest_row["state"] == "failed" and guest_row["segment"] is None
     row = service.room_history(actor(), space, translation)[0]
     assert row["state"] == "failed" and row["segment"] is None
 
