@@ -6,7 +6,7 @@ This repository owns the native Group communication runtime defined by its curre
 
 For every normal product-engineering task, read in this order:
 
-1. `docs/engineering/CHATGPT_CODEX_PLANNER_EXECUTOR_STANDARD.md` — **v1.3.1, single canonical workflow**
+1. `docs/engineering/CHATGPT_CODEX_PLANNER_EXECUTOR_STANDARD.md` — **v1.3.2, single canonical workflow**
 2. `docs/engineering/LEGACY_WORKFLOW_BLOCKLIST.md`
 3. the exact current ownership/security/release documents named by the task spec
 4. `docs/qa/<TASK_ID>.md`
@@ -14,7 +14,7 @@ For every normal product-engineering task, read in this order:
 
 `docs/engineering/CODEX_OPERATING_STANDARD.md` is a legacy compatibility tombstone and must not be used as execution authority.
 
-Do not execute v1.1/v1.2/v1.3 workflow revisions, historical direct-main instructions, old model-score routing, or stale PR/conversation workflow instructions.
+Do not execute v1.1/v1.2/v1.3/v1.3.1 workflow revisions, historical direct-main instructions, old model-score routing, or stale PR/conversation workflow instructions when they conflict with v1.3.2.
 
 ## Canonical path
 
@@ -30,7 +30,9 @@ owner task / QA evidence
 -> NO QA between implementation phases
 -> freeze exact candidate commit
 -> ONE final local QA gate against exact candidate
--> push same tested candidate / update PR
+-> FINAL_LOCAL_QA=PASS
+-> RELEASE HANDOFF FAST PATH
+-> push exact tested candidate / update PR
 -> CANDIDATE_SHA == TESTED_COMMIT_SHA == REMOTE_PR_HEAD_SHA == DEPLOY_TEST_SHA
 -> report exact SHA and STOP
 -> owner manually deploys exact SHA
@@ -52,7 +54,8 @@ Never assume `main` is the correct starting point. Before planning or writing co
 - One task tree = one active write executor.
 - One file = one active write owner.
 - Planner owns analysis/spec; executor owns production implementation.
-- If executor quota changes, preserve branch/SHA/task lineage with a compact handoff instead of rediscovering the project.
+- If executor quota changes before final QA, preserve branch/SHA/task lineage with a compact handoff instead of rediscovering the project.
+- If quota changes after `FINAL_LOCAL_QA=PASS`, use `TASK_MODE=RELEASE_HANDOFF`; do not start another full engineering executor.
 
 ## Core ownership
 
@@ -67,6 +70,9 @@ Never assume `main` is the correct starting point. Before planning or writing co
 - Final QA must test that exact candidate tree.
 - Full repository QA is not automatic; match verification to task risk.
 - GitHub Actions are not an iterative edit/fail/edit loop.
+- After final QA PASS, release handoff is a mechanical Git step: verify exact HEAD/tracked tree, fetch, verify lineage, push exact candidate, verify PR head, report `DEPLOY_TEST_SHA`, STOP.
+- Untracked QA/browser artifacts do not block release handoff when tracked diff and index are clean.
+- Do not rerun QA solely because untracked QA artifacts exist.
 - Do not automatically deploy Render.
 - Do not merge main before owner QA PASS.
 - Never force-push or rewrite published history.
@@ -80,6 +86,25 @@ Use only task-relevant tools under least privilege. GitHub is normal for repo/PR
 
 Prefer current source, current SHA, current ownership contracts, task spec, relevant tests and concrete evidence. Do not load old conversations, historical PR narratives, archived workflow versions, or unrelated Timeblock Dev AI material into normal task execution.
 
+For `TASK_MODE=RELEASE_HANDOFF`, do not reload broad source/tests. Use only repository, branch, PR, candidate/tested SHA, expected remote head, and final-QA PASS state.
+
 ## Reporting
 
-Report base/start, PLAN, candidate, tested, PR-head, deploy, paired-repo and final-main SHA values as separate facts. Current v1.3.1 workflow is the only execution authority.
+Normal release handoff report is compact:
+
+```text
+STATUS=READY_FOR_OWNER_MANUAL_QA
+PR_NUMBER=
+BRANCH=
+CANDIDATE_SHA=
+TESTED_COMMIT_SHA=
+REMOTE_PR_HEAD_SHA=
+DEPLOY_TEST_SHA=
+TRACKED_WORKTREE_CLEAN=YES
+FINAL_LOCAL_QA=PASS
+RENDER_DEPLOYED=NO
+MAIN_MERGED=NO
+NEXT_ACTION=OWNER_DEPLOY_DEPLOY_TEST_SHA
+```
+
+Current v1.3.2 workflow is the only execution authority.
