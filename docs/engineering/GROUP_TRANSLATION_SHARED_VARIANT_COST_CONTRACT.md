@@ -1,61 +1,57 @@
-# Group Translation Shared Variant + Speaker-Funded Cost Contract v1.0
+# Group Translation Shared Variant Cost Contract v1.1
 
-Status: **OWNER-APPROVED PRODUCT ARCHITECTURE**
+Status: **OWNER-APPROVED PRODUCT ARCHITECTURE UPDATE**
 Decision date: **2026-09-06**
 Applies to: **Group Chat, Group Call, Group Video, Group Radio translation** in `Panjiaphu/AI-COMMUNICATION-Timeblock`.
 
-This contract defines translation reuse, history behavior, TTS behavior, and logical cost ownership. It must be preserved by Group translation work unless the owner explicitly replaces it with a newer contract.
+This v1.1 contract supersedes v1.0 only where Group Chat cost ownership and automatic translation policy are concerned. The approved Call/Video/Radio speaker-funded shared-variant model remains unchanged.
 
-## 1. Core architecture
+## 1. Core architecture shared by all Group translation
 
-Translation is shared by source unit and target language. It is **not** created separately for every recipient.
+Translation text is shared by source unit/version and target language. It is **not** created separately for every recipient.
 
 ```text
-SOURCE UNIT
+SOURCE UNIT / SOURCE VERSION
   -> authoritative source text
-  -> one target-language variant per required language
-  -> all authorized members with that target language reuse the same variant
+  -> at most one FINAL variant per target language
+  -> all authorized members needing that target language reuse the same variant
 ```
 
-Canonical cost/reuse rules:
+Global cost/reuse invariants:
 
 ```text
 COST_UNIT=NEW_UNIQUE_TRANSLATION_VARIANT
-COST_OWNER=SOURCE_AUTHOR_OR_SPEAKER
 SAME_LANGUAGE_TRANSLATION_COST=0
 EXISTING_VARIANT_REUSE_COST=0
 RECIPIENT_COUNT_MULTIPLIES_TRANSLATION_COST=NO
-HISTORY_REQUESTER_BECOMES_COST_OWNER=NO
+CONCURRENT_SAME_TARGET_PROVIDER_CALLS=1
 TTS_PROVIDER_TRANSLATION_COST=0
 AUDIO_PERSISTENCE=NONE
 ```
 
-A member who creates/speaks the source content is the logical cost owner for any new provider translation work generated from that source unit. A recipient may trigger a missing historical variant, but the recipient does not become the cost owner.
+Cost ownership differs by source mode:
 
-## 2. Example: five-member room
+```text
+CALL_VIDEO_RADIO_COST_OWNER=SOURCE_SPEAKER
+GROUP_CHAT_COST_OWNER=FIRST_REQUESTER_WHO_CAUSES_MISSING_SHARED_VARIANT_CREATION
+```
+
+## 2. Call / Video / Radio policy — speaker-funded
+
+For realtime voice media, the speaker who creates the source segment is the logical cost owner of any NEW provider translation variants created for that segment.
+
+Example:
 
 ```text
 A = vi
-B = zh-TW
-C = zh-TW
-D = en
-E = en
-```
+B,C = zh-TW
+D,E = en
 
-If A speaks Vietnamese:
+A speaks Vietnamese
+-> source A/vi = authoritative, no translation call
+-> A/zh-TW = create once; B,C reuse
+-> A/en = create once; D,E reuse
 
-```text
-source A/vi = authoritative source; no translation request
-A/zh-TW = create once; B and C reuse
-A/en = create once; D and E reuse
-```
-
-Required result:
-
-```text
-PARTICIPANTS=5
-UNIQUE_LANGUAGES=3
-SOURCE_LANGUAGE=vi
 MAX_NEW_PROVIDER_TRANSLATIONS=2
 COST_OWNER=A
 ```
@@ -63,93 +59,39 @@ COST_OWNER=A
 If B later speaks Traditional Chinese:
 
 ```text
-source B/zh-TW = no translation request
-B/vi = create once; A reuses
-B/en = create once; D and E reuse
+source B/zh-TW = no translation call
+B/vi = create once if required
+B/en = create once if required
 COST_OWNER=B
 ```
 
 The number of recipients must never multiply provider translation calls when recipients share a target language.
 
-## 3. Shared variant identity
+### 2.1 Cost-minimum media target eligibility
 
-### 3.1 Call / Video / Radio Translation V2
-
-For immutable V2 translation segments, the current semantic identity is:
+To minimize provider cost without removing realtime translation for members who actually enabled it, target-language discovery should be demand-aware:
 
 ```text
-(segment_id, target_language)
-```
-
-The current schema already enforces one `GroupTranslationVariant` per `segment_id + target_language`. Preserve that property.
-
-### 3.2 Group Chat
-
-For editable chat messages, the semantic identity is:
-
-```text
-(message_id, message_fingerprint, target_language)
-```
-
-`recipient_membership_id` must **not** be part of the shared translation-variant identity after the Group Chat migration.
-
-If a message is edited and its fingerprint changes, old variants are stale and must not be reused for the new message version.
-
-## 4. Concurrency / idempotency
-
-Two recipients requesting the same missing language variant concurrently must not create two provider translations.
-
-Required behavior:
-
-```text
-request #1: source X -> zh-TW
-request #2: source X -> zh-TW
-        |
-        v
-coalesce / lock / authoritative uniqueness
-        |
-        v
-ONE provider translation operation
-ONE stored FINAL variant
-both authorized clients reuse the same result
-```
-
-A database uniqueness constraint alone is insufficient if provider calls can occur before the conflict is detected. The implementation must prevent duplicate provider calls, not merely duplicate stored rows.
-
-Provider idempotency keys should be stable for the shared source-version + target language.
-
-## 5. Realtime translation policy
-
-For an eligible new realtime source unit:
-
-```text
-source language resolved
--> collect UNIQUE active target languages
+ACTIVE/JOINED PARTICIPANTS
+-> keep only participants who explicitly enabled/authorized translation for the current media session/profile
+-> collect UNIQUE preferred target languages
 -> remove source language
--> check existing variant for each target
--> create only missing unique variants
--> cost attribution remains with source author/speaker
--> recipients reuse matching finalized variant
+-> create only missing shared variants
 ```
 
-Example with 100 participants but only `vi`, `zh-TW`, `en`:
+Required optimization invariant:
 
 ```text
-speaker=vi
-60 zh-TW recipients
-30 en recipients
-10 vi recipients
-
-provider translations:
-vi -> zh-TW : once
-vi -> en    : once
+NO_TRANSLATION_ENABLED_RECIPIENTS -> NEW_PROVIDER_TRANSLATIONS=0
+ONE_REQUIRED_TARGET_LANGUAGE -> MAX_NEW_PROVIDER_TRANSLATIONS=1
+TWO_REQUIRED_TARGET_LANGUAGES -> MAX_NEW_PROVIDER_TRANSLATIONS=2
 ```
 
-## 6. Historical translation on demand
+This is the cost-minimum target-selection direction. If an accepted production candidate still derives targets from every joined participant regardless of translation enablement, preserve that candidate for its current owner QA and implement this refinement in a separately sequenced media translation optimization task; do not silently expand an unrelated Group Chat migration.
 
-History is intentionally cheaper than realtime translation.
+## 3. Media history — source-first, shared reuse, speaker-funded missing variant
 
-For history that existed before a member joined or before they requested translation:
+For historical Call/Video/Radio source segments:
 
 ```text
 LOAD_SOURCE_HISTORY=YES
@@ -159,41 +101,263 @@ HISTORY_TRANSLATE=ON_DEMAND
 HISTORY_TTS=MANUAL_ON_DEMAND
 ```
 
-Authorized members must always be able to see the source text/history permitted by the room.
-
-When a member presses `Translate` on one historical item:
+When a late-joining member requests a target language:
 
 ```text
-lookup shared variant for their target language
-|
-+-- FINAL exists -> reuse; provider calls added = 0
-|
-+-- absent/failed retry-eligible -> create one shared missing variant
+FINAL shared variant exists
+-> reuse
+-> provider calls added = 0
+-> additional provider translation cost = 0
+
+shared variant missing
+-> create one missing target variant
+-> COST_OWNER=ORIGINAL_SOURCE_SPEAKER
 ```
 
-A manually requested historical translation must not automatically speak merely because Auto Read is enabled.
-
-## 7. Historical cost ownership
-
-If member B requests a missing `zh-TW` historical variant for content authored by A:
+Example:
 
 ```text
-REQUESTED_BY=B
+source speaker=A
+historical Translate requested by=F
+missing media target variant required
 COST_OWNER=A
+REQUESTER_COST_OWNER=F -> NO
 ```
 
-B must not be silently charged for A's historical content.
+No fallback requester billing for another speaker's media history without a future owner decision.
 
-If the original author's applicable translation quota is exhausted or the cost owner cannot authorize new provider work:
+## 4. Group Chat policy — requester-funded + shared + on-demand
+
+Group Chat intentionally uses a different cost policy from voice media.
+
+A text message is stored as source text first. Merely sending a message must not force automatic translation into every language present in the room.
+
+Canonical policy:
 
 ```text
-existing FINAL variant -> reuse normally at zero new translation cost
-missing variant -> do not silently charge requester; return a truthful quota/unavailable state
+GROUP_CHAT_TRANSLATION_DEFAULT=ON_DEMAND
+AUTO_TRANSLATE=USER_OPT_IN
+NEW_SHARED_VARIANT_COST_OWNER=FIRST_SUCCESSFUL_REQUESTER
+EXISTING_SHARED_VARIANT_REUSE_COST=0
+HISTORY_REUSE_COST=0
 ```
 
-No fallback requester billing is allowed without a future explicit owner decision.
+The requester may be either the sender or a recipient. The determining rule is not sender/recipient role; it is who first causes a missing shared target-language variant to be created.
 
-## 8. TTS policy
+Example:
+
+```text
+A sends VI source message X
+B,C target zh-TW
+D,E target en
+
+No user requests translation
+-> provider calls=0
+-> A cost=0
+
+B first requests/auto-translates X -> zh-TW
+-> shared zh-TW missing
+-> provider call=1
+-> COST_OWNER=B
+
+C later needs zh-TW
+-> reuse B-created FINAL variant
+-> provider calls added=0
+-> C cost=0
+
+D first requests X -> en
+-> shared en missing
+-> provider call=1
+-> COST_OWNER=D
+
+E later needs en
+-> reuse
+-> provider calls added=0
+-> E cost=0
+```
+
+If sender A explicitly requests an outgoing English translation before anyone else:
+
+```text
+A triggers missing X/en
+-> COST_OWNER=A
+-> later EN recipients reuse at zero new provider translation cost
+```
+
+## 5. Shared variant identity
+
+### 5.1 Call / Video / Radio Translation V2
+
+For immutable V2 media translation segments:
+
+```text
+(segment_id, target_language)
+```
+
+The current schema already enforces one `GroupTranslationVariant` per `segment_id + target_language`. Preserve that property.
+
+### 5.2 Group Chat
+
+For editable chat messages:
+
+```text
+(message_id, message_fingerprint, target_language)
+```
+
+`recipient_membership_id` must **not** be part of the shared translation-variant identity after the Group Chat migration.
+
+If a message is edited:
+
+```text
+message_fingerprint changes
+-> old variants are stale for the current message version
+-> old translated text must not be projected as current
+-> new variants are created only when a user actually requests/enables them
+```
+
+## 6. Group Chat request flow — reuse before quota
+
+Every Chat translation request or opt-in Auto Translate event must perform reuse lookup before any requester quota reservation.
+
+Required order:
+
+```text
+request target language
+-> target == source?
+   -> use source, cost=0
+-> lookup shared (message_id, fingerprint, target_language)
+-> FINAL exists?
+   -> return/reuse immediately
+   -> provider call=0
+   -> requester quota check=NOT REQUIRED FOR PROVIDER WORK
+-> missing?
+   -> acquire canonical shared-variant lock/reservation
+   -> recheck FINAL after lock
+   -> reserve requester quota only if provider work is still required
+   -> provider translation ONCE
+   -> persist shared FINAL variant
+   -> settle requester cost
+```
+
+A user with no remaining translation quota must still be allowed to reuse an authorized existing FINAL variant because reuse generates no new provider translation work.
+
+## 7. Group Chat concurrency / payer selection
+
+Two users can request the same missing target language simultaneously.
+
+Required behavior:
+
+```text
+message X + fingerprint F + zh-TW
+B request ----\
+              -> canonical lock/reservation -> ONE provider call
+C request ----/                              -> ONE stored FINAL variant
+```
+
+Payer rule:
+
+```text
+FIRST_SUCCESSFUL_RESERVATION_OWNER=COST_OWNER
+LOSING_CONCURRENT_REQUESTERS=REUSE_AFTER_FINAL
+DOUBLE_CHARGE=NO
+```
+
+Database uniqueness alone is insufficient if duplicate provider calls can happen before row conflict. Provider work must be coalesced before the external translation call.
+
+Use a stable provider idempotency key derived from message-version + target language.
+
+## 8. Group Chat history — reuse first, missing variant requester-funded
+
+History remains source-first and on-demand.
+
+Required:
+
+```text
+LOAD_SOURCE_HISTORY=YES
+LATE_JOIN_HISTORY_AUTO_TRANSLATE=NO
+LATE_JOIN_HISTORY_AUTO_READ=NO
+HISTORY_TRANSLATE=ON_DEMAND
+HISTORY_TTS=MANUAL_ON_DEMAND
+```
+
+For each historical message:
+
+```text
+recipient target == source
+-> source already usable, cost=0
+
+shared FINAL target variant exists
+-> reuse, provider call=0, cost=0
+
+shared target variant missing
+-> show explicit Translate
+-> first requester who causes creation becomes COST_OWNER
+```
+
+Example:
+
+```text
+A authored X/vi three days ago
+B previously paid for X/zh-TW
+F joins later and needs zh-TW
+-> reuse X/zh-TW
+-> F cost=0
+
+G joins later and needs en
+X/en missing
+G presses Translate
+-> provider call=1
+-> COST_OWNER=G
+-> all later EN users reuse at zero new provider cost
+```
+
+Manual historical Translate must not trigger Auto Read automatically.
+
+## 9. Group Chat Auto Translate is authorization for missing provider work
+
+Auto Translate should be user opt-in, not room-wide precomputation.
+
+For user B:
+
+```text
+AUTO_TRANSLATE=ON
+TARGET=zh-TW
+```
+
+For each new message:
+
+```text
+source == zh-TW
+-> use source
+
+source != zh-TW
+-> lookup shared zh-TW variant first
+   -> FINAL exists: reuse free
+   -> missing: B is eligible to trigger one new provider translation and pay for it
+```
+
+If multiple same-target users have Auto Translate enabled, they still share one provider operation. The first successful canonical reservation owns the cost; later/concurrent users reuse.
+
+Do not precompute translations merely because a room contains members with other preferred languages.
+
+## 10. Provider failure / quota reservation
+
+A requester should not be permanently charged merely for pressing Translate if provider work fails.
+
+Target accounting flow:
+
+```text
+shared reuse lookup
+-> missing only: requester quota eligibility
+-> reserve bounded estimated usage
+-> provider call
+-> success: settle actual/approved usage
+-> failure: release/expire reservation; no settled provider translation charge
+```
+
+Exact commercial billing units remain a dedicated quota/package task unless already defined by an approved schema.
+
+## 11. TTS policy
 
 Text translation variants are shared; TTS playback is local per device.
 
@@ -207,50 +371,45 @@ Rules:
 
 - do not create one server audio file per recipient;
 - do not persist translation audio;
-- realtime Auto Read may speak eligible **new** realtime FINAL translations according to the user's local/room profile setting;
+- realtime media Auto Read may speak eligible new realtime FINAL translations according to the user's setting;
+- Chat Auto Translate does not imply server audio generation;
 - history bootstrap must never Auto Read;
 - historical TTS is explicit manual `Play on this device`;
 - Manual Play and realtime Auto Read should share one deterministic local TTS manager.
 
-## 9. Package/quota boundary
-
-This document locks **logical cost ownership** and translation deduplication. It does not authorize inventing a new billing unit inside an unrelated corrective task.
-
-Current Group media quota structures are target-seconds based. If the product package later requires token-denominated quota accounting, implement it in a dedicated quota/billing task with explicit schema/config/accounting acceptance criteria.
-
-Until that task exists, Group translation code must at minimum preserve:
-
-```text
-provider work attributed to source author/speaker context
-one provider call per missing unique target-language variant
-zero new provider call for reuse
-no recipient-count multiplier
-```
-
-## 10. Current-system migration rule
+## 12. Current-system migration rules
 
 ### Call / Video / Radio V2
 
-The current `GroupTranslationVariant` model already has shared `(segment_id, target_language)` uniqueness. Corrective work must preserve and test this behavior, and must not regress to recipient-specific translation variants.
+The current `GroupTranslationVariant` model already has shared `(segment_id, target_language)` uniqueness. Preserve this behavior and speaker-funded cost ownership.
+
+A separate media target-eligibility optimization may be required to ensure only translation-enabled active recipients contribute required target languages. Do not regress the already accepted shared-variant/history behavior while adding that refinement.
 
 ### Group Chat
 
-The current Group Chat translation model/service is recipient-scoped. It must be migrated in a dedicated Group Chat task to the shared-variant model defined here.
+Current Group Chat translation is recipient-scoped. Migrate it in the dedicated Group Chat task to:
 
-That migration must preserve:
+```text
+SHARED_IDENTITY=(message_id, message_fingerprint, target_language)
+COST_OWNER=FIRST_REQUESTER_WHO_CREATES_MISSING_VARIANT
+TRANSLATION_DEFAULT=ON_DEMAND
+AUTO_TRANSLATE=USER_OPT_IN
+```
+
+Preserve:
 
 - message edit/fingerprint invalidation;
 - encryption-at-rest;
 - authorization/membership boundaries;
 - consent/profile behavior;
-- idempotency;
+- stable idempotency;
 - current message source-language truth;
-- current room event invalidation;
-- no Direct 1:1 migration or ownership change.
+- room event invalidation;
+- no Direct 1:1 ownership/runtime change.
 
-## 11. Required tests for shared translation semantics
+## 13. Required tests
 
-At minimum, implementation tests must prove:
+### Media/Radio shared-cost tests
 
 ```text
 ROOM:
@@ -258,61 +417,58 @@ vi x1
 zh-TW x2
 en x2
 
-VI source unit created
-EXPECTED NEW TARGET VARIANTS:
-zh-TW x1
-en x1
-EXPECTED PROVIDER TRANSLATION_CALLS=2
+VI speaker creates eligible realtime source segment
+EXPECTED unique target variants <= {zh-TW,en}
+EXPECTED provider calls <= 2
+EXPECTED recipient-count multiplier=NO
+EXPECTED cost owner=speaker
 ```
 
-Concurrent historical request test:
-
-```text
-ZH member #1 requests X/zh-TW
-ZH member #2 requests X/zh-TW concurrently
-
-EXPECTED:
-provider calls=1
-stored shared variants=1
-both users receive same translated text
-```
-
-Reuse test:
-
-```text
-third zh-TW member later requests X/zh-TW
-EXPECTED additional provider calls=0
-```
-
-History test:
+Media history:
 
 ```text
 late join
 -> source history visible
+-> existing target variant reused at zero new provider cost
 -> no automatic historical translation
 -> no automatic historical TTS
--> explicit Translate reuses existing shared variant or creates one missing shared variant
--> explicit Play uses local TTS
+-> missing media historical variant remains speaker-funded
 ```
 
-Cost-owner test:
+### Group Chat tests
 
 ```text
-source author=A
-historical translate requested by=B
-new provider variant required
-EXPECTED logical cost owner=A
-EXPECTED requester cost owner=B -> NO
+MESSAGE_CREATED_WITH_NO_TRANSLATION_REQUEST -> PROVIDER_CALLS=0
+SHARED_VARIANT_IDENTITY=message_id+fingerprint+target_language
+RECIPIENT_ID_NOT_VARIANT_IDENTITY=YES
+SAME_LANGUAGE_SOURCE_REUSE=PASS
+FIRST_REQUESTER_MISSING_TARGET_IS_COST_OWNER=PASS
+EXISTING_VARIANT_REUSE_PROVIDER_CALLS_ADDED=0
+EXISTING_VARIANT_REUSE_REQUIRES_NEW_REQUESTER_QUOTA=NO
+CONCURRENT_SAME_TARGET_PROVIDER_CALLS=1
+CONCURRENT_LOSER_ADDITIONAL_COST=0
+AUTO_TRANSLATE_OPT_IN_ONLY=PASS
+ROOM_MEMBER_LANGUAGE_ALONE_DOES_NOT_PRECOMPUTE_VARIANT=PASS
+MESSAGE_EDIT_INVALIDATES_OLD_VARIANT=PASS
+HISTORY_SOURCE_VISIBLE=PASS
+HISTORY_AUTO_TRANSLATE=NO
+HISTORY_AUTO_READ=NO
+HISTORY_EXISTING_VARIANT_REUSE_COST=0
+HISTORY_MISSING_VARIANT_COST_OWNER=REQUESTER
+HISTORY_MANUAL_TTS=PASS
+AUDIO_PERSISTENCE=NONE
 ```
 
-## 12. Protected boundaries
+## 14. Protected boundaries
 
 This contract does not authorize:
 
 - Direct 1:1 ownership/runtime changes;
 - translation-owned second microphone acquisition;
-- LiveKit ownership rewrites;
+- LiveKit/Cloudflare media ownership changes;
 - audio archive/storage;
 - server TTS audio generation per recipient;
-- recipient-based duplicate translations;
-- silent requester billing for another member's historical source content.
+- recipient-specific duplicate Chat translations;
+- room-wide Chat translation precomputation merely from member language profiles;
+- charging a requester for reuse of an existing FINAL shared Chat variant;
+- changing accepted PR #35 production code inside the docs-only Group Chat planning branch.
