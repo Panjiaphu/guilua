@@ -253,8 +253,10 @@ class GroupMediaSessionService:
                     participant.invite_status = "joined"
                     participant.joined_at = _now()
                     participant.updated_at = _now()
-                participant.connection_status = "not_connected"
-                participant.connection_error_code = ""
+                    # Join is idempotent. A duplicate/retried Join must not
+                    # regress an already connecting or connected participant.
+                    participant.connection_status = "not_connected"
+                    participant.connection_error_code = ""
                 self._audit(db, actor, space_id, "media_session.joined", session.id)
                 self._enqueue(db, space_id, "media_session.joined", session.id)
                 db.flush()

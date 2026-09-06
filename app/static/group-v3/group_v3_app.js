@@ -32,6 +32,7 @@
     paperclip: '<path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>',
     send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
     headphones: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+    "volume-2": '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
     "log-out": '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
     "refresh-cw": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
     history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
@@ -81,6 +82,7 @@
     radioPreparing: false,
     radioMembersOpen: false,
     radioRoomsOpen: false,
+    mediaRoomsOpen: false,
     roomsCollapsed: false,
     mediaSession: null,
     radioSession: null,
@@ -93,6 +95,7 @@
     busy: false,
     error: "",
     mediaConnected: false,
+    audioPlaybackBlocked: false,
     micEnabled: true,
     videoEnabled: true,
     deviceLost: false,
@@ -136,6 +139,9 @@
   var groupEventRefreshPendingSpaceId = "";
   var mediaGeneration = 0;
   var mediaActionInFlight = false;
+  var mediaMutationEpoch = 0;
+  var mediaSessionLoadSequence = 0;
+  var mediaConnectTask = null;
   var chatTranslationSweep = false;
   var chatTranslationInflight = new Set();
   var chatTranslationFailures = new Map();
@@ -148,6 +154,24 @@
 
   function t(key) {
     return window.GroupV3I18n.translator(state.locale)(key);
+  }
+
+  function markMediaMutation() {
+    mediaMutationEpoch += 1;
+    return mediaMutationEpoch;
+  }
+
+  function mediaContext() {
+    return {
+      surface: state.surface,
+      spaceId: state.space && state.space.id || "",
+      sessionId: state.mediaSession && state.mediaSession.id || ""
+    };
+  }
+
+  function mediaContextCurrent(context) {
+    return Boolean(context && state.surface === context.surface && state.space &&
+      state.space.id === context.spaceId && state.mediaSession && state.mediaSession.id === context.sessionId);
   }
 
   function esc(value) {
@@ -343,6 +367,7 @@
     if (typeof person.mediaConnected === "boolean") return person.mediaConnected;
     if (person.media_connection_state) return String(person.media_connection_state).toLowerCase() === "connected";
     if (person.connection_state) return String(person.connection_state).toLowerCase() === "connected";
+    if (person.connection_status) return String(person.connection_status).toLowerCase() === "connected";
     return person.invite_status === "joined";
   }
 
@@ -497,13 +522,47 @@
     }
   }
 
+  function mergeMediaSessionSnapshot(remote, local) {
+    if (!remote || !local || remote.id !== local.id) return remote;
+    var merged = Object.assign({}, remote);
+    if (local.status === "active" && remote.status === "ringing") merged.status = "active";
+    var localParticipants = new Map((local.participants || []).map(function (participant) {
+      return [String(participant.id || participant.membership_id || ""), participant];
+    }));
+    merged.participants = (remote.participants || []).map(function (participant) {
+      var key = String(participant.id || participant.membership_id || "");
+      var previous = localParticipants.get(key);
+      if (!previous) return participant;
+      var next = Object.assign({}, participant);
+      if (previous.invite_status === "joined" && participant.invite_status === "invited") {
+        next.invite_status = "joined";
+        next.joined_at = previous.joined_at || participant.joined_at;
+      }
+      if (["connecting", "connected", "reconnecting"].indexOf(previous.connection_status) >= 0 &&
+          participant.connection_status === "not_connected") {
+        next.connection_status = previous.connection_status;
+        next.connection_error_code = previous.connection_error_code || "";
+      }
+      return next;
+    });
+    return merged;
+  }
+
   async function loadMediaSessions() {
-    var path = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions?limit=50";
+    if (!state.space || (state.surface !== "call" && state.surface !== "video")) return;
+    var spaceId = state.space.id;
+    var surface = state.surface;
+    var epoch = mediaMutationEpoch;
+    var sequence = ++mediaSessionLoadSequence;
+    var path = "/api/group/spaces/" + encodeURIComponent(spaceId) + "/sessions?limit=50";
     var payload = await optional(path, { sessions: [] });
-    var kind = state.surface === "video" ? "video" : "audio";
-    state.mediaSession = (payload.sessions || []).find(function (item) {
+    if (!state.space || state.space.id !== spaceId || state.surface !== surface ||
+        epoch !== mediaMutationEpoch || sequence !== mediaSessionLoadSequence) return;
+    var kind = surface === "video" ? "video" : "audio";
+    var remote = (payload.sessions || []).find(function (item) {
       return item.media_kind === kind && item.status !== "ended";
     }) || null;
+    state.mediaSession = mergeMediaSessionSnapshot(remote, state.mediaSession);
   }
 
   async function loadRadioSession() {
@@ -801,6 +860,28 @@
       esc(t("send")) + '">' + icon("send", 17) + "<span>" + esc(t("send")) + "</span></button></form></section>" + renderParticipants(false) + "</div>";
   }
 
+  function mediaRoomsButton(extraClass) {
+    return '<button type="button" class="icon-button media-room-picker-toggle ' + esc(extraClass || "") +
+      '" data-action="media-rooms" aria-label="' + esc(t("openGroupSpaces")) + '" title="' +
+      esc(t("openGroupSpaces")) + '">' + icon("panel-right", 20) + '</button>';
+  }
+
+  function mediaRoomPicker() {
+    if (!window.GroupV3RadioUi || !window.GroupV3RadioUi.roomPicker) return "";
+    return window.GroupV3RadioUi.roomPicker(state.spaces, state.space && state.space.id, {
+      roomsOpen: state.mediaRoomsOpen,
+      pickerClass: "media-room-picker",
+      rowClass: "media-room-picker-row",
+      toggleAction: "media-rooms"
+    }, t);
+  }
+
+  function audioPlaybackRecovery() {
+    if (!state.audioPlaybackBlocked) return "";
+    return '<aside class="media-audio-recovery" role="alert"><span>' + esc(t("roomAudioBlocked")) +
+      '</span>' + action("enable-room-audio", t("enableRoomAudio"), "volume-2", "primary") + '</aside>';
+  }
+
   function inviteForm(kind) {
     var mine = myMembership();
     var others = state.members.filter(function (member) {
@@ -813,8 +894,11 @@
     }).join("");
     var title = kind === "radio" ? t("startRadio") : kind === "video" ? t("startVideoCall") : t("startAudioCall");
     var iconName = kind === "radio" ? "radio-tower" : kind === "video" ? "video" : "phone-call";
-    return '<div class="runtime-empty media-start-empty"><span>' + icon(iconName, 28) + "</span><h2>" + esc(t("noActiveSession")) + "</h2><p>" +
-      esc(others.length ? t("chooseParticipants") : t("creatorNeedsInvitee")) + '</p><form class="media-start-form" data-form="' +
+    return '<div class="runtime-empty media-start-empty"><header class="media-start-intro"><span>' + icon(iconName, 28) +
+      '</span><div><h2>' + esc(t("noActiveSession")) + '</h2><p>' +
+      esc(others.length ? t("chooseParticipants") : t("creatorNeedsInvitee")) + '</p></div>' +
+      (kind === "radio" ? "" : mediaRoomsButton("media-start-room-button")) + '</header>' +
+      (kind === "radio" ? "" : mediaRoomPicker()) + '<form class="media-start-form" data-form="' +
       (kind === "radio" ? "create-radio" : "create-media") + '" data-kind="' + kind + '">' +
       (others.length ? '<label class="media-member-search"><span>' + icon("search", 15) + '<span class="sr-only">' + esc(t("searchMembers")) + '</span><input type="search" data-media-member-search autocomplete="off" placeholder="' + esc(t("searchMembers")) + '"></label>' : "") +
       '<div class="media-member-list"><fieldset>' + labels + '</fieldset><p class="media-member-empty" data-media-no-results hidden>' + esc(t("noEligibleContacts")) + '</p></div><button type="submit" class="action-button action-primary" ' + (others.length ? "" : "disabled") + ">" +
@@ -839,11 +923,14 @@
   function translationDock() {
     var workspace = window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot ? window.GroupCommunicationWorkspace.snapshot() : { translationMode: "COLLAPSED" };
     var mode = workspace.effectiveTranslationMode || workspace.translationMode || "COLLAPSED";
-    var safety = state.surface === "video" && state.mediaSession
-      ? '<div class="translation-safety-layer" aria-label="' + esc(t("mediaSafetyControls")) + '"><span class="translation-live-status">' + badge("LIVE", "success") + '</span><span class="translation-video-mini">' + icon("video", 16) + '<span>' + esc(t("activeVideo")) + '</span></span>' +
+    var mediaKind = state.surface === "video" ? "video" : "audio";
+    var safety = (state.surface === "video" || state.surface === "call") && state.mediaSession
+      ? '<div class="translation-safety-layer" aria-label="' + esc(t("mediaSafetyControls")) + '"><span class="translation-live-status">' + badge("LIVE", "success") + '</span><span class="translation-video-mini">' + icon(mediaKind === "video" ? "video" : "phone-call", 16) + '<span>' + esc(t(mediaKind === "video" ? "activeVideo" : "activeAudio")) + '</span></span>' +
+        mediaRoomsButton("translation-room-button") +
         action("toggle-mic", state.micEnabled ? t("micOn") : t("micOff"), "mic", state.micEnabled ? "secondary" : "danger") +
-        action("toggle-video", state.videoEnabled ? t("videoOn") : t("videoOff"), "video", state.videoEnabled ? "secondary" : "danger") +
-        action("more-media", t("more"), "more-horizontal", "secondary") + action("leave-media", t("leaveCall"), "log-out", "danger") + workspaceButton("video-restore", t("shrinkVideo"), "panel-right", false) + '</div>'
+        (mediaKind === "video" ? action("toggle-video", state.videoEnabled ? t("videoOn") : t("videoOff"), "video", state.videoEnabled ? "secondary" : "danger") : "") +
+        action("more-media", t("more"), "more-horizontal", "secondary") + action("leave-media", t("leaveCall"), "log-out", "danger") +
+        (mediaKind === "video" ? workspaceButton("video-restore", t("shrinkVideo"), "panel-right", false) : "") + '</div>'
       : "";
     return '<aside class="translation-dock" data-translation-mode="' + esc(mode) + '" data-translation-requested-mode="' + esc(workspace.requestedTranslationMode || workspace.translationMode || "COLLAPSED") + '"><header class="translation-dock__bar"><strong>' + esc(t("translationPlugin")) + '</strong><span data-translation-mode-label>' + esc(workspace.desktopTranslationMode || mode) + '</span><div>' +
       workspaceButton("translation-minus", t("shrinkTranslation"), "chevron-down", mode === "COLLAPSED") +
@@ -854,7 +941,7 @@
   function renderMedia() {
     var session = state.mediaSession;
     var kind = state.surface === "video" ? "video" : "audio";
-    if (!session) return '<div class="chat-content state-active_' + kind + ' surface-content">' + inviteForm(kind) + renderParticipants(true) + "</div>";
+    if (!session) return '<div class="chat-content state-active_' + kind + ' media-start-layout surface-content">' + inviteForm(kind) + renderParticipants(true) + "</div>";
     var me = selfParticipant(session);
     // Keep the invite action visible until this participant joins. The first
     // participant can promote the session to ACTIVE before the invitee refreshes.
@@ -893,19 +980,19 @@
       var gridClass = window.GroupV3VideoLayout && window.GroupV3VideoLayout.layoutClass ? window.GroupV3VideoLayout.layoutClass(people.length) : "count-" + people.length;
       return '<div class="video-call-layout with-translation' +
         ' surface-content"><div class="video-stage"><div class="call-status-line">' + badge("LIVE", "success") + "<span>" +
-        esc(t("activeVideo")) + '</span><small class="media-participant-count">' + esc(String(people.length)) + " " + esc(t("participantsShort")) + '</small><span class="video-layout-mode" data-video-mode-label>' + esc((window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot().videoMode) || "STANDARD") + '</span><button type="button" class="icon-button" data-action="toggle-participant-drawer" aria-label="' + esc(t("participants")) + '">' + icon("users", 17) + '</button></div><div class="video-grid ' + gridClass + '" data-video-grid>' + tiles + "</div>" +
+        esc(t("activeVideo")) + '</span><small class="media-participant-count">' + esc(String(people.length)) + " " + esc(t("participantsShort")) + '</small><span class="video-layout-mode" data-video-mode-label>' + esc((window.GroupCommunicationWorkspace && window.GroupCommunicationWorkspace.snapshot().videoMode) || "STANDARD") + '</span>' + mediaRoomsButton("active-media-room-button") + '<button type="button" class="icon-button" data-action="toggle-participant-drawer" aria-label="' + esc(t("participants")) + '">' + icon("users", 17) + '</button></div>' + audioPlaybackRecovery() + '<div class="video-grid ' + gridClass + '" data-video-grid>' + tiles + "</div>" +
         '<div class="video-panel-toolbar">' + videoPanelControls() + '</div>' + callDock(kind) +
-        '<div class="audio-host" data-audio-host></div></div>' + drawer + translationDock() + "</div>";
+        '<div class="audio-host" data-audio-host></div></div>' + drawer + translationDock() + mediaRoomPicker() + "</div>";
     }
     var speaker = (session.participants || []).find(function (person) { return person.invite_status === "joined"; }) || me;
     var peopleRow = (session.participants || []).filter(function (person) { return person.invite_status === "joined"; }).slice(0, 4).map(function (person) {
       return "<div>" + avatar(person.display_name, "mint", "lg", true) + "<span>" + esc(person.display_name) + "</span></div>";
     }).join("");
-    return '<div class="chat-content state-active_audio surface-content"><div class="call-stage audio-stage"><div class="call-status-line">' +
-      badge("LIVE", "success") + "<span>" + esc(t("activeAudio")) + '</span></div><div class="speaker-hero"><span class="speaker-ring">' +
+    return '<div class="call-communication-layout with-translation surface-content"><div class="call-workspace-stage"><div class="call-stage audio-stage"><div class="call-status-line">' +
+      badge("LIVE", "success") + "<span>" + esc(t("activeAudio")) + '</span>' + mediaRoomsButton("active-media-room-button") + '</div>' + audioPlaybackRecovery() + '<div class="speaker-hero"><span class="speaker-ring">' +
       avatar(speaker && speaker.display_name, "teal", "xl", true) + "</span><h1>" + esc(speaker && speaker.display_name || state.space.title) +
       "</h1><p>" + esc(t("speaking")) + "</p>" + wave(false) + '</div><div class="audio-participant-row">' + peopleRow + "</div>" +
-      callDock(kind) + '<div class="audio-host" data-audio-host></div></div>' + renderParticipants(true) + "</div>";
+      callDock(kind) + '<div class="audio-host" data-audio-host></div></div>' + renderParticipants(true) + '</div>' + translationDock() + mediaRoomPicker() + "</div>";
   }
 
   function radioState() {
@@ -931,6 +1018,7 @@
       floor: state.radioFloor, burst: state.burst, history: state.radioHistory,
       error: state.radioHistoryError, membersOpen: state.radioMembersOpen,
       roomsOpen: state.radioRoomsOpen, spaces: state.spaces, spaceId: state.space && state.space.id,
+      audioBlocked: state.audioPlaybackBlocked,
       participants: state.radioSession && state.radioSession.participants || [],
       labels: translationLabels()
     });
@@ -1268,8 +1356,11 @@
   }
 
   function presentationRuntimeKey() {
-    if (state.surface === "video" || state.surface === "call") {
+    if (state.surface === "video") {
       return "video:" + String(state.mediaSession && state.mediaSession.id || state.space && state.space.id || "none");
+    }
+    if (state.surface === "call") {
+      return "call:" + String(state.mediaSession && state.mediaSession.id || state.space && state.space.id || "none");
     }
     if (state.surface === "radio") {
       return "radio:" + String(state.radioSession && state.radioSession.id || state.space && state.space.id || "none");
@@ -1380,6 +1471,7 @@
     state.radioFloor = null;
     state.burst = null;
     state.radioRoomsOpen = false;
+    state.mediaRoomsOpen = false;
     state.radioMembersOpen = false;
     state.moreMediaOpen = false;
     state.error = "";
@@ -1399,22 +1491,61 @@
   }
 
   async function selectSpace(id) {
-    if (state.floorToken) {
-      notify(t("stopBurst"));
+    id = String(id || "");
+    if (!id || !state.space) return;
+    if (id === state.space.id) {
+      state.radioRoomsOpen = false;
+      state.mediaRoomsOpen = false;
+      render();
       return;
     }
+    var oldSpaceId = state.space.id;
+    var oldMediaSession = state.mediaSession;
+    var oldRadioBase = state.radioSession && radioBase();
+    var oldMediaParticipant = oldMediaSession && selfParticipant(oldMediaSession);
+    var mustLeaveMedia = Boolean(oldMediaSession && oldMediaSession.status !== "ended" &&
+      oldMediaParticipant && oldMediaParticipant.invite_status === "joined");
+    var mustLeaveRadio = Boolean(state.surface === "radio" && state.radioSession);
+    if ((mustLeaveMedia || mustLeaveRadio || state.mediaConnected || state.floorToken) &&
+        !window.confirm(t("switchMediaRoomConfirm"))) return;
     setBusy(true);
     state.error = "";
     try {
       state.radioRoomsOpen = false;
-      closePrejoin(true);
-      await disconnectMedia(false);
+      state.mediaRoomsOpen = false;
+      markMediaMutation();
+      if (mustLeaveRadio) {
+        radioLeaving = true;
+        ++radioGeneration;
+        if (state.floorToken) await stopRadio();
+        if (state.floorToken) throw new Error("group_radio_floor_release_failed");
+        await window.GroupV3RadioRecording.stop(true);
+        // Server lifecycle changes before transport teardown.
+        await radioRequest(oldRadioBase + "/leave", { method: "POST" });
+        await disconnectMedia(false);
+        state.radioSession = null;
+        state.radioFloor = null;
+        state.burst = null;
+        state.radioPreparing = state.radioStopping = state.deviceLost = false;
+      } else if (mustLeaveMedia) {
+        var mediaBase = "/api/group/spaces/" + encodeURIComponent(oldSpaceId) + "/sessions/" +
+          encodeURIComponent(oldMediaSession.id);
+        // A room switch is a semantic Leave, not merely a LiveKit disconnect.
+        await api(mediaBase + "/leave", { method: "POST" });
+        closePrejoin(true);
+        await disconnectMedia(false);
+        state.mediaSession = null;
+      } else {
+        closePrejoin(true);
+        await disconnectMedia(false);
+      }
       await loadSpaces(id);
       render();
     } catch (error) {
       state.error = publicError(error);
       render();
     } finally {
+      radioLeaving = false;
       setBusy(false);
     }
   }
@@ -1792,24 +1923,29 @@
   }
 
   async function createMedia(form) {
+    if (mediaActionInFlight) return;
     var participants = selectedParticipants(form);
     if (!participants.length) {
       notify(t("inviteRequired"));
       return;
     }
     var kind = form.dataset.kind === "video" ? "video" : "audio";
+    mediaActionInFlight = true;
     try {
       var payload = await api("/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions", json("POST", {
         media_kind: kind,
         title: state.space.title,
         participant_membership_ids: participants
       }));
+      markMediaMutation();
       state.mediaSession = payload.session;
       render();
       if (await trySavedDeviceStream(kind)) await connectMedia();
       else await openPrejoin(kind);
     } catch (error) {
       notify(publicError(error));
+    } finally {
+      mediaActionInFlight = false;
     }
   }
 
@@ -1820,26 +1956,30 @@
     try {
       if (name === "join-media") {
         var joined = await api(base + "/join", { method: "POST" });
+        markMediaMutation();
         state.mediaSession = joined.session;
         render();
         if (await trySavedDeviceStream(state.mediaSession.media_kind)) await connectMedia();
         else await openPrejoin(state.mediaSession.media_kind);
       } else if (name === "reject-media") {
         var rejected = await api(base + "/reject", { method: "POST" });
+        markMediaMutation();
         state.mediaSession = rejected.session.status === "ended" ? null : rejected.session;
         render();
       } else if (name === "leave-media") {
+        var left = await api(base + "/leave", { method: "POST" });
+        markMediaMutation();
         closePrejoin(true);
         await disconnectMedia(false);
-        var left = await api(base + "/leave", { method: "POST" });
         state.mediaSession = left.session.status === "ended" ? null : left.session;
         notify(t("leaveComplete"));
         render();
       } else if (name === "end-media") {
         if (!window.confirm(t("endForAllConfirm"))) return;
+        await api(base + "/end-for-all", { method: "POST" });
+        markMediaMutation();
         closePrejoin(true);
         await disconnectMedia(false);
-        await api(base + "/end-for-all", { method: "POST" });
         state.mediaSession = null;
         notify(t("endedForAll"));
         render();
@@ -2055,8 +2195,8 @@
     try {
       if (state.floorToken) await stopRadio();
       await window.GroupV3RadioRecording.stop(true);
-      await disconnectMedia(false);
       if (base) await radioRequest(base + "/leave", { method: "POST" });
+      await disconnectMedia(false);
     } catch (_error) { notify(t("radioExitOffline")); }
     finally {
       window.clearInterval(heartbeatTimer);
@@ -2076,6 +2216,7 @@
     if (name === "rooms-collapse") { state.roomsCollapsed = !state.roomsCollapsed; render(); return; }
     if (name === "radio-members") { state.radioMembersOpen = !state.radioMembersOpen; render(); return; }
     if (name === "radio-rooms") { state.radioRoomsOpen = !state.radioRoomsOpen; render(); return; }
+    if (name === "media-rooms") { state.mediaRoomsOpen = !state.mediaRoomsOpen; render(); return; }
     if (name === "settings-collapse") { state.settingsCollapsed = !state.settingsCollapsed; render(); return; }
     if (name === "history-tab") {
       state.historyTab = button.dataset.tab;
@@ -2204,6 +2345,11 @@
     if (name === "stop-radio") return stopRadio();
     if (name === "leave-radio") return leaveRadio();
     if (name === "reconnect-radio") return reconnectRadio();
+    if (name === "enable-room-audio") {
+      return resumeRoomAudio().then(function (ready) {
+        if (ready) notify(t("roomAudioReady"));
+      }).catch(function () { notify(t("roomAudioBlocked")); });
+    }
   }
 
   async function handleForm(form) {
@@ -2290,6 +2436,38 @@
     });
   }
 
+  function setAudioPlaybackBlocked(blocked) {
+    blocked = Boolean(blocked);
+    if (state.audioPlaybackBlocked === blocked) return;
+    state.audioPlaybackBlocked = blocked;
+    render();
+  }
+
+  function resumeRoomAudio() {
+    var room = mediaRoom;
+    var attempts = [];
+    try {
+      if (room && typeof room.startAudio === "function") {
+        // LiveKit requires startAudio() itself to run in the click/tap stack.
+        attempts.push(Promise.resolve(room.startAudio()).then(function () { return true; }));
+      }
+      if (window.GroupMediaPresentation && window.GroupMediaPresentation.resumeAudio) {
+        attempts.push(Promise.resolve(window.GroupMediaPresentation.resumeAudio()));
+      }
+    } catch (error) {
+      setAudioPlaybackBlocked(true);
+      return Promise.reject(error);
+    }
+    return Promise.all(attempts).then(function (results) {
+      var ready = results.every(function (value) { return value !== false; });
+      if (room === mediaRoom) setAudioPlaybackBlocked(!ready);
+      return ready;
+    }).catch(function (error) {
+      if (room === mediaRoom) setAudioPlaybackBlocked(true);
+      throw error;
+    });
+  }
+
   function clearMediaReconnect() {
     window.clearTimeout(mediaReconnectTimer);
     mediaReconnectTimer = 0;
@@ -2350,6 +2528,12 @@
     room.on(library.RoomEvent.TrackUnsubscribed, function (track) {
       window.GroupMediaPresentation.unsubscribe(track);
     });
+    if (library.RoomEvent.AudioPlaybackStatusChanged) {
+      room.on(library.RoomEvent.AudioPlaybackStatusChanged, function () {
+        if (room !== mediaRoom || generation !== mediaGeneration) return;
+        setAudioPlaybackBlocked(room.canPlaybackAudio === false);
+      });
+    }
     [library.RoomEvent.TrackMuted, library.RoomEvent.TrackUnmuted].filter(Boolean).forEach(function (eventName) {
       room.on(eventName, function () { if (room === mediaRoom) syncMediaElements(); });
     });
@@ -2414,6 +2598,7 @@
       }
       await room.connect(grant.url, grant.token);
       if (generation !== mediaGeneration) throw new Error("group_media_stale_attempt");
+      if (room.canPlaybackAudio === false) setAudioPlaybackBlocked(true);
       if (publish && localStream) {
         for (var mediaTrack of localStream.getTracks()) {
           mediaTrack.addEventListener("ended", function () {
@@ -2449,19 +2634,31 @@
     }
   }
 
-  async function updateMediaConnectionState(status, failureCode) {
-    if (!state.mediaSession || state.surface === "radio") return null;
-    var path = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions/" +
-      encodeURIComponent(state.mediaSession.id) + "/connection-state";
+  async function updateMediaConnectionState(status, failureCode, context) {
+    context = context || mediaContext();
+    if (!context.sessionId || context.surface === "radio") return null;
+    var path = "/api/group/spaces/" + encodeURIComponent(context.spaceId) + "/sessions/" +
+      encodeURIComponent(context.sessionId) + "/connection-state";
     var payload = await api(path, json("POST", {
       status: status,
       failure_code: failureCode || ""
     }));
-    if (payload.session) state.mediaSession = payload.session;
+    if (payload.session && mediaContextCurrent(context)) {
+      markMediaMutation();
+      state.mediaSession = mergeMediaSessionSnapshot(payload.session, state.mediaSession);
+    }
     return payload.session || null;
   }
 
   async function connectMedia() {
+    if (mediaConnectTask) return mediaConnectTask;
+    var task = connectMediaOnce();
+    mediaConnectTask = task;
+    try { return await task; }
+    finally { if (mediaConnectTask === task) mediaConnectTask = null; }
+  }
+
+  async function connectMediaOnce() {
     if (!state.mediaSession) {
       notify(t("mediaPolicy"));
       return;
@@ -2486,19 +2683,29 @@
       await openPrejoin(state.mediaSession.media_kind);
       return;
     }
-    var path = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/sessions/" +
-      encodeURIComponent(state.mediaSession.id) + "/media-grant";
-    await updateMediaConnectionState("connecting");
+    var context = mediaContext();
+    markMediaMutation();
+    var path = "/api/group/spaces/" + encodeURIComponent(context.spaceId) + "/sessions/" +
+      encodeURIComponent(context.sessionId) + "/media-grant";
+    await updateMediaConnectionState("connecting", "", context);
     try {
+      if (!mediaContextCurrent(context)) throw new Error("group_media_stale_attempt");
       var payload = await api(path, { method: "POST" });
+      if (!mediaContextCurrent(context)) throw new Error("group_media_stale_attempt");
       await connectWithGrant(payload.grant, true, { preserveStream: Boolean(localStream) });
-      await updateMediaConnectionState("connected");
+      if (!mediaContextCurrent(context)) {
+        await disconnectMedia(false);
+        throw new Error("group_media_stale_attempt");
+      }
+      await updateMediaConnectionState("connected", "", context);
       clearMediaReconnect();
       state.mediaReconnectState = "idle";
       render();
     } catch (error) {
       state.mediaReconnectState = "failed";
-      await updateMediaConnectionState("failed", String(error && error.message || "media_connect_failed").slice(0, 80)).catch(function () {});
+      if (mediaContextCurrent(context)) {
+        await updateMediaConnectionState("failed", String(error && error.message || "media_connect_failed").slice(0, 80), context).catch(function () {});
+      }
       throw error;
     }
   }
@@ -2521,6 +2728,7 @@
     var stream = localStream;
     if (!options.preserveStream) localStream = null;
     state.mediaConnected = false;
+    state.audioPlaybackBlocked = false;
     currentGrantIdentity = "";
     window.GroupMediaPresentation.clear();
     if (stream && !options.preserveStream) {
@@ -2585,9 +2793,20 @@
     handleAction(button.dataset.action, button);
   });
 
-  root.addEventListener("pointerdown", function () {
+  window.addEventListener("group-v3:audio-playback-blocked", function () {
+    setAudioPlaybackBlocked(true);
+  });
+  window.addEventListener("group-v3:audio-playback-ready", function () {
+    setAudioPlaybackBlocked(false);
+  });
+
+  root.addEventListener("pointerdown", function (event) {
     if (window.GroupV3TtsManager && window.GroupV3TtsManager.unlock) window.GroupV3TtsManager.unlock();
-    if (window.GroupMediaPresentation && window.GroupMediaPresentation.resumeAudio) window.GroupMediaPresentation.resumeAudio();
+    if (event.target.closest && event.target.closest('[data-action="enable-room-audio"]')) return;
+    if (mediaRoom && state.audioPlaybackBlocked) {
+      resumeRoomAudio().catch(function () {});
+    }
+    else if (window.GroupMediaPresentation && window.GroupMediaPresentation.resumeAudio) window.GroupMediaPresentation.resumeAudio();
   }, { passive: true });
 
   root.addEventListener("input", function (event) {

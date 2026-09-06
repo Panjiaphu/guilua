@@ -9,17 +9,79 @@
   var startTimeoutMs = 3000;
   var voiceWaitMs = 500;
   var sequence = 0;
+  var managerState = "LOCKED";
+  var managerDetail = "";
+  var primingUtterance = null;
+  var utteranceRefs = new Set();
 
   function supported() {
     return Boolean(synthesis && typeof window.SpeechSynthesisUtterance === "function");
   }
 
+  if (!supported()) managerState = "UNSUPPORTED";
+
+  function setManagerState(next, detail) {
+    managerState = next;
+    managerDetail = detail || "";
+    window.dispatchEvent(new CustomEvent("group-v3:tts-state", { detail: {
+      state: managerState,
+      detail: managerDetail,
+      supported: supported(),
+      queued: queue.length,
+      active: active && active.key || ""
+    } }));
+  }
+
+  function releaseUtterance(utterance) {
+    if (!utterance) return;
+    utterance.onstart = utterance.onend = utterance.onerror = null;
+    utteranceRefs.delete(utterance);
+  }
+
+  function primeInGesture() {
+    if (!supported() || managerState === "READY" || primingUtterance || active || queue.length) return;
+    var utterance = new window.SpeechSynthesisUtterance("\u200b");
+    primingUtterance = utterance;
+    utteranceRefs.add(utterance);
+    utterance.volume = 0.01;
+    utterance.lang = normalizeLanguage("en");
+    var ready = function () {
+      if (primingUtterance !== utterance) return;
+      primingUtterance = null;
+      releaseUtterance(utterance);
+      setManagerState("READY");
+      window.queueMicrotask(pump);
+    };
+    utterance.onstart = ready;
+    utterance.onend = ready;
+    utterance.onerror = function (event) {
+      if (primingUtterance !== utterance) return;
+      primingUtterance = null;
+      releaseUtterance(utterance);
+      setManagerState("UNLOCK_REQUIRED", event && event.error || "tts_unlock_failed");
+    };
+    try {
+      synthesis.speak(utterance);
+    } catch (_error) {
+      primingUtterance = null;
+      releaseUtterance(utterance);
+      setManagerState("UNLOCK_REQUIRED", "tts_unlock_failed");
+    }
+  }
+
   function unlock() {
-    if (!supported()) return false;
+    if (!supported()) {
+      setManagerState("UNSUPPORTED", "tts_unsupported");
+      return false;
+    }
     try {
       if (typeof synthesis.resume === "function") synthesis.resume();
+      if (!active && queue.length) pump(true);
+      else if (active && !active.started && !active.utterance) startJob(active);
+      else if (!active) primeInGesture();
       return true;
     } catch (_error) {
+      setManagerState("UNLOCK_REQUIRED", "tts_unlock_failed");
       return false;
     }
   }
@@ -69,46 +131,71 @@
     if (!job || job.finished) return;
     job.finished = true;
     window.clearTimeout(job.startTimer);
+    releaseUtterance(job.utterance);
+    job.utterance = null;
     queuedKeys.delete(job.key);
     if (active === job) active = null;
     notify(job, state, detail);
+    if (supported() && state === "COMPLETED") setManagerState("READY");
+    else if (state === "FAILED" && detail === "tts_unsupported") setManagerState("UNSUPPORTED", detail);
+    else if (state === "FAILED" && detail !== "tts_cancelled") setManagerState("ERROR", detail);
     window.queueMicrotask(pump);
   }
 
-  function failBeforeStart(job, detail) {
+  function retryBeforeStart(job, detail, nextState) {
     if (!job || job.finished || job.started) return;
+    window.clearTimeout(job.startTimer);
+    releaseUtterance(job.utterance);
+    job.utterance = null;
     try { synthesis.cancel(); } catch (_error) {}
-    finish(job, "FAILED", detail || "tts_start_failed");
+    if (active === job) active = null;
+    job.attempts += 1;
+    queue.unshift(job);
+    notify(job, nextState || "BLOCKED", detail || "tts_start_failed");
+    setManagerState(nextState || "BLOCKED", detail || "tts_start_failed");
   }
 
   function startJob(job) {
-    if (active !== job || job.finished) return;
+    if (active !== job || job.finished || job.utterance) return;
     var utterance = new window.SpeechSynthesisUtterance(job.text);
     job.utterance = utterance; // Keep a strong reference for mobile Safari.
+    utteranceRefs.add(utterance);
     utterance.lang = normalizeLanguage(job.language);
     var voice = matchingVoice(job.language);
-    if (voice) utterance.voice = voice;
+    if (voice) {
+      // A stale/foreign voice object must not abort the whole TTS queue. Some
+      // WebKit builds refresh their voice objects while voiceschanged fires.
+      try { utterance.voice = voice; } catch (_error) {}
+    }
     utterance.onstart = function () {
       if (job.finished) return;
       job.started = true;
       startedKeys.add(job.key);
       window.clearTimeout(job.startTimer);
       notify(job, "STARTED");
+      setManagerState("PLAYING");
     };
     utterance.onend = function () { finish(job, "COMPLETED"); };
     utterance.onerror = function (event) {
-      finish(job, "FAILED", event && event.error || "tts_playback_failed");
+      var detail = event && event.error || "tts_playback_failed";
+      if (!job.started && job.automatic && detail !== "canceled" && detail !== "interrupted") {
+        retryBeforeStart(job, detail, detail === "not-allowed" ? "UNLOCK_REQUIRED" : "BLOCKED");
+      } else finish(job, "FAILED", detail);
     };
-    job.startTimer = window.setTimeout(function () { failBeforeStart(job, "tts_start_timeout"); }, startTimeoutMs);
+    job.startTimer = window.setTimeout(function () {
+      if (job.automatic) retryBeforeStart(job, "tts_start_timeout", "UNLOCK_REQUIRED");
+      else finish(job, "FAILED", "tts_start_timeout");
+    }, startTimeoutMs);
     try {
       if (synthesis.paused && typeof synthesis.resume === "function") synthesis.resume();
       synthesis.speak(utterance);
     } catch (_error) {
-      failBeforeStart(job, "tts_start_failed");
+      if (job.automatic) retryBeforeStart(job, "tts_start_failed", "UNLOCK_REQUIRED");
+      else finish(job, "FAILED", "tts_start_failed");
     }
   }
 
-  function pump() {
+  function pump(userGesture) {
     if (active || !queue.length) return;
     var job = queue.shift();
     if (!job || job.finished) return window.queueMicrotask(pump);
@@ -118,14 +205,29 @@
     }
     active = job;
     notify(job, "PREPARING");
+    if (job.automatic && !userGesture && ["LOCKED", "UNLOCK_REQUIRED", "BLOCKED"].indexOf(managerState) >= 0) {
+      active = null;
+      queue.unshift(job);
+      notify(job, "UNLOCK_REQUIRED", "tts_user_activation_required");
+      setManagerState("UNLOCK_REQUIRED", "tts_user_activation_required");
+      return;
+    }
     // Manual playback stays inside the click/tap call stack. Moving speak()
     // behind a Promise can lose Safari's user-activation token and become a
     // silent no-op. Automatic delivery can wait briefly for populated voices.
-    if (!job.automatic || voices().length) {
+    if (userGesture || !job.automatic || voices().length) {
+      if (managerState !== "PLAYING") setManagerState("READY");
       startJob(job);
       return;
     }
-    waitForVoices().then(function () { startJob(job); });
+    setManagerState("VOICE_LOADING");
+    notify(job, "VOICE_LOADING");
+    waitForVoices().then(function () {
+      if (active === job && !job.finished) {
+        setManagerState("READY");
+        startJob(job);
+      }
+    });
   }
 
   function enqueue(options) {
@@ -146,13 +248,14 @@
       started: false,
       finished: false,
       startTimer: 0,
-      utterance: null
+      utterance: null,
+      attempts: 0
     };
     queuedKeys.add(key);
     if (options.priority) queue.unshift(job);
     else queue.push(job);
     notify(job, "QUEUED");
-    if (options.immediate) pump();
+    if (options.immediate) pump(Boolean(options.userGesture));
     else window.queueMicrotask(pump);
     return true;
   }
@@ -163,8 +266,14 @@
     pending.forEach(function (job) { finish(job, "FAILED", "tts_cancelled"); });
     if (active) {
       var job = active;
+      releaseUtterance(job.utterance);
+      job.utterance = null;
       try { synthesis.cancel(); } catch (_error) {}
       finish(job, "FAILED", "tts_cancelled");
+    }
+    if (primingUtterance) {
+      releaseUtterance(primingUtterance);
+      primingUtterance = null;
     }
     if (options.forgetStarted) startedKeys.clear();
   }
@@ -174,7 +283,8 @@
       key: String(options && options.key || "manual-" + Date.now() + "-" + (++sequence)),
       automatic: false,
       priority: true,
-      immediate: true
+      immediate: true,
+      userGesture: true
     });
     cancel();
     return enqueue(options);
@@ -183,6 +293,8 @@
   function diagnostics() {
     return {
       supported: supported(),
+      state: managerState,
+      detail: managerDetail,
       active: active ? { key: active.key, started: active.started, automatic: active.automatic } : null,
       queued: queue.map(function (job) { return { key: job.key, automatic: job.automatic }; }),
       startedKeys: Array.from(startedKeys)
@@ -191,6 +303,7 @@
 
   window.GroupV3TtsManager = Object.freeze({
     supported: supported,
+    state: function () { return managerState; },
     unlock: unlock,
     enqueue: enqueue,
     playManual: playManual,

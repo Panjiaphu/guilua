@@ -12,7 +12,7 @@ def test_group_text_entry_uses_ai_owned_keyboard_contract():
     ).read_text(encoding="utf-8")
 
     assert "group_text_entry_keyboard_contract_v1.css?v=20260903-keyboard-1" in template
-    assert "group_v3_app.js?v=20260904-p8-1" in template
+    assert "group_v3_app.js?v=20260906-r1-owner-qa-closure-1" in template
     assert '<textarea name="content" data-group-text-entry rows="1"' in app_js
     assert 'enterkeyhint="send" autocapitalize="sentences" spellcheck="true"' in app_js
     assert 'input name="title" data-group-text-entry' in app_js

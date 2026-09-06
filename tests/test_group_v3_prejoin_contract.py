@@ -27,9 +27,14 @@ def test_group_v3_prejoin_is_explicit_and_device_coordinator_isolated():
 
 def test_group_v3_prejoin_never_persists_handoff_or_media_secrets():
     manager_js = (ROOT / "app/static/group-v3/group_device_manager.js").read_text(encoding="utf-8")
-    assert "localStorage" not in manager_js
+    # Device ids/readiness are intentionally remembered locally so Call, Video,
+    # and Radio can reuse one device setup.  Authentication and LiveKit material
+    # must still never enter browser storage.
+    assert 'var STORAGE_KEY = "group-v3-device-preferences-v1"' in manager_js
+    assert 'JSON.stringify(Object.assign({}, preferences, { mediaReady: mediaReady }))' in manager_js
     assert "sessionStorage" not in manager_js
-    assert "token" not in manager_js.lower()
+    for secret_name in ("handoff", "token", "livekit", "access_token", "refresh_token"):
+        assert secret_name not in manager_js.lower()
 
 
 def test_group_v3_media_reconnect_is_bounded_and_cleanup_cancels_stale_work():

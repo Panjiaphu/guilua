@@ -3,6 +3,24 @@
   // DOM identity is independent from the rendering cadence and Room ownership.
   var remotes = new Map();
   var local = null;
+  function emitAudioState(name, entry, detail) {
+    window.dispatchEvent(new CustomEvent(name, { detail: {
+      identity: entry && entry.identity || "",
+      sid: entry && entry.track && entry.track.sid || "",
+      reason: detail || ""
+    } }));
+  }
+  function audioReady(entry) {
+    if (!entry || entry.kind !== "audio") return;
+    var wasBlocked = Boolean(entry.playbackBlocked);
+    entry.playbackBlocked = false;
+    if (wasBlocked) emitAudioState("group-v3:audio-playback-ready", entry);
+  }
+  function audioBlocked(entry, detail) {
+    if (!entry || entry.kind !== "audio") return;
+    entry.playbackBlocked = true;
+    emitAudioState("group-v3:audio-playback-blocked", entry, detail);
+  }
   function root() { return document.getElementById("group-native-app"); }
   function tile(identity) {
     var host = root();
@@ -39,7 +57,7 @@
       }
       entry.element.addEventListener("loadeddata", function () { mark(entry); });
       entry.element.addEventListener("resize", function () { mark(entry); });
-      entry.element.addEventListener("playing", function () { mark(entry); });
+      entry.element.addEventListener("playing", function () { audioReady(entry); mark(entry); });
       entry.element.addEventListener("canplay", function () { attemptPlayback(entry); });
     }
     if (entry.element.parentNode !== target) target.appendChild(entry.element);
@@ -47,21 +65,33 @@
       window.GroupV3DeviceManager.applyOutput(entry.element).catch(function () {});
     }
     mark(entry);
-    attemptPlayback(entry);
+    return attemptPlayback(entry);
   }
   function attemptPlayback(entry) {
-    if (!entry || !entry.element || !entry.element.play) return;
+    if (!entry || !entry.element || !entry.element.play) return Promise.resolve(false);
     if (entry.kind === "audio") {
       entry.element.muted = false;
       entry.element.volume = 1;
     }
     if (entry.element.paused) {
-      var result = entry.element.play();
-      if (result && result.catch) result.catch(function () {
-        entry.playbackBlocked = true;
-      });
+      try {
+        var result = entry.element.play();
+        if (result && result.then) return result.then(function () {
+          audioReady(entry);
+          return true;
+        }).catch(function (error) {
+          audioBlocked(entry, error && (error.name || error.message) || "playback_blocked");
+          return false;
+        });
+        audioReady(entry);
+        return Promise.resolve(true);
+      } catch (error) {
+        audioBlocked(entry, error && (error.name || error.message) || "playback_blocked");
+        return Promise.resolve(false);
+      }
     } else {
-      entry.playbackBlocked = false;
+      audioReady(entry);
+      return Promise.resolve(true);
     }
   }
   function remote(track, identity) {
@@ -109,8 +139,14 @@
     local = null;
   }
   function resumeAudio() {
+    var attempts = [];
     remotes.forEach(function (entry) {
-      if (entry.kind === "audio") place(entry);
+      if (entry.kind === "audio") {
+        attempts.push(place(entry));
+      }
+    });
+    return Promise.all(attempts).then(function (values) {
+      return values.every(Boolean);
     });
   }
   function diagnostics() {

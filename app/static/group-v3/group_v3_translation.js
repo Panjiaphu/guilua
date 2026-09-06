@@ -152,11 +152,20 @@
     node.dataset.errorCategory = message ? category || "TRANSLATION_VARIANT_ERROR" : "";
   }
 
-  function reportTtsFailure(panel) {
-    var message = translate("translationTtsUnavailable");
-    setError(panel, message, "TTS_ERROR");
+  function reportTtsState(panel, state, detail) {
+    var key = state === "UNSUPPORTED" || detail === "tts_unsupported"
+      ? "translationTtsUnavailable"
+      : state === "VOICE_LOADING"
+        ? "translationTtsVoiceLoading"
+        : state === "UNLOCK_REQUIRED" || state === "BLOCKED"
+          ? "translationTtsActivationRequired"
+          : "translationTtsError";
+    var message = translate(key);
+    setError(panel, message, state === "UNSUPPORTED" ? "TTS_UNSUPPORTED" : "TTS_PLAYBACK_STATE");
     if (panel === document.body) {
-      window.dispatchEvent(new CustomEvent("group-v3:tts-error", { detail: { code: "tts_error" } }));
+      window.dispatchEvent(new CustomEvent("group-v3:tts-error", { detail: {
+        code: String(detail || state || "tts_error"), state: state || "ERROR"
+      } }));
     }
   }
   function warning(panel, message) {
@@ -325,7 +334,7 @@
     if (!text || !state || state.disposed) return false;
     var manager = window.GroupV3TtsManager;
     if (!manager || !manager.supported()) {
-      reportTtsFailure(panel);
+      reportTtsState(panel, "UNSUPPORTED", "tts_unsupported");
       return false;
     }
     if (!automatic && state.ttsPlaying && state.ttsText === text) {
@@ -349,6 +358,9 @@
           autoplayQueued.delete(playback);
           setError(panel, "");
         }
+        if (["VOICE_LOADING", "UNLOCK_REQUIRED", "BLOCKED"].indexOf(playbackState) >= 0) {
+          reportTtsState(panel, playbackState, detail);
+        }
         if (playbackState === "COMPLETED" || playbackState === "FAILED") {
           if (!automatic) {
             state.ttsPlaying = false;
@@ -357,7 +369,9 @@
           }
           autoplayQueued.delete(playback);
           setButtonPlayback(panel, text, false);
-          if (playbackState === "FAILED" && detail !== "tts_cancelled") reportTtsFailure(panel);
+          if (playbackState === "FAILED" && detail !== "tts_cancelled") {
+            reportTtsState(panel, detail === "tts_unsupported" ? "UNSUPPORTED" : "ERROR", detail);
+          }
         }
       }
     };

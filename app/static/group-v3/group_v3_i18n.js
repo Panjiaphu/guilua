@@ -540,8 +540,38 @@ Object.assign(copy["zh-TW"], {
   "radioMember_rejected": "已拒絕"
 });
 Object.assign(copy.vi, {
+  openGroupSpaces: "Chọn không gian nhóm",
+  switchMediaRoomConfirm: "Rời phiên hiện tại và chuyển sang không gian nhóm khác?",
+  enableRoomAudio: "Bật âm thanh cuộc gọi",
+  roomAudioBlocked: "Trình duyệt đang chặn giọng nói trực tiếp. Chạm Bật âm thanh để nghe người đang nói.",
+  roomAudioReady: "Âm thanh cuộc gọi đã sẵn sàng.",
+  translationTtsActivationRequired: "Chạm vào màn hình một lần để cho phép Tự động đọc. Bản dịch này vẫn đang chờ phát.",
+  translationTtsVoiceLoading: "Đang chuẩn bị giọng đọc trên thiết bị. Bản dịch vẫn đang chờ phát.",
+  translationTtsError: "Không phát được giọng đọc. Hãy thử chạm Phát trên thiết bị này."
+});
+Object.assign(copy.en, {
+  openGroupSpaces: "Choose group space",
+  switchMediaRoomConfirm: "Leave the current session and switch to another group space?",
+  enableRoomAudio: "Enable call audio",
+  roomAudioBlocked: "The browser blocked live speech. Tap Enable call audio to hear the speaker.",
+  roomAudioReady: "Call audio is ready.",
+  translationTtsActivationRequired: "Tap the screen once to allow Auto Read. This translation remains queued.",
+  translationTtsVoiceLoading: "Preparing an on-device voice. This translation remains queued.",
+  translationTtsError: "Speech playback failed. Try Play on this device."
+});
+Object.assign(copy["zh-TW"], {
+  openGroupSpaces: "選擇群組空間",
+  switchMediaRoomConfirm: "離開目前工作階段並切換到其他群組空間？",
+  enableRoomAudio: "啟用通話音訊",
+  roomAudioBlocked: "瀏覽器已封鎖即時語音。點選啟用通話音訊即可聽到發言者。",
+  roomAudioReady: "通話音訊已就緒。",
+  translationTtsActivationRequired: "請點一下畫面以允許自動朗讀，此翻譯仍在等待播放。",
+  translationTtsVoiceLoading: "正在準備裝置語音，此翻譯仍在等待播放。",
+  translationTtsError: "無法播放語音，請嘗試點選在此裝置播放。"
+});
+Object.assign(copy.vi, {
   communicationDevices: "Thiết bị giao tiếp",
-  communicationDevicesNote: "Dùng chung lựa chọn cục bộ này cho Video nhóm và Radio. Chỉ nút kiểm tra hoặc tham gia mới xin quyền thiết bị.",
+  communicationDevicesNote: "Dùng chung lựa chọn cục bộ này cho Call nhóm, Video nhóm và Radio. Chỉ nút kiểm tra hoặc tham gia mới xin quyền thiết bị.",
   deviceOutputOsManaged: "Do hệ điều hành / trình duyệt quản lý",
   devicePreferencesLoading: "Đang đọc danh sách thiết bị…",
   devicePreferencesReady: "Cài đặt thiết bị cục bộ đã sẵn sàng",
@@ -557,7 +587,7 @@ Object.assign(copy.vi, {
 });
 Object.assign(copy.en, {
   communicationDevices: "Communication devices",
-  communicationDevicesNote: "These local choices are shared by Group Video and Radio. Device permission is requested only when you test or join.",
+  communicationDevicesNote: "These local choices are shared by Group Call, Group Video, and Radio. Device permission is requested only when you test or join.",
   deviceOutputOsManaged: "Managed by the operating system / browser",
   devicePreferencesLoading: "Reading available devices…",
   devicePreferencesReady: "Local device settings are ready",
@@ -573,7 +603,7 @@ Object.assign(copy.en, {
 });
 Object.assign(copy["zh-TW"], {
   communicationDevices: "通訊裝置",
-  communicationDevicesNote: "這些本機選擇會共用於群組視訊與 Radio。只有測試或加入時才會請求裝置權限。",
+  communicationDevicesNote: "這些本機選擇會共用於群組通話、群組視訊與 Radio。只有測試或加入時才會請求裝置權限。",
   deviceOutputOsManaged: "由作業系統／瀏覽器管理",
   devicePreferencesLoading: "正在讀取可用裝置…",
   devicePreferencesReady: "本機裝置設定已就緒",

@@ -220,8 +220,8 @@
     state.viewport.visualHeight = Math.round((window.visualViewport && window.visualViewport.height) || window.innerHeight || 0);
     state.viewport.keyboardOpen = document.body.classList.contains("group-keyboard-open") || Boolean(target.dataset.keyboardState === "OPEN");
     ensureRuntime(runtimeKey, surface);
-    var media = Boolean(native && native.querySelector(".video-call-layout, .radio-room, .radio-content.state-ready, .radio-content.state-talking, .radio-content.state-floor_busy, .radio-content.state-finalizing_burst, .radio-content.state-device_lost, .radio-content.state-disconnected"));
-    state.active = media && (surface === "video" || surface === "radio");
+    var media = Boolean(native && native.querySelector(".video-call-layout, .call-communication-layout, .radio-room, .radio-content.state-ready, .radio-content.state-talking, .radio-content.state-floor_busy, .radio-content.state-finalizing_burst, .radio-content.state-device_lost, .radio-content.state-disconnected"));
+    state.active = media && (surface === "video" || surface === "call" || surface === "radio");
     deriveEffective();
 
     var effective = state.effective;
@@ -240,6 +240,7 @@
     target.dataset.communicationMode = state.active ? "IMMERSIVE" : "NORMAL";
 
     var videoShell = target.querySelector(".video-call-layout");
+    var callShell = target.querySelector(".call-communication-layout");
     var translationShell = target.querySelector(".translation-dock");
     var radioShell = target.querySelector(".radio-content");
     var radioTranslationShell = target.querySelector(".radio-translation-card");
@@ -249,6 +250,11 @@
       videoShell.dataset.translationMode = effective.translationMode;
       videoShell.dataset.desktopTranslationMode = effective.desktopTranslationMode;
       videoShell.dataset.translationRequestedMode = requested.translationMode;
+    }
+    if (callShell) {
+      callShell.dataset.translationMode = effective.translationMode;
+      callShell.dataset.desktopTranslationMode = effective.desktopTranslationMode;
+      callShell.dataset.translationRequestedMode = requested.translationMode;
     }
     if (translationShell) {
       translationShell.dataset.translationMode = effective.translationMode;
