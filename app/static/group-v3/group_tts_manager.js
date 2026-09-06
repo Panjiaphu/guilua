@@ -14,6 +14,16 @@
     return Boolean(synthesis && typeof window.SpeechSynthesisUtterance === "function");
   }
 
+  function unlock() {
+    if (!supported()) return false;
+    try {
+      if (typeof synthesis.resume === "function") synthesis.resume();
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function normalizeLanguage(language) {
     if (language === "zh-TW") return "zh-TW";
     if (language === "vi") return "vi-VN";
@@ -181,6 +191,7 @@
 
   window.GroupV3TtsManager = Object.freeze({
     supported: supported,
+    unlock: unlock,
     enqueue: enqueue,
     playManual: playManual,
     cancel: cancel,

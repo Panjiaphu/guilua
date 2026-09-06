@@ -39,6 +39,17 @@
     }).join("");
   }
 
+  function roomPicker(spaces, currentId, options, t) {
+    var rows = (spaces || []).map(function (space) {
+      return '<button type="button" class="radio-room-picker-row ' + (space.id === currentId ? "is-active" : "") +
+        '" data-action="select-space" data-id="' + esc(space.id) + '">' +
+        '<span>' + esc(space.title) + '</span>' + (space.id === currentId ? '<b>•</b>' : '') + '</button>';
+    }).join("");
+    return '<aside class="radio-room-picker" ' + (options.roomsOpen ? "" : "hidden") + '><header><h2>' +
+      esc(t("rooms")) + '</h2><button type="button" class="icon-button" data-action="radio-rooms" aria-label="' +
+      esc(t("close")) + '">' + icon("log-out", 18) + '</button></header>' + (rows || '<p>' + esc(t("noSpaces")) + '</p>') + '</aside>';
+  }
+
   function room(options) {
     var t = options.t, current = options.state;
     function button(action, label, name, disabled, extra) {
@@ -58,6 +69,7 @@
     return '<section class="radio-content radio-room surface-content state-' + current.toLowerCase() + '">' +
       '<header class="radio-room-header">' + button("leave-radio", "backToGroup", "log-out") +
       '<h1>' + esc(t("groupRadio")) + ' · ' + esc(options.title) + '</h1>' +
+      button("radio-rooms", "rooms", "panel-right", false, "radio-room-picker-toggle") +
       button("radio-members", "participants", "users") + '</header>' +
       '<div class="radio-floor" role="status"><strong>' + esc(speaker) + '</strong><span data-radio-elapsed></span><small>' +
       esc(t("radioState_" + current.toLowerCase())) + '</small></div>' + recovery +
@@ -70,7 +82,7 @@
       esc(t("participants")) + '</h2>' + button("radio-members", "close", "users") + '</header>' +
       members.map(function (person) { return '<div><strong>' + esc(person.display_name) + '</strong><small>' +
         esc(t("radioMember_" + person.status)) + '</small></div>'; }).join("") +
-      '</aside><div class="audio-host" data-audio-host></div></section>';
+      '</aside>' + roomPicker(options.spaces, options.spaceId, options, t) + '<div class="audio-host" data-audio-host></div></section>';
   }
 
   window.GroupV3RadioUi = Object.freeze({ panelControls: panelControls, room: room, timeline: timeline });

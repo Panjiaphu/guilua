@@ -8,16 +8,23 @@
   var meterFrame = 0;
   var STORAGE_KEY = "group-v3-device-preferences-v1";
   var preferences = Object.create(null);
+  var mediaReady = { audio: false, video: false };
 
   try {
     var stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}");
     ["audioInput", "videoInput", "audioOutput"].forEach(function (kind) {
       if (typeof stored[kind] === "string") preferences[kind] = stored[kind];
     });
+    if (stored.mediaReady && typeof stored.mediaReady === "object") {
+      mediaReady.audio = stored.mediaReady.audio === true;
+      mediaReady.video = stored.mediaReady.video === true;
+    }
   } catch (_error) {}
 
   function persistPreferences() {
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences)); } catch (_error) {}
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.assign({}, preferences, { mediaReady: mediaReady })));
+    } catch (_error) {}
   }
 
   function normalizeError(error) {
@@ -59,8 +66,14 @@
 
   function remember(kind, deviceId) {
     if (["audioInput", "videoInput", "audioOutput"].indexOf(kind) < 0) return;
-    if (deviceId) preferences[kind] = String(deviceId);
+    var next = deviceId ? String(deviceId) : "";
+    var previous = preferences[kind] || "";
+    if (next) preferences[kind] = next;
     else delete preferences[kind];
+    if (next !== previous) {
+      if (kind === "audioInput" || kind === "audioOutput") mediaReady.audio = false;
+      if (kind === "audioInput" || kind === "videoInput" || kind === "audioOutput") mediaReady.video = false;
+    }
     persistPreferences();
   }
 
@@ -96,15 +109,47 @@
       activeStream = await navigator.mediaDevices.getUserMedia(constraints(request));
     } catch (error) {
       var normalized = normalizeError(error);
-      error.code = normalized.code;
-      error.deviceError = normalized;
-      throw error;
+      var canRetryWithDefaults = normalized.code === "device_not_found" &&
+        (Boolean(request.audioDeviceId) || Boolean(request.videoDeviceId));
+      if (!canRetryWithDefaults) {
+        error.code = normalized.code;
+        error.deviceError = normalized;
+        throw error;
+      }
+      // A remembered device can disappear after a browser/OS update. Retry
+      // once with the browser default instead of trapping the call in prejoin.
+      if (request.audioDeviceId) remember("audioInput", "");
+      if (request.videoDeviceId) remember("videoInput", "");
+      request.audioDeviceId = "";
+      request.videoDeviceId = "";
+      try {
+        activeStream = await navigator.mediaDevices.getUserMedia(constraints(request));
+      } catch (fallbackError) {
+        var fallback = normalizeError(fallbackError);
+        fallbackError.code = fallback.code;
+        fallbackError.deviceError = fallback;
+        throw fallbackError;
+      }
     }
     var audioTrack = activeStream.getAudioTracks()[0];
     var videoTrack = activeStream.getVideoTracks()[0];
     if (audioTrack && audioTrack.getSettings().deviceId) remember("audioInput", audioTrack.getSettings().deviceId);
     if (videoTrack && videoTrack.getSettings().deviceId) remember("videoInput", videoTrack.getSettings().deviceId);
+    if (audioTrack) mediaReady.audio = true;
+    if (kind === "video" && videoTrack) mediaReady.video = true;
+    persistPreferences();
     return activeStream;
+  }
+
+  function markReady(kind) {
+    kind = kind === "video" ? "video" : "audio";
+    mediaReady[kind] = true;
+    persistPreferences();
+  }
+
+  function isReady(kind) {
+    kind = kind === "video" ? "video" : "audio";
+    return mediaReady[kind] === true;
   }
 
   function stop() {
@@ -191,6 +236,8 @@
     normalizeError: normalizeError,
     remembered: remembered,
     remember: remember,
+    markReady: markReady,
+    isReady: isReady,
     preferences: function () {
       return { audioInput: remembered("audioInput"), videoInput: remembered("videoInput"), audioOutput: remembered("audioOutput") };
     }

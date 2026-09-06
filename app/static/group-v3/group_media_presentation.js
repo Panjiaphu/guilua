@@ -20,25 +20,48 @@
   function place(entry) {
     var host = root();
     var target = entry.kind === "video" ? tile(entry.identity) : host && host.querySelector("[data-audio-host]");
-    if (!target) return; // Wait for the exact participant, never first-tile fallback.
+    if (!target) {
+      entry.pendingTarget = true;
+      return; // Wait for the exact participant, never first-tile fallback.
+    }
     if (!entry.element) {
       entry.element = entry.track.attach();
       entry.element.className = "remote-media";
       entry.element.dataset.groupV3Media = "true";
       entry.element.autoplay = true;
       entry.element.playsInline = true;
+      entry.element.setAttribute("playsinline", "");
+      if (entry.kind === "audio") {
+        // LiveKit remote audio must remain audible. Mobile browsers may create
+        // attached elements muted or pause them until the next user gesture.
+        entry.element.muted = false;
+        entry.element.volume = 1;
+      }
       entry.element.addEventListener("loadeddata", function () { mark(entry); });
       entry.element.addEventListener("resize", function () { mark(entry); });
       entry.element.addEventListener("playing", function () { mark(entry); });
+      entry.element.addEventListener("canplay", function () { attemptPlayback(entry); });
     }
     if (entry.element.parentNode !== target) target.appendChild(entry.element);
     if (entry.kind === "audio" && window.GroupV3DeviceManager && window.GroupV3DeviceManager.applyOutput) {
       window.GroupV3DeviceManager.applyOutput(entry.element).catch(function () {});
     }
     mark(entry);
-    if (entry.element.paused && entry.element.play) {
+    attemptPlayback(entry);
+  }
+  function attemptPlayback(entry) {
+    if (!entry || !entry.element || !entry.element.play) return;
+    if (entry.kind === "audio") {
+      entry.element.muted = false;
+      entry.element.volume = 1;
+    }
+    if (entry.element.paused) {
       var result = entry.element.play();
-      if (result && result.catch) result.catch(function () { entry.playbackBlocked = true; });
+      if (result && result.catch) result.catch(function () {
+        entry.playbackBlocked = true;
+      });
+    } else {
+      entry.playbackBlocked = false;
     }
   }
   function remote(track, identity) {
@@ -85,6 +108,11 @@
     if (local) { local.element.srcObject = null; local.element.remove(); }
     local = null;
   }
+  function resumeAudio() {
+    remotes.forEach(function (entry) {
+      if (entry.kind === "audio") place(entry);
+    });
+  }
   function diagnostics() {
     return Array.from(remotes.values()).concat(local ? [local] : []).map(function (entry) {
       var el = entry.element, track = entry.track.mediaStreamTrack || entry.track;
@@ -99,6 +127,7 @@
   }
   window.GroupMediaPresentation = Object.freeze({
     remote: remote, local: syncLocal, unsubscribe: unsubscribe, clear: clear,
+    resumeAudio: resumeAudio,
     sync: function () { remotes.forEach(place); if (local) place(local); },
     diagnostics: diagnostics
   });

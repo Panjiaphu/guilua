@@ -163,6 +163,11 @@ body.group-communication-immersive .native-mobile .video-panel-toolbar {
   --meter-level: 12%; width: 64px; height: 7px; border-radius: 999px;
   background: linear-gradient(90deg, var(--teal) var(--meter-level), var(--border) var(--meter-level));
 }
+.settings-form-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.settings-form-heading h2 { min-width: 0; margin: 0; }
+.settings-collapse-control { flex: 0 0 44px; width: 44px; min-height: 44px; }
+.settings-form-body { display: grid; gap: 10px; }
+.settings-form.is-collapsed { gap: 0; }
 
 @media (max-width: 640px) {
   .chat-content > .media-start-empty { align-content: start; padding-top: 18px; }
@@ -171,6 +176,8 @@ body.group-communication-immersive .native-mobile .video-panel-toolbar {
   }
   .communication-device-grid { grid-template-columns: minmax(0, 1fr); }
   .communication-device-actions { grid-template-columns: minmax(0, 1fr); }
+  .native-mobile .settings-form { max-height: none; }
+  .native-mobile .settings-form-body { min-height: 0; }
 }
 
 @media (max-height: 500px) and (orientation: landscape) {

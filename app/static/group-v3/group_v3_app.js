@@ -80,6 +80,7 @@
     radioHistoryError: "",
     radioPreparing: false,
     radioMembersOpen: false,
+    radioRoomsOpen: false,
     roomsCollapsed: false,
     mediaSession: null,
     radioSession: null,
@@ -110,6 +111,7 @@
     deviceSettingsLoaded: false,
     deviceSettingsStatus: "",
     deviceSettingsError: "",
+    settingsCollapsed: false,
     attachmentViewer: null,
     mediaReconnectState: "idle",
     mediaReconnectAttempts: 0
@@ -854,7 +856,9 @@
     var kind = state.surface === "video" ? "video" : "audio";
     if (!session) return '<div class="chat-content state-active_' + kind + ' surface-content">' + inviteForm(kind) + renderParticipants(true) + "</div>";
     var me = selfParticipant(session);
-    if (me && me.invite_status === "invited" && session.status === "ringing") {
+    // Keep the invite action visible until this participant joins. The first
+    // participant can promote the session to ACTIVE before the invitee refreshes.
+    if (me && me.invite_status === "invited" && session.status !== "ended") {
       return '<div class="chat-content state-ringing_audio surface-content"><div class="call-stage incoming-stage"><div class="incoming-orbit">' +
         avatar(session.participants[0] && session.participants[0].display_name || session.title, "teal", "xl", true) +
         "<i></i><i></i></div>" + badge("RINGING", "warning") + "<h1>" + esc(kind === "video" ? t("groupVideo") : t("incomingAudio")) +
@@ -926,6 +930,7 @@
       t: t, icon: icon, state: radioState(), title: state.space.title,
       floor: state.radioFloor, burst: state.burst, history: state.radioHistory,
       error: state.radioHistoryError, membersOpen: state.radioMembersOpen,
+      roomsOpen: state.radioRoomsOpen, spaces: state.spaces, spaceId: state.space && state.space.id,
       participants: state.radioSession && state.radioSession.participants || [],
       labels: translationLabels()
     });
@@ -1089,21 +1094,26 @@
         (tab === item[0]) + '" class="' + (tab === item[0] ? "is-active" : "") + '">' + esc(t(item[1])) + '</button>';
     }).join("");
     var error = tab === "radio" ? state.radioHistoryError : state.archiveError;
-    return '<div class="plugin-workspace surface-content"><div class="plugin-heading"><h1>' + esc(t("translationHistory")) +
-      '</h1></div><div class="segmented-control">' + tabs + '</div><div class="history-list is-focused" data-translation-archive>' +
-      (error ? '<p role="alert">' + esc(error) + '</p>' : "") +
-      (history || '<p class="is-empty">' + esc(t("historyEmpty")) + '</p>') +
-      (state.historyTab === "chat" ? "" : action("history-more", t("historyOlder"), "history", "secondary")) +
-      '</div><form class="settings-form" data-form="save-profile"><h2>' + esc(t("translationSettings")) +
-      '</h2><label class="language-select"><span>' + esc(t("sourceLanguage")) +
+    var settingsBody = '<label class="language-select"><span>' + esc(t("sourceLanguage")) +
       '</span><select name="spoken_language">' + languageOptions(profile.spoken_language || state.locale) +
       '</select></label><label class="language-select"><span>' + esc(t("targetLanguage")) +
       '</span><select name="preferred_output_language">' + languageOptions(profile.preferred_output_language || "zh-TW") +
       '</select></label>' + toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(profile.auto_read_enabled)) +
       '<details><summary>' + esc(t("translationPrivacy")) + '</summary>' +
-       toggle("toggle-consent", t("consent"), t("consentDetail"), state.consent && state.consent.status === "granted") +
-       '</details>' + communicationDeviceSettings() + '<button type="submit" class="action-button action-primary">' + icon("languages", 17) +
-      '<span>' + esc(t("saveSettings")) + '</span></button></form></div>';
+      toggle("toggle-consent", t("consent"), t("consentDetail"), state.consent && state.consent.status === "granted") +
+      '</details>' + communicationDeviceSettings() + '<button type="submit" class="action-button action-primary">' + icon("languages", 17) +
+      '<span>' + esc(t("saveSettings")) + '</span></button>';
+    return '<div class="plugin-workspace surface-content"><div class="plugin-heading"><h1>' + esc(t("translationHistory")) +
+      '</h1></div><div class="segmented-control">' + tabs + '</div><div class="history-list is-focused" data-translation-archive>' +
+      (error ? '<p role="alert">' + esc(error) + '</p>' : "") +
+      (history || '<p class="is-empty">' + esc(t("historyEmpty")) + '</p>') +
+      (state.historyTab === "chat" ? "" : action("history-more", t("historyOlder"), "history", "secondary")) +
+      '</div><form class="settings-form ' + (state.settingsCollapsed ? "is-collapsed" : "") + '" data-form="save-profile">' +
+      '<header class="settings-form-heading"><h2>' + esc(t("translationSettings")) + '</h2>' +
+      '<button type="button" class="icon-button settings-collapse-control" data-action="settings-collapse" aria-expanded="' +
+      String(!state.settingsCollapsed) + '" aria-label="' + esc(state.settingsCollapsed ? t("expandTranslation") : t("shrinkTranslation")) + '">' +
+      icon(state.settingsCollapsed ? "plus" : "minus", 18) + '</button></header>' +
+      '<div class="settings-form-body" ' + (state.settingsCollapsed ? "hidden" : "") + '>' + settingsBody + '</div></form></div>';
   }
 
   function header() {
@@ -1188,6 +1198,7 @@
         if (meter) meter.style.setProperty("--meter-level", Math.round(level * 100) + "%");
       });
       await new Promise(function (resolve) { window.setTimeout(resolve, 900); });
+      if (window.GroupV3DeviceManager.markReady) window.GroupV3DeviceManager.markReady("audio");
       state.deviceSettingsStatus = "deviceMicrophoneReady";
     } catch (error) {
       state.deviceSettingsError = error.code || error.deviceError && error.deviceError.code || "device_error";
@@ -1368,6 +1379,8 @@
     state.radioSession = null;
     state.radioFloor = null;
     state.burst = null;
+    state.radioRoomsOpen = false;
+    state.radioMembersOpen = false;
     state.moreMediaOpen = false;
     state.error = "";
     if (window.location.pathname.indexOf("/group") === 0) {
@@ -1393,6 +1406,7 @@
     setBusy(true);
     state.error = "";
     try {
+      state.radioRoomsOpen = false;
       closePrejoin(true);
       await disconnectMedia(false);
       await loadSpaces(id);
@@ -1628,6 +1642,37 @@
     }
   }
 
+  async function trySavedDeviceStream(kind) {
+    var manager = window.GroupV3DeviceManager;
+    if (!manager || !manager.isReady || !manager.isReady(kind)) return false;
+    try {
+      if (manager.enumerate) {
+        state.prejoinDevices = await manager.enumerate();
+        state.prejoinAudioDeviceId = manager.remembered("audioInput") || state.prejoinAudioDeviceId;
+        state.prejoinVideoDeviceId = manager.remembered("videoInput") || state.prejoinVideoDeviceId;
+        state.prejoinOutputDeviceId = manager.remembered("audioOutput") || state.prejoinOutputDeviceId;
+      }
+      localStream = await manager.acquire({
+        mediaKind: kind === "video" ? "video" : "audio",
+        audioEnabled: true,
+        videoEnabled: kind === "video",
+        audioDeviceId: state.prejoinAudioDeviceId || manager.remembered("audioInput") || "",
+        videoDeviceId: state.prejoinVideoDeviceId || manager.remembered("videoInput") || ""
+      });
+      state.prejoinConfirmed = true;
+      state.prejoinOpen = false;
+      state.prejoinError = "";
+      return true;
+    } catch (_error) {
+      if (localStream) {
+        localStream.getTracks().forEach(function (track) { track.stop(); });
+        localStream = null;
+      }
+      state.prejoinConfirmed = false;
+      return false;
+    }
+  }
+
   async function saveGroupSettings(form) {
     if (!state.space || !form) return;
     var data = new FormData(form);
@@ -1761,7 +1806,8 @@
       }));
       state.mediaSession = payload.session;
       render();
-      await openPrejoin(kind);
+      if (await trySavedDeviceStream(kind)) await connectMedia();
+      else await openPrejoin(kind);
     } catch (error) {
       notify(publicError(error));
     }
@@ -1776,7 +1822,8 @@
         var joined = await api(base + "/join", { method: "POST" });
         state.mediaSession = joined.session;
         render();
-        await openPrejoin(state.mediaSession.media_kind);
+        if (await trySavedDeviceStream(state.mediaSession.media_kind)) await connectMedia();
+        else await openPrejoin(state.mediaSession.media_kind);
       } else if (name === "reject-media") {
         var rejected = await api(base + "/reject", { method: "POST" });
         state.mediaSession = rejected.session.status === "ended" ? null : rejected.session;
@@ -1797,8 +1844,10 @@
         notify(t("endedForAll"));
         render();
       } else if (name === "connect-media") {
-        if (!state.prejoinOpen && !state.prejoinConfirmed) await openPrejoin(state.mediaSession.media_kind);
-        else await connectMedia();
+        if (!state.prejoinOpen && !state.prejoinConfirmed) {
+          if (await trySavedDeviceStream(state.mediaSession.media_kind)) await connectMedia();
+          else await openPrejoin(state.mediaSession.media_kind);
+        } else await connectMedia();
       }
     } catch (error) {
       notify(publicError(error));
@@ -2026,6 +2075,8 @@
     if (name === "surface") return updateSurface(button.dataset.surface);
     if (name === "rooms-collapse") { state.roomsCollapsed = !state.roomsCollapsed; render(); return; }
     if (name === "radio-members") { state.radioMembersOpen = !state.radioMembersOpen; render(); return; }
+    if (name === "radio-rooms") { state.radioRoomsOpen = !state.radioRoomsOpen; render(); return; }
+    if (name === "settings-collapse") { state.settingsCollapsed = !state.settingsCollapsed; render(); return; }
     if (name === "history-tab") {
       state.historyTab = button.dataset.tab;
       window.history.replaceState({}, "", "/group/chat-translation?tab=" + encodeURIComponent(state.historyTab));
@@ -2533,6 +2584,11 @@
     if (button.classList.contains("attachment-viewer-backdrop") && event.target.closest(".attachment-viewer")) return;
     handleAction(button.dataset.action, button);
   });
+
+  root.addEventListener("pointerdown", function () {
+    if (window.GroupV3TtsManager && window.GroupV3TtsManager.unlock) window.GroupV3TtsManager.unlock();
+    if (window.GroupMediaPresentation && window.GroupMediaPresentation.resumeAudio) window.GroupMediaPresentation.resumeAudio();
+  }, { passive: true });
 
   root.addEventListener("input", function (event) {
     var memberSearch = event.target.closest("[data-media-member-search]");
