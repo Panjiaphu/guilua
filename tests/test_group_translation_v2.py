@@ -34,13 +34,13 @@ class FakeV2Provider:
         return SpeechTranscriptionResult(text="transcribed source", model="fake-stt", request_id="stt-v2")
 
 
-def _runtime(tmp_path, **overrides):
+def _runtime(tmp_path, runtime_kind="video", **overrides):
     app = _native_app(tmp_path, group_translation_enabled=True, openai_api_key="server-only", **overrides)
     provider = FakeV2Provider([])
     app.state.group_translation_service.provider = provider
     session = app.state.bff_session_store.create_group_session(
-        principal=_handoff_payload("video")["principal"], scope=SCOPES,
-        expires_at=_future(), handoff_id="handoff-v2", surface="video", entitlement=AI_ENTITLEMENT,
+        principal=_handoff_payload(runtime_kind)["principal"], scope=SCOPES,
+        expires_at=_future(), handoff_id="handoff-v2", surface=runtime_kind, entitlement=AI_ENTITLEMENT,
     )
     with TestClient(app) as client:
         client.cookies.set(app.state.settings.guilua_session_cookie, session.session_id)
@@ -58,7 +58,7 @@ def _runtime(tmp_path, **overrides):
                 GroupLanguageProfile(id=str(uuid4()), space_id=space.id, membership_id=owner.id, spoken_language="vi", preferred_output_language="en", auto_translate_enabled=1, auto_read_enabled=0, show_original_enabled=1),
                 GroupLanguageProfile(id=str(uuid4()), space_id=space.id, membership_id=guest.id, spoken_language="en", preferred_output_language="zh-TW", auto_translate_enabled=1, auto_read_enabled=0, show_original_enabled=1),
             ])
-            media = GroupMediaSession(id=str(uuid4()), space_id=space.id, media_kind="video", title="V2", initiated_by_membership_id=owner.id, livekit_room_name="room-" + uuid4().hex, status="active")
+            media = GroupMediaSession(id=str(uuid4()), space_id=space.id, media_kind="audio" if runtime_kind == "call" else "video", title="V2", initiated_by_membership_id=owner.id, livekit_room_name="room-" + uuid4().hex, status="active")
             db.add(media)
             db.flush()
             db.add_all([
@@ -69,15 +69,21 @@ def _runtime(tmp_path, **overrides):
     return app, session, provider, space_id, runtime_id
 
 
+@pytest.mark.parametrize("runtime_kind", ["call", "video"])
 @pytest.mark.anyio
-async def test_v2_text_dedupes_targets_and_projects_only_recipient_language(tmp_path):
-    app, session, provider, space_id, runtime_id = _runtime(tmp_path)
-    actor = __import__("app.group_v3.auth", fromlist=["GroupActor"]).GroupActor("member", "42", "42", "Nguyen Minh", "vi", frozenset(SCOPES), "h", "video", AI_ENTITLEMENT)
-    first = await app.state.group_translation_service.submit_text(actor, space_id, {"runtime_kind": "video", "runtime_id": runtime_id, "client_segment_id": "segment-v2-0001", "source_language": "vi", "source_text": "Xin chao"})
-    repeated = await app.state.group_translation_service.submit_text(actor, space_id, {"runtime_kind": "video", "runtime_id": runtime_id, "client_segment_id": "segment-v2-0001", "source_language": "vi", "source_text": "Xin chao"})
+async def test_v2_text_dedupes_targets_and_projects_only_recipient_language(
+    tmp_path, runtime_kind
+):
+    app, session, provider, space_id, runtime_id = _runtime(
+        tmp_path, runtime_kind=runtime_kind
+    )
+    actor = __import__("app.group_v3.auth", fromlist=["GroupActor"]).GroupActor("member", "42", "42", "Nguyen Minh", "vi", frozenset(SCOPES), "h", runtime_kind, AI_ENTITLEMENT)
+    first = await app.state.group_translation_service.submit_text(actor, space_id, {"runtime_kind": runtime_kind, "runtime_id": runtime_id, "client_segment_id": f"segment-v2-{runtime_kind}-0001", "source_language": "vi", "source_text": "Xin chao"})
+    repeated = await app.state.group_translation_service.submit_text(actor, space_id, {"runtime_kind": runtime_kind, "runtime_id": runtime_id, "client_segment_id": f"segment-v2-{runtime_kind}-0001", "source_language": "vi", "source_text": "Xin chao"})
     assert first["state"] == "FINAL" and first["translated_text"] == "en:Xin chao"
     assert repeated["id"] == first["id"]
     assert len(provider.calls) == 2
+    assert all(call["principal_id"] == actor.key for call in provider.calls)
     with app.state.database.session() as db:
         assert db.scalar(select(GroupTranslationSegment).where(GroupTranslationSegment.id == first["id"])) is not None
         assert len(list(db.scalars(select(GroupTranslationVariant).where(GroupTranslationVariant.segment_id == first["id"])).all())) == 2

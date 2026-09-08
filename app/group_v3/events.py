@@ -69,6 +69,7 @@ class GroupEventBroker:
         self._pubsub: Any | None = None
         self._listener_task: asyncio.Task[None] | None = None
         self._closed = False
+        self.notification_dispatcher: Any | None = None
         # Services enqueue events inside their SQLAlchemy transaction.  The
         # request-local handoff lets the router publish that exact row after
         # commit without creating a second semantic event.
@@ -258,6 +259,8 @@ class GroupEventBroker:
             # durable distributed delivery. Keep the row pending so a later
             # worker can retry once Redis/Valkey is available.
             logger.info("Group event queued pending; Redis/Valkey unavailable")
+        if self.notification_dispatcher:
+            self.notification_dispatcher.kick()
 
     async def drain_outbox(self, limit: int = 100) -> int:
         if not self._database or not self._redis:

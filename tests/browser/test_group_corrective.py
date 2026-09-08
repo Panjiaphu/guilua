@@ -6,7 +6,7 @@ Run once after source freeze: BROWSER_QA_ENABLED=1 pytest this-file.
 import json
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import pytest
 from jinja2 import Environment
@@ -21,9 +21,13 @@ ASSETS = ROOT / "app/static/group-v3"
 DEVICE = """
 window.__mediaCounts={acquire:0,publish:0,rooms:0,attach:0,audioAttach:0,audioPlay:0,connect:0,disconnect:0,startAudio:0};
 window.__devicePrefs=JSON.parse(localStorage.getItem('qa-device-prefs')||'{}');
+window.__spoken=[];
 speechSynthesis.cancel=()=>{};speechSynthesis.resume=()=>{};
 speechSynthesis.getVoices=()=>[{name:'QA voice',lang:'vi-VN'}];
-speechSynthesis.speak=utterance=>queueMicrotask(()=>{utterance.onstart?.();utterance.onend?.();});
+speechSynthesis.speak=utterance=>queueMicrotask(()=>{
+  if(utterance.text!=='\u200b')window.__spoken.push(utterance.text);
+  utterance.onstart?.();utterance.onend?.();
+});
 window.__makeStream=()=> {
   const canvas=document.createElement('canvas');canvas.width=640;canvas.height=360;
   const c=canvas.getContext('2d');c.fillStyle='#186f62';c.fillRect(0,0,640,360);
@@ -233,9 +237,19 @@ def test_r1_old_radio_translation_url_alias_and_unified_settings(page):
 
 def boot(page, surface="video", connected=True, locale="vi", participant_count=2, has_session=True,
          output_supported=True, spaces=None, blocked_audio=False, defer_connect=False,
-         auto_read=False, auto_translate=False, connect_with_pointer=True):
+         auto_read=False, auto_translate=False, connect_with_pointer=True,
+         messages=None, chat_translations=None, notification_preferences=None,
+         notification_destination=None,
+         session_status="active", self_invite_status="joined",
+         initiated_by_membership_id="m1"):
     media_kind = "video" if surface == "video" else "audio"
     spaces = spaces or [dict(id="s1", title="Điều phối QA", status="active", version=1)]
+    messages = list(messages or [])
+    chat_translations = list(chat_translations or [])
+    notification_preferences = dict(notification_preferences or {
+        "mode": "smart", "muted_until": None, "paused": False,
+        "unread_count": 0, "last_seen_sequence": 0,
+    })
     lifecycle = []
     page.expose_function("__qaLifecycle", lambda item: lifecycle.append(item))
     members = [dict(id="m1", principal_type="member", principal_id="42", principal_user_id="42",
@@ -244,6 +258,7 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
         display_name="Trần An", role="member", status="active")]
     people = [dict(id="p1", membership_id="m1", livekit_identity="owner", display_name="Nguyễn Minh", invite_status="joined", connection_status="connected", media_connected=True),
         dict(id="p2", membership_id="m2", livekit_identity="guest", display_name="Trần An", invite_status="joined", connection_status="connected", media_connected=True)]
+    people[0]["invite_status"] = self_invite_status
     for index in range(2, participant_count):
         members.append(dict(id=f"m{index+1}", principal_type="member", principal_id=str(100+index), principal_user_id=str(100+index),
             display_name=f"QA {index}", role="member", status="active"))
@@ -253,7 +268,8 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
     radio_history = []
     radio_events = []
     session = dict(id="r1", media_kind=media_kind, title="QA Video" if media_kind == "video" else "QA Call",
-        status="active", participants=people)
+        status=session_status, participants=people,
+        initiated_by_membership_id=initiated_by_membership_id)
     profile = dict(spoken_language="vi", preferred_output_language="zh-TW",
         auto_translate_enabled=auto_translate, auto_read_enabled=auto_read)
     template = (ROOT / "app/templates/group_communication_v3.html").read_text(encoding="utf-8")
@@ -280,7 +296,7 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
             if file.exists():
                 return route.fulfill(path=str(file))
             return route.fulfill(status=204)
-        if path.startswith("/group/"):
+        if path == "/group" or path.startswith("/group/"):
             return route.fulfill(content_type="text/html", body=html)
         payload = {}
         if path == "/api/group/session":
@@ -288,10 +304,34 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
         elif path == "/api/group/spaces":
             payload = {"spaces":spaces}
         elif path.endswith("/memberships"): payload={"memberships":members}
+        elif path.endswith("/messages"):
+            payload={"messages":messages}
+        elif path.endswith("/notifications/preferences"):
+            if route.request.method == "PUT":
+                update = route.request.post_data_json or {}
+                notification_preferences["mode"] = update.get(
+                    "mode", notification_preferences["mode"]
+                )
+                if "mute_for_minutes" in update:
+                    minutes = int(update["mute_for_minutes"])
+                    notification_preferences["paused"] = minutes < 0
+                    notification_preferences["muted_until"] = (
+                        None if minutes == 0 else "2026-09-08T00:00:00Z"
+                    )
+            payload={"preferences":notification_preferences}
+        elif path.endswith("/notifications/read"):
+            update = route.request.post_data_json or {}
+            notification_preferences["last_seen_sequence"] = int(
+                update.get("last_seen_sequence") or 0
+            )
+            notification_preferences["unread_count"] = 0
+            payload={"preferences":notification_preferences}
         elif path.endswith("/translation/profile"):
             if route.request.method == "PUT": profile.update(route.request.post_data_json)
             payload={"profile":profile}
         elif path.endswith("/translation/consent"): payload={"consent":{"status":"granted"}}
+        elif path.endswith("/translation/chat-history"):
+            payload={"translations":chat_translations}
         elif path.endswith("/radio/sessions"): payload={"sessions":[radio_session]}
         elif path.endswith("/radio/room/join"): payload={"session":radio_session}
         elif path.endswith("/radio/history"): payload={"bursts":radio_history}
@@ -319,7 +359,10 @@ def boot(page, surface="video", connected=True, locale="vi", participant_count=2
             payload={"grant":{"provider":"livekit-cloud","url":"wss://fixture.invalid","token":"fixture-only","participant_identity":"owner","media_kind":"audio" if "/radio/" in path else media_kind}}
         route.fulfill(content_type="application/json", body=json.dumps(payload))
     page.route("**/*", handle)
-    page.goto("http://127.0.0.1:8765/group/" + surface)
+    entry_path = "/group/" + surface
+    if notification_destination:
+        entry_path = "/group?" + urlencode(notification_destination)
+    page.goto("http://127.0.0.1:8765" + entry_path)
     expect(page.locator(".native-app")).to_be_visible()
     if connected:
         if connect_with_pointer:
@@ -349,6 +392,168 @@ def geometry(page):
       .map(s=>{let n=document.querySelector(s);if(!n)return [s,null];let r=n.getBoundingClientRect(),c=getComputedStyle(n);
       return [s,{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom,rows:c.gridTemplateRows,
         columns:c.gridTemplateColumns,padding:c.padding,minHeight:c.minHeight,display:c.display}]}))""")
+
+
+@pytest.mark.parametrize("width,height", [(1440, 900), (390, 844), (390, 667)])
+def test_notification_destination_and_settings_are_exact_and_responsive(
+    page, tmp_path, width, height
+):
+    page.set_viewport_size({"width": width, "height": height})
+    target_message = {
+        "id": "message-qa",
+        "sequence": 7,
+        "sender": {
+            "type": "member",
+            "id": "84",
+            "user_id": "84",
+            "display_name": "Trần An",
+        },
+        "content_type": "text",
+        "content": "Nội dung chỉ được đọc trong AI-COMMUNICATION.",
+        "source_language": "vi",
+        "attachments": [],
+        "pinned": False,
+        "created_at": "2026-09-07T02:00:00Z",
+    }
+    boot(
+        page,
+        surface="chat",
+        connected=False,
+        spaces=[
+            {"id": "s0", "title": "Nhóm mặc định", "status": "active", "version": 1},
+            {"id": "s1", "title": "Điều phối QA", "status": "active", "version": 1},
+        ],
+        messages=[target_message],
+        notification_preferences={
+            "mode": "smart",
+            "muted_until": None,
+            "paused": False,
+            "unread_count": 1,
+            "last_seen_sequence": 0,
+        },
+        notification_destination={
+            "space_id": "s1",
+            "surface": "chat",
+            "resource_id": "message-qa",
+        },
+    )
+
+    expect(page.locator(".native-app")).to_have_attribute("data-state", "chat")
+    assert page.evaluate("GroupV3Runtime.snapshot().space_id") == "s1"
+    target = page.locator('[data-message-id="message-qa"]')
+    expect(target).to_have_attribute("data-notification-target", "true")
+    assert "space_id=s1" in page.url
+    assert "resource_id=message-qa" in page.url
+
+    page.locator('[data-action="settings"]').click()
+    settings = page.locator(".group-settings")
+    expect(settings).to_be_visible()
+    expect(settings.locator(".group-notification-settings")).to_be_visible()
+    assert settings.locator('[data-action="notification-mode"]').count() == 4
+    assert settings.locator('[data-action="notification-mute"]').count() == 5
+    if width <= 390:
+        touch_targets = settings.locator(
+            '[data-action="notification-mode"], '
+            '[data-action="notification-mute"], '
+            '.group-ringtone-preferences select'
+        )
+        assert all(
+            touch_targets.nth(index).bounding_box()["height"] >= 44
+            for index in range(touch_targets.count())
+        )
+
+    settings.locator('[data-action="notification-mode"][data-mode="all"]').click()
+    page.wait_for_function(
+        """() => document.querySelector(
+          '[data-action="notification-mode"][data-mode="all"]'
+        )?.classList.contains('action-primary')"""
+    )
+    settings.locator('[data-action="notification-mute"][data-minutes="15"]').click()
+    expect(settings.locator('[data-action="notification-mute"][data-minutes="0"]')).to_be_visible()
+
+    settings.locator('[data-change="ringtone-volume"]').select_option("25")
+    settings.locator('[data-change="ringtone-duration"]').select_option("15")
+    stored = page.evaluate(
+        "JSON.parse(localStorage.getItem('groupV3RingtonePreferences'))"
+    )
+    assert stored["incoming_ringtone_volume_percent"] == 25
+    assert stored["incoming_ringtone_duration_seconds"] == 15
+
+    box = settings.bounding_box()
+    assert box is not None
+    assert box["x"] >= 0 and box["y"] >= 0
+    assert box["x"] + box["width"] <= width + 1
+    assert box["y"] + box["height"] <= height + 1
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    scroll = settings.locator(".member-manager-scroll")
+    scroll_metrics = scroll.evaluate(
+        "node => ({clientWidth: node.clientWidth, scrollWidth: node.scrollWidth, "
+        "clientHeight: node.clientHeight, scrollHeight: node.scrollHeight})"
+    )
+    assert scroll_metrics["scrollWidth"] <= scroll_metrics["clientWidth"] + 1
+    last_action = settings.locator('[data-action="delete-group"]')
+    last_action.scroll_into_view_if_needed()
+    last_box = last_action.bounding_box()
+    assert last_box is not None and last_box["y"] + last_box["height"] <= height + 1
+    if scroll_metrics["scrollHeight"] > scroll_metrics["clientHeight"] + 1:
+        assert scroll.evaluate("node => node.scrollTop") > 0
+    page.screenshot(
+        path=str(tmp_path / f"group-notifications-{width}x{height}.png"),
+        animations="disabled",
+    )
+
+
+def test_chat_history_translation_never_auto_reads_when_auto_read_is_enabled(page):
+    message = {
+        "id": "chat-history-message",
+        "sequence": 8,
+        "sender": {
+            "type": "member",
+            "id": "84",
+            "user_id": "84",
+            "display_name": "Trần An",
+        },
+        "content_type": "text",
+        "content": "Nội dung gốc trong lịch sử Chat",
+        "source_language": "vi",
+        "attachments": [],
+        "pinned": False,
+        "created_at": "2026-09-07T02:00:00Z",
+    }
+    translation = {
+        "id": "chat-history-translation",
+        "message_id": message["id"],
+        "source_language": "vi",
+        "target_language": "zh-TW",
+        "state": "FINAL",
+        "translated_text": "聊天歷史翻譯",
+        "shared_variant": True,
+    }
+    boot(
+        page,
+        surface="chat",
+        connected=False,
+        auto_read=True,
+        messages=[message],
+        chat_translations=[translation],
+    )
+
+    expect(page.locator('[data-message-id="chat-history-message"]')).to_contain_text(
+        "聊天歷史翻譯"
+    )
+    assert page.evaluate("window.__spoken") == []
+    page.evaluate(
+        """() => window.__eventSources[0].emit('group-change', {
+          type: 'translation.chat.final',
+          space_id: 's1',
+          resource_id: 'chat-history-message'
+        })"""
+    )
+    page.wait_for_timeout(200)
+    expect(page.locator('[data-message-id="chat-history-message"]')).to_contain_text(
+        "聊天歷史翻譯"
+    )
+    assert page.evaluate("window.__spoken") == []
 
 
 @pytest.mark.parametrize("width,height", [(390,844),(844,390),(412,915)])
@@ -1167,6 +1372,252 @@ def test_member_picker_uses_available_height_and_keeps_action_visible(page, widt
     assert list_box["height"] >= (90 if height < 500 else 100)
     assert action_box["y"] + action_box["height"] <= min(height, form_box["y"] + form_box["height"] + 1)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+@pytest.mark.parametrize("surface", ["call", "video"])
+def test_incoming_ringtone_stops_for_every_non_incoming_runtime_state(page, surface):
+    runtime = boot(
+        page,
+        surface=surface,
+        connected=False,
+        spaces=[
+            {"id": "s1", "title": "Điều phối QA", "status": "active", "version": 1},
+            {"id": "s0", "title": "Nhóm khác", "status": "active", "version": 1},
+        ],
+        session_status="ringing",
+        self_invite_status="invited",
+        initiated_by_membership_id="m2",
+    )
+    expect(page.locator(".incoming-stage")).to_be_visible()
+    page.evaluate(
+        """() => {
+          const control = document.createElement('button');
+          control.type = 'button';
+          control.dataset.action = 'qa-noop';
+          control.textContent = 'Arm';
+          document.querySelector('#group-native-app').append(control);
+        }"""
+    )
+    page.locator('[data-action="qa-noop"]').click()
+    page.wait_for_function(
+        """() => {
+          const state = GroupV3IncomingRingtone.diagnostics();
+          return state.key === 'r1' && state.armed && state.leader;
+        }"""
+    )
+    page.evaluate(
+        """() => {
+          const ringback = window.GroupV3Ringback;
+          window.__ringbackEvents = [];
+          window.GroupV3Ringback = {
+            start(key) { window.__ringbackEvents.push({type: 'start', key}); ringback.start(key); },
+            stop() { window.__ringbackEvents.push({type: 'stop'}); ringback.stop(); },
+            arm() { ringback.arm(); }
+          };
+        }"""
+    )
+    session = runtime["session"]
+    participant = session["participants"][0]
+    session["id"] = "r-replacement"
+    page.evaluate(
+        """() => window.__eventSources[0].emit('group-change', {
+          space_id: 's1', type: 'media.session.changed'
+        })"""
+    )
+    page.wait_for_function(
+        """() => {
+          const state = GroupV3IncomingRingtone.diagnostics();
+          return state.key === 'r-replacement' && state.leader;
+        }"""
+    )
+
+    terminal_cases = [
+        ("accepted", "active", "joined", "m2"),
+        ("rejected", "ringing", "rejected", "m2"),
+        ("left", "ringing", "left", "m2"),
+        ("cancelled", "cancelled", "invited", "m2"),
+        ("expired", "expired", "invited", "m2"),
+        ("missed", "missed", "invited", "m2"),
+        ("outgoing-caller", "ringing", "joined", "m1"),
+        ("ended", "ended", "invited", "m2"),
+    ]
+    for index, (label, status, invite_status, initiator) in enumerate(
+        terminal_cases, start=1
+    ):
+        if index > 1:
+            session["id"] = f"r{index}"
+            session["status"] = "ringing"
+            session["initiated_by_membership_id"] = "m2"
+            participant["invite_status"] = "invited"
+            page.evaluate(
+                """() => window.__eventSources[0].emit('group-change', {
+                  space_id: 's1', type: 'media.session.changed'
+                })"""
+            )
+            page.wait_for_function(
+                "expected => GroupV3IncomingRingtone.diagnostics().key === expected",
+                arg=f"r{index}",
+            )
+
+        session["status"] = status
+        session["initiated_by_membership_id"] = initiator
+        participant["invite_status"] = invite_status
+        page.evaluate(
+            """() => window.__eventSources[0].emit('group-change', {
+              space_id: 's1', type: 'media.session.changed'
+            })"""
+        )
+        page.wait_for_function(
+            "GroupV3IncomingRingtone.diagnostics().key === ''"
+        )
+        assert not page.evaluate(
+            "GroupV3IncomingRingtone.diagnostics().leader"
+        ), label
+        if label == "outgoing-caller":
+            assert page.evaluate(
+                "expected => window.__ringbackEvents.some(event => "
+                "event.type === 'start' && event.key === expected)",
+                arg=session["id"],
+            )
+
+    session["id"] = "r-room-switch"
+    session["status"] = "ringing"
+    session["initiated_by_membership_id"] = "m2"
+    participant["invite_status"] = "invited"
+    page.evaluate(
+        """() => window.__eventSources[0].emit('group-change', {
+          space_id: 's1', type: 'media.session.changed'
+        })"""
+    )
+    page.wait_for_function(
+        "GroupV3IncomingRingtone.diagnostics().key === 'r-room-switch'"
+    )
+    page.locator('[data-action="select-space"][data-id="s0"]').click()
+    page.wait_for_function(
+        """() => GroupV3Runtime.snapshot().space_id === 's0'
+          && GroupV3IncomingRingtone.diagnostics().key === ''
+          && !GroupV3IncomingRingtone.diagnostics().leader"""
+    )
+    page.locator('[data-action="select-space"][data-id="s1"]').click()
+    page.wait_for_function(
+        """() => GroupV3Runtime.snapshot().space_id === 's1'
+          && GroupV3IncomingRingtone.diagnostics().key === 'r-room-switch'"""
+    )
+    page.evaluate("window.dispatchEvent(new PageTransitionEvent('pagehide'))")
+    page.wait_for_function(
+        """() => GroupV3IncomingRingtone.diagnostics().key === ''
+          && !GroupV3IncomingRingtone.diagnostics().leader"""
+    )
+
+
+def test_radio_runtime_never_starts_custom_incoming_ringtone(page):
+    boot(page, surface="radio", connected=False)
+    page.locator(".radio-ptt").click()
+    page.wait_for_function("GroupV3Runtime.snapshot().media_connected")
+    assert page.evaluate("GroupV3IncomingRingtone.diagnostics().key") == ""
+    assert not page.evaluate("GroupV3IncomingRingtone.diagnostics().leader")
+
+
+@pytest.mark.parametrize("surface", ["call", "video"])
+def test_ringtone_multitab_has_one_audible_owner_and_stops_terminally(
+    chromium_browser, surface
+):
+    ringtone_source = (
+        ROOT / "app/static/group-v3/group_incoming_ringtone.js"
+    ).read_text(encoding="utf-8")
+    html = """<!doctype html>
+<html><head><meta charset="utf-8">
+<script>
+window.__toneStarts = 0;
+window.__qaRingtoneKey = '';
+window.AudioContext = class {
+  constructor() { this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+  resume() { this.state = 'running'; return Promise.resolve(); }
+  createOscillator() {
+    return {
+      type: '', frequency: { value: 0 }, onended: null,
+      connect(node) { return node; },
+      disconnect() {},
+      start() { window.__toneStarts += 1; },
+      stop() { if (this.onended) this.onended(); }
+    };
+  }
+  createGain() {
+    return {
+      gain: {
+        setValueAtTime() {},
+        exponentialRampToValueAtTime() {}
+      },
+      connect(node) { return node; },
+      disconnect() {}
+    };
+  }
+};
+</script>
+<script src="/group_incoming_ringtone.js" defer></script>
+</head><body><button id="arm" type="button">Arm ringtone</button>
+<script>
+document.querySelector('#arm').addEventListener('click', () => {
+  GroupV3IncomingRingtone.start(window.__qaRingtoneKey, { durationSeconds: 15 });
+  GroupV3IncomingRingtone.arm();
+});
+</script></body></html>"""
+    context = chromium_browser.new_context(service_workers="block")
+
+    def fulfill(route):
+        path = urlparse(route.request.url).path
+        if path == "/group_incoming_ringtone.js":
+            return route.fulfill(
+                content_type="application/javascript", body=ringtone_source
+            )
+        return route.fulfill(content_type="text/html", body=html)
+
+    context.route("http://127.0.0.1:8766/**", fulfill)
+    errors = []
+    try:
+        pages = [context.new_page(), context.new_page()]
+        for current in pages:
+            current.on("pageerror", lambda error: errors.append(str(error)))
+            current.goto("http://127.0.0.1:8766/")
+            current.evaluate(
+                "key => { window.__qaRingtoneKey = key; }",
+                f"{surface}:session-qa",
+            )
+            current.locator("#arm").click()
+        pages[0].wait_for_timeout(500)
+
+        diagnostics = [
+            current.evaluate("GroupV3IncomingRingtone.diagnostics()")
+            for current in pages
+        ]
+        leaders = [index for index, item in enumerate(diagnostics) if item["leader"]]
+        assert all(item["armed"] and item["visible"] for item in diagnostics), diagnostics
+        assert len(leaders) == 1, diagnostics
+        tone_counts = [current.evaluate("window.__toneStarts") for current in pages]
+        assert tone_counts[leaders[0]] > 0, tone_counts
+        assert tone_counts[1 - leaders[0]] == 0, tone_counts
+
+        leader = pages[leaders[0]]
+        survivor = pages[1 - leaders[0]]
+        survivor_before = survivor.evaluate("window.__toneStarts")
+        leader.close()
+        survivor.wait_for_function(
+            "GroupV3IncomingRingtone.diagnostics().leader === true"
+        )
+        survivor.wait_for_function(
+            "before => window.__toneStarts > before", arg=survivor_before
+        )
+
+        survivor.evaluate("GroupV3IncomingRingtone.stop()")
+        terminal = survivor.evaluate("GroupV3IncomingRingtone.diagnostics()")
+        assert terminal["key"] == ""
+        assert terminal["leader"] is False
+        stopped_count = survivor.evaluate("window.__toneStarts")
+        survivor.wait_for_timeout(1800)
+        assert survivor.evaluate("window.__toneStarts") == stopped_count
+        assert not errors, errors
+    finally:
+        context.close()
 
 
 @pytest.mark.parametrize("width,height",[(390,844),(844,390)])

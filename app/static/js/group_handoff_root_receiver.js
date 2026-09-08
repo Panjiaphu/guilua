@@ -49,11 +49,26 @@
       && Number.isFinite(expiry) && expiry > Date.now();
   };
 
+  const validDestination = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "object") return null;
+    const spaceId = text(value.space_id, 36);
+    const surface = text(value.surface, 16);
+    const resourceId = value.resource_id ? text(value.resource_id, 80) : "";
+    const eventKind = text(value.event_kind, 80);
+    const safeId = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+    if (!safeId.test(spaceId) || (resourceId && !safeId.test(resourceId))) return null;
+    if (!["chat", "call", "video", "radio"].includes(surface)) return null;
+    if (!eventKind.startsWith("group.")) return null;
+    return { spaceId, surface, resourceId };
+  };
+
   const redeem = async (message, sourceOrigin) => {
     if (state.consumed || state.status === "REDEEMING") return;
     state.consumed = true;
     setState("REDEEMING");
     let handoffCode = text(message.handoff_code, 256);
+    const destination = validDestination(message.destination);
     try {
       const response = await window.fetch("/api/group-handoff/v3/consume", {
         method: "POST",
@@ -72,7 +87,17 @@
       // The Group capability and its runtime are AI-owned. The generic root
       // receiver only establishes the server session, then enters the AI app's
       // normal Group route without forwarding a capability selector.
-      window.location.replace("/group");
+      if (!destination) {
+        window.location.replace("/group");
+        return;
+      }
+      const target = new URL("/group", window.location.origin);
+      target.searchParams.set("space_id", destination.spaceId);
+      target.searchParams.set("surface", destination.surface);
+      if (destination.resourceId) {
+        target.searchParams.set("resource_id", destination.resourceId);
+      }
+      window.location.replace(target.pathname + target.search);
     } catch (_error) {
       handoffCode = "";
       setState("FAILED");

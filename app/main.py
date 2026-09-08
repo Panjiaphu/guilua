@@ -16,6 +16,9 @@ from app.group_v3.chat_translation_service import GroupChatTranslationService
 from app.group_v3.events import GroupEventBroker
 from app.group_v3.media import LiveKitGroupMediaProvider
 from app.group_v3.invitation_service import GroupInvitationService
+from app.group_v3.notification_presence import GroupNotificationPresence
+from app.group_v3.notification_router import router as group_v3_notification_router
+from app.group_v3.notification_service import GroupNotificationService
 from app.group_v3.radio_floor import DistributedRadioFloor
 from app.group_v3.radio_router import router as group_v3_radio_router
 from app.group_v3.radio_service import GroupRadioService
@@ -48,6 +51,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 drain_outbox = getattr(app.state.group_event_broker, "drain_outbox", None)
                 if drain_outbox:
                     await drain_outbox()
+                drain_notifications = getattr(
+                    app.state.group_notification_service, "drain", None
+                )
+                if drain_notifications:
+                    await drain_notifications()
                 if app.state.settings.group_radio_v3_enabled:
                     try:
                         await app.state.group_radio_service.reconcile_device_loss(app.state.group_radio_floor)
@@ -70,6 +78,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             with suppress(asyncio.CancelledError):
                 await task
             close_client = getattr(getattr(app, "state", None), "timeblock_client", None)
+            group_notification_service = getattr(
+                getattr(app, "state", None), "group_notification_service", None
+            )
+            close_notifications = getattr(group_notification_service, "close", None)
+            if close_notifications:
+                await close_notifications()
             close_method = getattr(close_client, "aclose", None)
             if close_method:
                 await close_method()
@@ -87,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(title=runtime_settings.app_name, debug=runtime_settings.debug, lifespan=lifespan)
     application.state.settings = runtime_settings
     application.state.database = Database(runtime_settings)
+    application.state.timeblock_client = TimeblockClient(runtime_settings)
     group_crypto = GroupCrypto(runtime_settings)
     livekit_provider = LiveKitGroupMediaProvider(runtime_settings)
     application.state.group_media_provider = livekit_provider
@@ -94,6 +109,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database=application.state.database,
         redis_url=runtime_settings.group_radio_redis_url,
         redis_namespace=f"{runtime_settings.group_radio_redis_namespace}:group-events",
+    )
+    application.state.group_notification_presence = GroupNotificationPresence(
+        runtime_settings.group_radio_redis_url,
+        f"{runtime_settings.group_radio_redis_namespace}:group-notifications",
+        ttl_seconds=75,
+    )
+    application.state.group_notification_service = GroupNotificationService(
+        application.state.database,
+        application.state.timeblock_client,
+        application.state.group_notification_presence,
+    )
+    application.state.group_event_broker.notification_dispatcher = (
+        application.state.group_notification_service
     )
     application.state.group_service = GroupService(
         application.state.database, group_crypto, application.state.group_event_broker
@@ -132,7 +160,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         application.state.group_event_broker,
     )
     application.state.room_manager = RoomManager(runtime_settings)
-    application.state.timeblock_client = TimeblockClient(runtime_settings)
     application.state.bff_session_store = SessionStore(
         session_ttl_seconds=runtime_settings.guilua_session_ttl_seconds,
         pending_ttl_seconds=runtime_settings.guilua_pending_authorization_ttl_seconds,
@@ -157,6 +184,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(group_v3_router)
     application.include_router(group_v3_session_router)
     application.include_router(group_v3_translation_router)
+    application.include_router(group_v3_notification_router)
     application.include_router(group_v3_radio_router)
     application.include_router(communication_router)
 

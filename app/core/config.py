@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     group_translation_monthly_video_target_seconds: int = Field(
         default=1800, ge=60, le=10_000_000
     )
+    # 0 records requester-funded Chat cost without inventing a commercial cap.
+    # A future approved package can set a positive monthly variant allowance.
+    group_chat_translation_monthly_variant_limit: int = Field(
+        default=0, ge=0, le=10_000_000
+    )
     group_translation_policy_version: str = 'group-translation-v3-2026-08-31'
     group_v3_enabled: bool = False
     group_handoff_audience: str = 'ai-communication-group-v3'

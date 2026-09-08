@@ -257,6 +257,7 @@ async def test_historical_missing_variant_is_created_once_and_charged_to_source_
     assert projected["translated_text"] == "zh-TW:Tạo khi được yêu cầu"
     assert len(provider.calls) == 1
     assert provider.calls[0]["principal_id"] == "member:42:42"
+    assert provider.calls[0]["principal_id"] != actor("late-lazy").key
 
 
 @pytest.mark.anyio
@@ -368,6 +369,9 @@ async def test_radio_floor_release_before_stt_single_attempt_history_reopen(tmp_
     repeated = await translation.submit_radio_voice(actor(), space, sid, burst["id"],
         {}, b"duplicate", "clip.m4a", "audio/mp4")
     assert result["id"] == repeated["id"] and provider.stt_calls == 1
+    assert provider.calls and all(
+        call["principal_id"] == actor().key for call in provider.calls
+    )
     assert result["client_segment_id"] == burst["id"] and result["source_language"] == "vi"
     history = service.room_history(actor(), space, translation)
     final = next(x for x in history if x["id"] == burst["id"])

@@ -87,7 +87,11 @@ async def translate_chat_message(
         str(idempotency_key or ""),
     )
     translation = result.get("translation")
-    if translation and translation.get("state") == "FINAL":
+    if (
+        translation
+        and translation.get("state") == "FINAL"
+        and not result.get("idempotent")
+    ):
         await request.app.state.group_event_broker.publish(
             normalized_space_id,
             "chat_translation.final",

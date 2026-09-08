@@ -14,6 +14,7 @@ class LanguageProfileUpdate(StrictModel):
     spoken_language: str
     preferred_output_language: str
     auto_translate_enabled: bool = True
+    chat_auto_translate_enabled: bool = False
     auto_read_enabled: bool = False
     show_original_enabled: bool = True
 

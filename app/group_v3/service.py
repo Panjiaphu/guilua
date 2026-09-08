@@ -102,6 +102,8 @@ class GroupService:
             "lifecycle_status": space.lifecycle_status,
             "version": space.version,
             "my_role": membership.role if membership else "",
+            "notification_mode": membership.notification_mode if membership else "smart",
+            "unread_count": membership.unread_count if membership else 0,
             "created_at": _iso(space.created_at),
             "updated_at": _iso(space.updated_at),
         }
@@ -117,6 +119,11 @@ class GroupService:
             "display_name": item.display_name,
             "role": item.role,
             "status": item.status,
+            "notification_mode": item.notification_mode,
+            "notification_muted_until": _iso(item.notification_muted_until),
+            "notification_paused": bool(item.notification_paused),
+            "last_seen_sequence": item.last_seen_sequence,
+            "unread_count": item.unread_count,
             "joined_at": _iso(item.joined_at),
             "left_at": _iso(item.left_at),
         }
@@ -378,6 +385,8 @@ class GroupService:
             try:
                 with db.begin():
                     self._require_membership(db, space_id, actor, roles={"owner", "admin"})
+                    space = db.get(GroupSpace, space_id)
+                    current_sequence = space.message_sequence if space else 0
                     existing = db.scalar(
                         select(GroupMembership).where(
                             GroupMembership.space_id == space_id,
@@ -391,6 +400,8 @@ class GroupService:
                         existing.role = values["role"]
                         existing.status = "active"
                         existing.left_at = None
+                        existing.last_seen_sequence = current_sequence
+                        existing.unread_count = 0
                         existing.updated_at = _now()
                         item = existing
                     else:
@@ -403,6 +414,8 @@ class GroupService:
                             display_name=values["display_name"],
                             role=values["role"],
                             status="active",
+                            last_seen_sequence=current_sequence,
+                            unread_count=0,
                         )
                         db.add(item)
                     self._audit(db, actor, space_id, "membership.upserted", resource_type="membership", resource_id=item.id, metadata={"role": item.role})

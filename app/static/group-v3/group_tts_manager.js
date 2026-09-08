@@ -11,6 +11,7 @@
   var sequence = 0;
   var managerState = "LOCKED";
   var managerDetail = "";
+  var ringtoneActive = false;
   var primingUtterance = null;
   var utteranceRefs = new Set();
 
@@ -196,7 +197,7 @@
   }
 
   function pump(userGesture) {
-    if (active || !queue.length) return;
+    if (ringtoneActive || active || !queue.length) return;
     var job = queue.shift();
     if (!job || job.finished) return window.queueMicrotask(pump);
     if (!supported()) {
@@ -295,11 +296,21 @@
       supported: supported(),
       state: managerState,
       detail: managerDetail,
+      ringtoneActive: ringtoneActive,
       active: active ? { key: active.key, started: active.started, automatic: active.automatic } : null,
       queued: queue.map(function (job) { return { key: job.key, automatic: job.automatic }; }),
       startedKeys: Array.from(startedKeys)
     };
   }
+
+  window.addEventListener("group-v3:ringtone-started", function () {
+    ringtoneActive = true;
+    cancel();
+  });
+  window.addEventListener("group-v3:ringtone-stopped", function () {
+    ringtoneActive = false;
+    window.queueMicrotask(pump);
+  });
 
   window.GroupV3TtsManager = Object.freeze({
     supported: supported,

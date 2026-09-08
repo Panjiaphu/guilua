@@ -508,6 +508,7 @@
         spoken_language: source && source.value !== "auto" && source.value || snapshot.spoken_language || "vi",
         preferred_output_language: target && target.value || snapshot.target_language || "vi",
         auto_translate_enabled: Boolean(snapshot.auto_translate),
+        chat_auto_translate_enabled: Boolean(snapshot.chat_auto_translate),
         auto_read_enabled: Boolean(autoRead && autoRead.checked),
         show_original_enabled: true
       })

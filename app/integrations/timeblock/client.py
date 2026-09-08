@@ -213,6 +213,7 @@ class TimeblockClient:
         *,
         idempotency_key: str | None = None,
         client_session: str | None = None,
+        timeout_seconds: float | None = None,
     ) -> dict:
         headers = self._server_headers(client_session=client_session)
         if idempotency_key:
@@ -222,6 +223,11 @@ class TimeblockClient:
                 self._api_url(path),
                 headers=headers,
                 json=payload,
+                timeout=(
+                    timeout_seconds
+                    if timeout_seconds is not None
+                    else self.settings.timeblock_timeout_seconds
+                ),
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:
@@ -274,6 +280,20 @@ class TimeblockClient:
         ):
             raise TimeblockIntegrationError('timeblock_contract_mismatch')
         return data
+
+    async def ingest_group_notification(
+        self,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str,
+    ) -> dict:
+        """Send one trusted metadata-only Group delivery to Timeblock."""
+        return await self._post(
+            "/api/communication/group/notifications/ingest",
+            payload,
+            idempotency_key=idempotency_key,
+            timeout_seconds=max(self.settings.timeblock_timeout_seconds, 35.0),
+        )
 
     async def redeem_group_handoff_v3(
         self,

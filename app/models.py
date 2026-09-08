@@ -47,6 +47,14 @@ class GroupMembership(Base):
         UniqueConstraint("space_id", "principal_type", "principal_id", "principal_user_id", name="uq_group_membership_principal"),
         CheckConstraint("role IN ('owner','admin','member')", name="ck_group_membership_role"),
         CheckConstraint("status IN ('active','left','removed')", name="ck_group_membership_status"),
+        CheckConstraint(
+            "notification_mode IN ('smart','all','important','none')",
+            name="ck_group_membership_notification_mode",
+        ),
+        CheckConstraint(
+            "notification_paused IN (0,1)",
+            name="ck_group_membership_notification_paused",
+        ),
         Index("ix_group_memberships_principal_status", "principal_type", "principal_id", "principal_user_id", "status"),
         Index("ix_group_memberships_space_status", "space_id", "status", "role"),
         Index(
@@ -66,6 +74,13 @@ class GroupMembership(Base):
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="member", server_default="member")
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
+    notification_mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    notification_muted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notification_paused: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_seen_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    unread_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
@@ -160,16 +175,10 @@ class GroupChatTranslation(Base):
     __tablename__ = "group_chat_translations"
     __table_args__ = (
         UniqueConstraint(
-            "recipient_membership_id",
-            "idempotency_key",
-            name="uq_group_chat_translation_idempotency",
-        ),
-        UniqueConstraint(
             "message_id",
-            "recipient_membership_id",
-            "target_language",
             "message_fingerprint",
-            name="uq_group_chat_translation_message_version",
+            "target_language",
+            name="uq_group_chat_translation_shared_variant",
         ),
         CheckConstraint(
             "status IN ('pending','final','failed')",
@@ -184,11 +193,15 @@ class GroupChatTranslation(Base):
             name="ck_group_chat_translations_target_language",
         ),
         Index(
-            "ix_group_chat_translations_recipient_final",
+            "ix_group_chat_translations_shared_final",
             "space_id",
-            "recipient_membership_id",
+            "target_language",
             "status",
             "final_at",
+        ),
+        CheckConstraint(
+            "cost_state IN ('reserved','settled','released')",
+            name="ck_group_chat_translations_cost_state",
         ),
     )
 
@@ -199,8 +212,14 @@ class GroupChatTranslation(Base):
     message_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("group_messages.id", ondelete="CASCADE"), nullable=False
     )
-    recipient_membership_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("group_memberships.id", ondelete="CASCADE"), nullable=False
+    # Keep the legacy physical column name during the rolling migration. Its
+    # meaning is now an immutable cost-owner snapshot, not a live membership
+    # relation and not part of variant identity. The identifier must survive a
+    # later membership deletion so settled accounting remains auditable.
+    cost_owner_membership_id: Mapped[str] = mapped_column(
+        "recipient_membership_id",
+        String(36),
+        nullable=False,
     )
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     message_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -213,7 +232,76 @@ class GroupChatTranslation(Base):
     provider_model: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
     provider_request_id: Mapped[str] = mapped_column(String(128), nullable=False, default="", server_default="")
     failure_code: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
+    cost_state: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="reserved", server_default="reserved"
+    )
+    claim_token: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default="")
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     final_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class GroupChatTranslationCostLedger(Base):
+    __tablename__ = "group_chat_translation_cost_ledgers"
+    __table_args__ = (
+        UniqueConstraint(
+            "billing_subject",
+            "period_start",
+            name="uq_group_chat_translation_cost_period",
+        ),
+        Index("ix_group_chat_translation_cost_subject", "billing_subject", "period_end"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    billing_subject: Mapped[str] = mapped_column(String(160), nullable=False)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    limit_variant_units: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    reserved_variant_units: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    settled_variant_units: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    authority: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="ai-communication", server_default="ai-communication"
+    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GroupChatTranslationRequest(Base):
+    __tablename__ = "group_chat_translation_requests"
+    __table_args__ = (
+        UniqueConstraint(
+            "requester_membership_id",
+            "idempotency_key",
+            name="uq_group_chat_translation_request_idempotency",
+        ),
+        CheckConstraint(
+            "cost_state IN ('reuse','reserved','settled','released')",
+            name="ck_group_chat_translation_requests_cost_state",
+        ),
+        Index(
+            "ix_group_chat_translation_requests_variant",
+            "translation_id",
+            "cost_state",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    translation_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("group_chat_translations.id", ondelete="CASCADE"), nullable=False
+    )
+    requester_membership_id: Mapped[str] = mapped_column(
+        String(36), nullable=False
+    )
+    cost_ledger_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("group_chat_translation_cost_ledgers.id", ondelete="RESTRICT")
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    cost_state: Mapped[str] = mapped_column(String(16), nullable=False, default="reuse", server_default="reuse")
+    claim_token: Mapped[str] = mapped_column(String(64), nullable=False, default="", server_default="")
+    reserved_variant_units: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    settled_variant_units: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -299,7 +387,17 @@ class GroupEventOutbox(Base):
     __tablename__ = "group_event_outbox"
     __table_args__ = (
         CheckConstraint("status IN ('pending','published','failed')", name="ck_group_event_outbox_status"),
+        CheckConstraint(
+            "notification_status IN ('pending','processing','completed','failed')",
+            name="ck_group_event_outbox_notification_status",
+        ),
         Index("ix_group_event_outbox_delivery", "status", "next_attempt_at", "created_at"),
+        Index(
+            "ix_group_event_outbox_notification",
+            "notification_status",
+            "notification_next_attempt_at",
+            "created_at",
+        ),
         Index("ix_group_event_outbox_space_created", "space_id", "created_at"),
     )
 
@@ -312,7 +410,78 @@ class GroupEventOutbox(Base):
     next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     last_error: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default="")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notification_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending"
+    )
+    notification_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    notification_next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    notification_last_error: Mapped[str] = mapped_column(
+        String(160), nullable=False, default="", server_default=""
+    )
+    notification_dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class GroupNotificationDelivery(Base):
+    __tablename__ = "group_notification_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "group_event_id",
+            "recipient_type",
+            "recipient_id",
+            "recipient_user_id",
+            "notification_class",
+            name="uq_group_notification_semantic_delivery",
+        ),
+        CheckConstraint(
+            "status IN ('pending','processing','delivered','suppressed','failed')",
+            name="ck_group_notification_deliveries_status",
+        ),
+        Index(
+            "ix_group_notification_deliveries_dispatch",
+            "status",
+            "next_attempt_at",
+            "created_at",
+        ),
+        Index(
+            "ix_group_notification_deliveries_recipient",
+            "recipient_type",
+            "recipient_id",
+            "recipient_user_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    group_event_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("group_event_outbox.id", ondelete="CASCADE"), nullable=False
+    )
+    space_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("group_spaces.id", ondelete="CASCADE"), nullable=False
+    )
+    resource_id: Mapped[str] = mapped_column(String(80), nullable=False, default="", server_default="")
+    recipient_membership_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("group_memberships.id", ondelete="CASCADE")
+    )
+    recipient_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    recipient_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    recipient_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    notification_class: Mapped[str] = mapped_column(String(40), nullable=False)
+    event_kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    push_eligible: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}", server_default="{}")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_error: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default="")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
 class GroupIdempotencyRecord(Base):
@@ -403,6 +572,9 @@ class GroupLanguageProfile(Base):
     spoken_language: Mapped[str] = mapped_column(String(8), nullable=False, default="vi", server_default="vi")
     preferred_output_language: Mapped[str] = mapped_column(String(8), nullable=False, default="vi", server_default="vi")
     auto_translate_enabled: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    chat_auto_translate_enabled: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     auto_read_enabled: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     show_original_enabled: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
