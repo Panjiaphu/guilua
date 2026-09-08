@@ -21,7 +21,9 @@ def test_group_text_entry_uses_ai_owned_keyboard_contract():
     assert 'font-size: max(16px, 1em)' in contract
     assert 'font-size: 16px' in contract
     assert 'grid-template-rows: minmax(0, 1fr) auto' in contract
-    assert 'scrollIntoView' not in app_js
+    assert 'target.scrollIntoView({ block: "center", behavior: "smooth" });' in app_js
+    assert "textarea.scrollIntoView" not in app_js
+    assert "form.scrollIntoView" not in app_js
 
 
 def test_direct_communication_template_is_not_restyled_by_group_contract():

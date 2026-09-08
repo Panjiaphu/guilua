@@ -425,14 +425,22 @@ def test_shared_variant_identity_is_message_fingerprint_and_target_not_recipient
     with app.state.database.session() as db:
         variants = list(db.scalars(select(GroupChatTranslation)).all())
         assert len(variants) == 3
-        assert {
-            (item.message_id, item.message_fingerprint, item.target_language)
-            for item in variants
-        } == {
-            (first_message, variants[0].message_fingerprint, "en"),
-            (second_message, variants[0].message_fingerprint, "en"),
-            (first_message, variants[0].message_fingerprint, "zh-TW"),
+        variants_by_identity = {
+            (item.message_id, item.target_language): item for item in variants
         }
+        assert set(variants_by_identity) == {
+            (first_message, "en"),
+            (second_message, "en"),
+            (first_message, "zh-TW"),
+        }
+        assert (
+            variants_by_identity[(first_message, "en")].message_fingerprint
+            == variants_by_identity[(first_message, "zh-TW")].message_fingerprint
+        )
+        assert (
+            variants_by_identity[(first_message, "en")].message_fingerprint
+            != variants_by_identity[(second_message, "en")].message_fingerprint
+        )
 
 
 def test_source_history_and_profile_opt_in_do_not_precompute_chat_translation(tmp_path):
@@ -464,7 +472,7 @@ def test_source_history_and_profile_opt_in_do_not_precompute_chat_translation(tm
     assert provider.calls == []
     with app.state.database.session() as db:
         assert list(db.scalars(select(GroupChatTranslation)).all()) == []
-    profile = app.state.group_translation_service.profile(recipient, space_id)
+    profile = app.state.group_translation_service.get_profile(recipient, space_id)
     assert profile["chat_auto_translate_enabled"] is True
     assert profile["auto_read_enabled"] is False
     assert message_id

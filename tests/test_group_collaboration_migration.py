@@ -6,7 +6,9 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 
+from app import models as _models
 from app.core.config import get_settings
+from app.db import Base
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,57 @@ def _alembic_config(database_path: Path, monkeypatch) -> Config:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "alembic"))
     return config
+
+
+def _bootstrap_legacy_revision(database_path: Path, config: Config) -> None:
+    """Create 0023 through the migration-under-test, not older SQLite history.
+
+    Historical revisions are immutable and include PostgreSQL-oriented ALTER
+    statements that SQLite cannot execute. Build the current ORM schema, add
+    the migration-only archive table, then exercise the 0024 downgrade to get
+    the exact legacy shape used by these round-trip tests.
+    """
+
+    assert _models.GroupSpace.__tablename__ == "group_spaces"
+    engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE group_chat_translation_legacy_archive (
+                    id VARCHAR(36) PRIMARY KEY,
+                    space_id VARCHAR(36) NOT NULL,
+                    message_id VARCHAR(36) NOT NULL,
+                    recipient_membership_id VARCHAR(36) NOT NULL,
+                    idempotency_key VARCHAR(128) NOT NULL,
+                    message_fingerprint VARCHAR(64) NOT NULL,
+                    source_language VARCHAR(8) NOT NULL,
+                    target_language VARCHAR(8) NOT NULL,
+                    status VARCHAR(16) NOT NULL,
+                    translated_ciphertext BLOB,
+                    translated_nonce BLOB,
+                    encryption_version VARCHAR(32) NOT NULL,
+                    provider_model VARCHAR(80) NOT NULL,
+                    provider_request_id VARCHAR(128) NOT NULL,
+                    failure_code VARCHAR(80) NOT NULL,
+                    final_at DATETIME,
+                    created_at DATETIME NOT NULL,
+                    updated_at DATETIME NOT NULL,
+                    archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        connection.execute(
+            text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+        )
+        connection.execute(
+            text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+            {"revision": COLLABORATION_REVISION},
+        )
+    engine.dispose()
+    command.downgrade(config, LEGACY_REVISION)
 
 
 def _seed_legacy_rows(database_path: Path) -> list[dict]:
@@ -172,7 +225,7 @@ def test_0024_preserves_legacy_encrypted_rows_across_upgrade_downgrade_upgrade(
 ):
     database_path = tmp_path / "group-collaboration-migration.sqlite3"
     config = _alembic_config(database_path, monkeypatch)
-    command.upgrade(config, LEGACY_REVISION)
+    _bootstrap_legacy_revision(database_path, config)
     seeded = _seed_legacy_rows(database_path)
     expected = sorted(
         (
@@ -259,7 +312,7 @@ def test_0024_membership_deletion_keeps_cost_history_and_downgrades_safely(
 ):
     database_path = tmp_path / "group-collaboration-membership-delete.sqlite3"
     config = _alembic_config(database_path, monkeypatch)
-    command.upgrade(config, LEGACY_REVISION)
+    _bootstrap_legacy_revision(database_path, config)
     seeded = _seed_legacy_rows(database_path)
     command.upgrade(config, COLLABORATION_REVISION)
 
