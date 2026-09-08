@@ -617,5 +617,23 @@ Object.assign(copy["zh-TW"], {
   deviceVoiceReady: "語音播放運作正常",
   deviceVoiceSample: "這是 AI-COMMUNICATION 的語音測試。"
 });
+Object.assign(copy.vi, {
+  notifications: "Thông báo", notificationSettingsNote: "Chọn mức thông báo riêng cho không gian này. Cài đặt push toàn cục vẫn do Timeblock quản lý.",
+  notificationSmart: "Thông minh · đề xuất", notificationAll: "Tất cả tin nhắn", notificationImportant: "Chỉ quan trọng", notificationOff: "Tắt",
+  muteTemporarily: "Tạm tắt", mute15m: "15 phút", mute1h: "1 giờ", mute8h: "8 giờ", mute24h: "24 giờ", muteUntilEnabled: "Đến khi bật lại", unmute: "Bật lại",
+  notificationSettingsSaved: "Đã lưu cài đặt thông báo", notificationTargetUnavailable: "Thông báo này đã cũ hoặc bạn không còn quyền truy cập nhóm.", foregroundRingtone: "Nhạc chuông khi ứng dụng đang mở", ringtoneVolume: "Âm lượng", ringtoneDuration: "Thời lượng"
+});
+Object.assign(copy.en, {
+  notifications: "Notifications", notificationSettingsNote: "Choose notifications for this space. Timeblock continues to own global push settings.",
+  notificationSmart: "Smart · recommended", notificationAll: "All messages", notificationImportant: "Important only", notificationOff: "Off",
+  muteTemporarily: "Mute temporarily", mute15m: "15 minutes", mute1h: "1 hour", mute8h: "8 hours", mute24h: "24 hours", muteUntilEnabled: "Until re-enabled", unmute: "Unmute",
+  notificationSettingsSaved: "Notification settings saved", notificationTargetUnavailable: "This notification is stale or you no longer have access to the group.", foregroundRingtone: "Ringtone while the app is open", ringtoneVolume: "Volume", ringtoneDuration: "Duration"
+});
+Object.assign(copy["zh-TW"], {
+  notifications: "通知", notificationSettingsNote: "選擇此空間的通知層級；全域推播設定仍由 Timeblock 管理。",
+  notificationSmart: "智慧型 · 建議", notificationAll: "所有訊息", notificationImportant: "僅重要通知", notificationOff: "關閉",
+  muteTemporarily: "暫時靜音", mute15m: "15 分鐘", mute1h: "1 小時", mute8h: "8 小時", mute24h: "24 小時", muteUntilEnabled: "直到重新開啟", unmute: "取消靜音",
+  notificationSettingsSaved: "通知設定已儲存", notificationTargetUnavailable: "此通知已失效，或您已無權存取該群組。", foregroundRingtone: "應用程式開啟時的鈴聲", ringtoneVolume: "音量", ringtoneDuration: "持續時間"
+});
 window.GroupV3I18n = Object.freeze({ copy, localeOptions, translator });
 }(window));

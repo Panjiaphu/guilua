@@ -19,6 +19,15 @@
     if (value === "plugin" || value === "radio-translation") return "chat-translation";
     return SURFACES.indexOf(value) >= 0 ? value : "";
   }
+  var notificationQuery = new URLSearchParams(window.location.search);
+  var notificationDestination = {
+    spaceId: /^[A-Za-z0-9][A-Za-z0-9._:-]{0,35}$/.test(notificationQuery.get("space_id") || "")
+      ? notificationQuery.get("space_id") : "",
+    surface: normalizeSurface(notificationQuery.get("surface") || ""),
+    resourceId: /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(notificationQuery.get("resource_id") || "")
+      ? notificationQuery.get("resource_id") : "",
+    applied: false
+  };
   var ICONS = {
     "message-circle": '<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/>',
     users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>',
@@ -55,7 +64,7 @@
   var state = {
     status: "WAITING",
     locale: LANGUAGES.indexOf(runtimeConfig.locale) >= 0 ? runtimeConfig.locale : "vi",
-    surface: normalizeSurface(runtimeConfig.initial_surface) || "chat",
+    surface: notificationDestination.surface || normalizeSurface(runtimeConfig.initial_surface) || "chat",
     previousSurface: "chat",
     mobile: window.matchMedia("(max-width: 640px), (pointer: coarse) and (max-height: 500px) and (max-width: 960px)").matches,
     context: null,
@@ -74,6 +83,7 @@
     pins: [],
     profile: null,
     consent: null,
+    notificationPreferences: { mode: "smart", muted_until: null, paused: false, unread_count: 0, last_seen_sequence: 0 },
     translations: [],
     historyTab: new URLSearchParams(window.location.search).get("tab") === "radio" || runtimeConfig.initial_surface === "radio-translation" ? "radio" : "media",
     archiveError: "",
@@ -145,10 +155,13 @@
   var chatTranslationSweep = false;
   var chatTranslationInflight = new Set();
   var chatTranslationFailures = new Map();
+  var pendingChatAutoTranslationIds = new Set();
   var prejoinMeterStop = null;
   var mediaReconnectTimer = 0;
   var mediaReconnectGeneration = 0;
   var lifecycleCleanupStarted = false;
+  var notificationPresenceTimer = 0;
+  var notificationTabIdentity = "";
   var archiveConvergence = { timer: 0, attempts: 0, deadline: 0, contextKey: "" };
   var radioConvergence = { timer: 0, attempts: 0, deadline: 0, contextKey: "" };
 
@@ -332,6 +345,72 @@
     }
   }
 
+  function notificationTabId() {
+    if (notificationTabIdentity) return notificationTabIdentity;
+    // Keep this document-scoped. sessionStorage can be cloned into a new tab
+    // opened from the current page, which would let one tab's teardown erase
+    // another visible tab's short-lived presence member.
+    notificationTabIdentity = idempotencyKey();
+    return notificationTabIdentity;
+  }
+
+  function sendGroupPresence(spaceId, visible, keepalive) {
+    if (!spaceId || !state.groupAuthorized) return Promise.resolve();
+    return window.fetch(
+      "/api/group/spaces/" + encodeURIComponent(spaceId) + "/notifications/presence",
+      {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        keepalive: Boolean(keepalive),
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          tab_id: notificationTabId(),
+          surface: state.surface === "chat-translation" ? "chat-translation" : state.surface,
+          visible: Boolean(visible)
+        })
+      }
+    ).then(function () {}).catch(function () {});
+  }
+
+  async function markCurrentSpaceRead() {
+    if (!state.space || state.surface !== "chat" || document.visibilityState !== "visible") return;
+    var latest = state.messages.reduce(function (value, item) {
+      return Math.max(value, Number(item.sequence || 0));
+    }, 0);
+    try {
+      var payload = await api(
+        "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/notifications/read",
+        json("POST", { last_seen_sequence: latest })
+      );
+      state.notificationPreferences = payload.preferences || state.notificationPreferences;
+      state.space.unread_count = state.notificationPreferences.unread_count || 0;
+    } catch (_error) {}
+  }
+
+  function ringtonePreferences() {
+    try {
+      return Object.assign(
+        { incoming_ringtone_enabled: true, incoming_ringtone_volume_percent: 70, incoming_ringtone_duration_seconds: 30 },
+        JSON.parse(window.localStorage.getItem("groupV3RingtonePreferences") || "{}")
+      );
+    } catch (_error) {
+      return { incoming_ringtone_enabled: true, incoming_ringtone_volume_percent: 70, incoming_ringtone_duration_seconds: 30 };
+    }
+  }
+
+  function saveRingtonePreference(name, value) {
+    var preferences = ringtonePreferences();
+    preferences[name] = Number(value);
+    try { window.localStorage.setItem("groupV3RingtonePreferences", JSON.stringify(preferences)); }
+    catch (_error) {}
+    if (window.GroupV3IncomingRingtone) window.GroupV3IncomingRingtone.configure({
+      enabled: preferences.incoming_ringtone_enabled !== false,
+      volume: Number(preferences.incoming_ringtone_volume_percent) / 100,
+      durationSeconds: Number(preferences.incoming_ringtone_duration_seconds)
+    });
+  }
+
   function setBusy(busy) {
     state.busy = busy;
     root.toggleAttribute("aria-busy", busy);
@@ -391,7 +470,7 @@
     state.context = payload;
     state.directAvailable = Boolean(payload.direct_available);
     state.groupAuthorized = Boolean(payload.group_authorized);
-    if (!normalizeSurface(runtimeConfig.initial_surface) && normalizeSurface(payload.surface)) {
+    if (!notificationDestination.surface && !normalizeSurface(runtimeConfig.initial_surface) && normalizeSurface(payload.surface)) {
       state.surface = normalizeSurface(payload.surface);
     }
     if (LANGUAGES.indexOf(payload.principal && payload.principal.locale) >= 0) state.locale = payload.principal.locale;
@@ -400,12 +479,20 @@
   }
 
   async function loadSpaces(preferredId) {
+    var previousSpaceId = state.space && state.space.id;
     var payload = await api("/api/group/spaces");
     state.spaces = Array.isArray(payload.spaces) ? payload.spaces : [];
     state.space = state.spaces.find(function (item) { return item.id === preferredId; })
       || state.spaces.find(function (item) { return item.id === (state.space && state.space.id); })
       || state.spaces[0]
       || null;
+    if (previousSpaceId && (!state.space || state.space.id !== previousSpaceId)) {
+      await sendGroupPresence(previousSpaceId, false, false);
+    }
+    if (notificationDestination.spaceId && preferredId === notificationDestination.spaceId &&
+        (!state.space || state.space.id !== notificationDestination.spaceId)) {
+      state.error = t("notificationTargetUnavailable");
+    }
     if (state.space) {
       await loadSpace();
       connectGroupEvents();
@@ -454,7 +541,10 @@
       optional("/api/group/spaces/" + id + "/translation/profile", { profile: null }),
       optional("/api/group/spaces/" + id + "/translation/consent", { consent: null }),
       optional("/api/group/spaces/" + id + "/translation/v2-history?limit=50", { segments: [], failed: true }),
-      optional("/api/group/spaces/" + id + "/translation/chat-history?limit=100", { translations: [] })
+      optional("/api/group/spaces/" + id + "/translation/chat-history?limit=100", { translations: [] }),
+      optional("/api/group/spaces/" + id + "/notifications/preferences", {
+        preferences: { mode: "smart", muted_until: null, paused: false, unread_count: 0, last_seen_sequence: 0 }
+      })
     ]);
     state.members = results[0].memberships || [];
     state.messages = results[1].messages || [];
@@ -463,6 +553,7 @@
       spoken_language: state.locale,
       preferred_output_language: state.locale === "vi" ? "zh-TW" : "vi",
       auto_translate_enabled: true,
+      chat_auto_translate_enabled: false,
       auto_read_enabled: false,
       show_original_enabled: true
     };
@@ -473,49 +564,68 @@
     (results[6].translations || []).forEach(function (item) {
       state.chatTranslations[item.message_id] = item;
     });
+    state.notificationPreferences = results[7].preferences || state.notificationPreferences;
     await loadMembershipManagement();
-    if (state.surface === "call" || state.surface === "video") await loadMediaSessions();
+    await loadMediaSessions();
     if (state.surface === "radio") await loadRadioSession();
     if (state.surface === "radio" || state.historyTab === "radio") await loadRadioHistory();
     if (state.surface === "chat-translation") await loadCommunicationDevices();
-    window.setTimeout(translateMissingChatMessages, 0);
+    await markCurrentSpaceRead();
+    await sendGroupPresence(state.space.id, document.visibilityState === "visible", false);
   }
 
-  async function translateMissingChatMessages() {
-    if (chatTranslationSweep || !state.space || !state.profile || ["chat", "chat-translation"].indexOf(state.surface) < 0) return;
-    if (!state.profile.auto_translate_enabled || !state.consent || state.consent.status !== "granted") return;
+  async function translateChatMessage(messageId, automatic) {
+    if (!state.space || !state.profile || !messageId) return;
+    if (!state.consent || state.consent.status !== "granted") {
+      if (!automatic) notify(t("consentDetail"));
+      return;
+    }
+    if (chatTranslationInflight.has(messageId)) return;
+    var message = state.messages.find(function (candidate) { return candidate.id === messageId; });
+    if (!message || message.content_type !== "text" || !message.source_language ||
+        message.source_language === state.profile.preferred_output_language || state.chatTranslations[messageId]) return;
+    chatTranslationInflight.add(messageId);
+    render();
+    try {
+      var payload = await api(
+        "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/messages/" +
+          encodeURIComponent(messageId) + "/translation",
+        { method: "POST", headers: { "Idempotency-Key": idempotencyKey() } }
+      );
+      if (payload.translation && payload.translation.state === "FINAL") {
+        state.chatTranslations[messageId] = payload.translation;
+      }
+      chatTranslationFailures.delete(messageId);
+    } catch (error) {
+      chatTranslationFailures.set(messageId, Date.now());
+      if (!automatic) notify(publicError(error));
+    } finally {
+      chatTranslationInflight.delete(messageId);
+      render();
+    }
+  }
+
+  async function translateRealtimeChatMessages() {
+    if (chatTranslationSweep || !state.space || !state.profile) return;
+    if (!state.profile.chat_auto_translate_enabled || !state.consent || state.consent.status !== "granted") return;
     var targetLanguage = state.profile.preferred_output_language;
     var candidates = state.messages.filter(function (message) {
       var failedAt = chatTranslationFailures.get(message.id) || 0;
-      return message.content_type === "text"
+      return pendingChatAutoTranslationIds.has(message.id)
+        && message.content_type === "text"
         && message.source_language
         && message.source_language !== targetLanguage
         && !state.chatTranslations[message.id]
         && !chatTranslationInflight.has(message.id)
         && Date.now() - failedAt > 30000;
-    }).slice(-12);
+    });
     if (!candidates.length) return;
     chatTranslationSweep = true;
     try {
       for (var index = 0; index < candidates.length; index += 1) {
         var message = candidates[index];
-        if (!state.space || state.chatTranslations[message.id]) continue;
-        chatTranslationInflight.add(message.id);
-        try {
-          var payload = await api(
-            "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/messages/" +
-              encodeURIComponent(message.id) + "/translation",
-            { method: "POST", headers: { "Idempotency-Key": idempotencyKey() } }
-          );
-          if (payload.translation && payload.translation.state === "FINAL") {
-            state.chatTranslations[message.id] = payload.translation;
-            render();
-          }
-        } catch (_error) {
-          chatTranslationFailures.set(message.id, Date.now());
-        } finally {
-          chatTranslationInflight.delete(message.id);
-        }
+        pendingChatAutoTranslationIds.delete(message.id);
+        await translateChatMessage(message.id, true);
       }
     } finally {
       chatTranslationSweep = false;
@@ -549,7 +659,7 @@
   }
 
   async function loadMediaSessions() {
-    if (!state.space || (state.surface !== "call" && state.surface !== "video")) return;
+    if (!state.space) return;
     var spaceId = state.space.id;
     var surface = state.surface;
     var epoch = mediaMutationEpoch;
@@ -558,17 +668,29 @@
     var payload = await optional(path, { sessions: [] });
     if (!state.space || state.space.id !== spaceId || state.surface !== surface ||
         epoch !== mediaMutationEpoch || sequence !== mediaSessionLoadSequence) return;
+    var sessions = payload.sessions || [];
+    var mediaSurface = surface === "call" || surface === "video";
     var kind = surface === "video" ? "video" : "audio";
-    var remote = (payload.sessions || []).find(function (item) {
+    var remote = sessions.find(function (item) {
+      return notificationDestination.resourceId && item.id === notificationDestination.resourceId &&
+        (!mediaSurface || item.media_kind === kind) && item.status !== "ended";
+    }) || sessions.find(function (item) {
+      return state.mediaSession && item.id === state.mediaSession.id && item.status !== "ended";
+    }) || sessions.find(function (item) {
+      var participant = selfParticipant(item);
+      return item.status === "ringing" && participant && participant.invite_status === "invited";
+    }) || (mediaSurface ? sessions.find(function (item) {
       return item.media_kind === kind && item.status !== "ended";
-    }) || null;
+    }) : null) || null;
     state.mediaSession = mergeMediaSessionSnapshot(remote, state.mediaSession);
   }
 
   async function loadRadioSession() {
     var base = "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/radio/sessions";
     var payload = await optional(base + "?status=ready&limit=50", { sessions: [] });
-    state.radioSession = (payload.sessions || [])[0] || null;
+    state.radioSession = (payload.sessions || []).find(function (item) {
+      return notificationDestination.resourceId && item.id === notificationDestination.resourceId;
+    }) || (payload.sessions || [])[0] || null;
     state.radioFloor = null;
     if (state.radioSession) {
       var detail = await optional(base + "/" + encodeURIComponent(state.radioSession.id), null);
@@ -584,6 +706,7 @@
       return '<button type="button" class="room-row ' + (space.id === (state.space && state.space.id) ? "is-active" : "") + '" data-action="select-space" data-id="' + esc(space.id) + '">' +
         '<span class="room-avatar ' + (index % 3 === 1 ? "soft" : index % 3 === 2 ? "sand" : "") + '">' + esc(initials(space.title)) + "</span>" +
         "<span><strong>" + esc(space.title) + "</strong><small>" + esc(space.description || t("roomDescription")) + "</small></span>" +
+        (Number(space.unread_count || 0) > 0 ? '<em class="room-unread">' + esc(String(space.unread_count)) + '</em>' : "") +
         (space.id === (state.space && state.space.id) ? "<b>•</b>" : "") + "</button>";
     }).join("");
     var createForm = state.creatingSpace
@@ -645,6 +768,7 @@
       try {
         await loadSpaces(spaceId);
         if (!state.space || state.space.id !== spaceId) await disconnectMedia(false);
+        await translateRealtimeChatMessages();
         render();
       } catch (error) {
         if (error && error.status === 403) {
@@ -678,6 +802,9 @@
       try {
         var payload = JSON.parse(event.data || "{}");
         if (payload.space_id === spaceId) {
+          if (payload.type === "message.created" && payload.resource_id) {
+            pendingChatAutoTranslationIds.add(String(payload.resource_id));
+          }
           if (String(payload.type || "").indexOf("translation.segment.") === 0) {
             window.dispatchEvent(new CustomEvent("group-v3:translation-segment", { detail: payload }));
             if (state.surface === "radio" || state.surface === "chat-translation") queueGroupEventRefresh(spaceId);
@@ -793,7 +920,8 @@
   function renderGroupSettings() {
     if (!state.settingsOpen || !state.space) return "";
     var mine = myMembership();
-    if (!mine || ["owner", "admin"].indexOf(mine.role) < 0) return "";
+    if (!mine) return "";
+    var canManage = ["owner", "admin"].indexOf(mine.role) >= 0;
     var canTransfer = mine.role === "owner";
     var targets = state.members.filter(function (item) {
       return item.status === "active" && item.id !== mine.id;
@@ -806,9 +934,38 @@
     var deleteBlock = canTransfer
       ? '<section class="group-settings-danger"><h3>' + esc(t("dangerZone")) + '</h3><p>' + esc(t("deleteGroupNote")) + '</p>' + action("delete-group", t("deleteGroup"), "log-out", "danger") + "</section>"
       : "";
+    var preferences = state.notificationPreferences || { mode: "smart" };
+    var notificationModes = [
+      ["smart", "notificationSmart"],
+      ["all", "notificationAll"],
+      ["important", "notificationImportant"],
+      ["none", "notificationOff"]
+    ].map(function (item) {
+      return action(
+        "notification-mode", t(item[1]), "settings",
+        preferences.mode === item[0] ? "primary" : "secondary",
+        'data-mode="' + item[0] + '"'
+      );
+    }).join("");
+    var muteOptions = [[15, "mute15m"], [60, "mute1h"], [480, "mute8h"], [1440, "mute24h"], [-1, "muteUntilEnabled"]].map(function (item) {
+      return action("notification-mute", t(item[1]), "minus", "ghost", 'data-minutes="' + item[0] + '"');
+    }).join("");
+    var muted = Boolean(preferences.paused || preferences.muted_until);
+    var ringtone = ringtonePreferences();
+    var ringtoneControls = '<div class="group-ringtone-preferences"><label><span>' + esc(t("ringtoneVolume")) +
+      '</span><select data-change="ringtone-volume"><option value="25" ' + (Number(ringtone.incoming_ringtone_volume_percent) === 25 ? "selected" : "") + '>25%</option><option value="50" ' + (Number(ringtone.incoming_ringtone_volume_percent) === 50 ? "selected" : "") + '>50%</option><option value="70" ' + (Number(ringtone.incoming_ringtone_volume_percent) === 70 ? "selected" : "") + '>70%</option><option value="100" ' + (Number(ringtone.incoming_ringtone_volume_percent) === 100 ? "selected" : "") + '>100%</option></select></label><label><span>' + esc(t("ringtoneDuration")) +
+      '</span><select data-change="ringtone-duration"><option value="15" ' + (Number(ringtone.incoming_ringtone_duration_seconds) === 15 ? "selected" : "") + '>15s</option><option value="30" ' + (Number(ringtone.incoming_ringtone_duration_seconds) === 30 ? "selected" : "") + '>30s</option><option value="45" ' + (Number(ringtone.incoming_ringtone_duration_seconds) === 45 ? "selected" : "") + '>45s</option><option value="60" ' + (Number(ringtone.incoming_ringtone_duration_seconds) === 60 ? "selected" : "") + '>60s</option></select></label></div>';
+    var notificationBlock = '<section class="group-notification-settings"><h3>' + esc(t("notifications")) +
+      '</h3><p>' + esc(t("notificationSettingsNote")) + '</p><div class="group-notification-modes">' +
+      notificationModes + '</div><h4>' + esc(t("muteTemporarily")) + '</h4><div class="group-notification-mutes">' +
+      muteOptions + (muted ? action("notification-mute", t("unmute"), "plus", "secondary", 'data-minutes="0"') : "") +
+      '</div><h4>' + esc(t("foregroundRingtone")) + '</h4>' + ringtoneControls + '</section>';
+    var managementBlock = canManage
+      ? '<form class="settings-form group-space-settings" data-form="save-group-settings"><label><span>' + esc(t("spaceName")) + '</span><input name="title" value="' + esc(state.space.title) + '" minlength="2" maxlength="120" required></label><label><span>' + esc(t("spaceDescription")) + '</span><textarea name="description" maxlength="500">' + esc(state.space.description || "") + '</textarea><small>' + esc(t("settingsVersion")) + ": " + esc(state.space.version) + '</small><button type="submit" class="action-button action-primary">' + icon("settings", 17) + '<span>' + esc(t("saveSettings")) + '</span></button></form>' + transferBlock + deleteBlock
+      : "";
     return '<div class="member-manager-backdrop" data-action="close-settings"><section class="member-manager group-settings" role="dialog" aria-modal="true" aria-labelledby="group-settings-title" data-member-manager>' +
       '<header><div><strong id="group-settings-title">' + esc(t("groupSettings")) + '</strong><small>' + esc(state.space.title) + '</small></div>' + iconButton("close-settings", t("close"), "log-out") + '</header><div class="member-manager-scroll">' +
-      '<form class="settings-form group-space-settings" data-form="save-group-settings"><label><span>' + esc(t("spaceName")) + '</span><input name="title" value="' + esc(state.space.title) + '" minlength="2" maxlength="120" required></label><label><span>' + esc(t("spaceDescription")) + '</span><textarea name="description" maxlength="500">' + esc(state.space.description || "") + '</textarea><small>' + esc(t("settingsVersion")) + ": " + esc(state.space.version) + '</small><button type="submit" class="action-button action-primary">' + icon("settings", 17) + '<span>' + esc(t("saveSettings")) + '</span></button></form>' + transferBlock + deleteBlock + '</div></section></div>';
+      notificationBlock + managementBlock + '</div></section></div>';
   }
 
   function renderMessage(message) {
@@ -833,12 +990,20 @@
         badge(t("final"), "success") + "</div><strong>" + esc(translation.translated_text) +
         "</strong><small>" + icon("languages", 13) + esc(t("chatTranslationLinked")) + "</small></div>"
       : "";
+    var canTranslate = message.content_type === "text" && message.source_language && state.profile &&
+      message.source_language !== state.profile.preferred_output_language && !translation &&
+      state.consent && state.consent.status === "granted";
+    var translateAction = canTranslate
+      ? '<button type="button" data-action="translate-message" data-id="' + esc(message.id) + '" ' +
+        (chatTranslationInflight.has(message.id) ? "disabled" : "") + ' aria-label="' +
+        esc(t("translationTranslate")) + '">' + icon("languages", 15) + "</button>"
+      : "";
     return '<article class="message-row ' + (mine ? "is-mine" : "") + '" data-message-id="' + esc(message.id) + '">' +
       (mine ? "" : avatar(message.sender && message.sender.display_name, "mint", "md", true)) +
       '<div class="message-bubble"><div class="message-meta"><strong>' + esc(mine ? t("currentUser") : message.sender && message.sender.display_name) +
       "</strong><span>" + esc(time) + "</span>" + (message.pinned ? badge(t("pinned"), "mint") : "") + "</div><p>" +
       esc(message.content_type === "tombstone" ? "—" : message.content) + "</p>" + attachments + translated +
-      '<div class="message-actions"><button type="button" data-action="pin-message" data-id="' + esc(message.id) + '" data-pinned="' + Boolean(message.pinned) +
+      '<div class="message-actions">' + translateAction + '<button type="button" data-action="pin-message" data-id="' + esc(message.id) + '" data-pinned="' + Boolean(message.pinned) +
       '" aria-label="' + esc(message.pinned ? t("unpinMessage") : t("pinMessage")) + '">' + icon("pin", 15) + "</button></div></div></article>";
   }
 
@@ -1186,7 +1351,8 @@
       '</span><select name="spoken_language">' + languageOptions(profile.spoken_language || state.locale) +
       '</select></label><label class="language-select"><span>' + esc(t("targetLanguage")) +
       '</span><select name="preferred_output_language">' + languageOptions(profile.preferred_output_language || "zh-TW") +
-      '</select></label>' + toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(profile.auto_read_enabled)) +
+      '</select></label>' + toggle("toggle-chat-auto-translate", t("autoTranslate"), t("translationOnDemand"), Boolean(profile.chat_auto_translate_enabled)) +
+      toggle("toggle-auto-read", t("autoRead"), t("autoReadRecipient"), Boolean(profile.auto_read_enabled)) +
       '<details><summary>' + esc(t("translationPrivacy")) + '</summary>' +
       toggle("toggle-consent", t("consent"), t("consentDetail"), state.consent && state.consent.status === "granted") +
       '</details>' + communicationDeviceSettings() + '<button type="submit" class="action-button action-primary">' + icon("languages", 17) +
@@ -1208,9 +1374,7 @@
     var title = state.space ? state.space.title : t("rooms");
     var status = state.surface === "radio" ? radioState() : state.mediaSession ? state.mediaSession.status.toUpperCase() : "ACTIVE";
     var mine = myMembership();
-    var settingsButton = mine && ["owner", "admin"].indexOf(mine.role) >= 0
-      ? iconButton("settings", t("groupSettings"), "settings")
-      : "";
+    var settingsButton = mine ? iconButton("settings", t("groupSettings"), "settings") : "";
     return '<header class="group-header"><div class="group-identity">' +
       (state.surface === "radio" ? '<span class="radio-mark">' + icon("radio-tower", 21) + "</span>" : avatar(title, "teal", "lg", true)) +
       "<span><strong>" + esc(title) + "</strong><small>" + esc(activeMemberCount()) + " " + esc(t("membersLabel")) +
@@ -1434,14 +1598,16 @@
     }
     setBusy(true);
     state.error = "";
+    sendGroupPresence(state.space && state.space.id, document.visibilityState === "visible", false);
     try {
       if (!state.context) await loadSessionContext();
       if (!state.groupAuthorized) {
         render();
         return;
       }
-      await loadSpaces(state.space && state.space.id || "");
+      await loadSpaces(state.space && state.space.id || notificationDestination.spaceId || "");
       render();
+      focusNotificationDestination();
     } catch (error) {
       if (error.status === 401) state.status = window.opener ? "WAITING" : "FAILED";
       else state.error = publicError(error);
@@ -1482,7 +1648,7 @@
     if (!state.space) return;
     setBusy(true);
     var loader = next === "call" || next === "video" ? loadMediaSessions() : next === "radio" ? Promise.all([loadRadioSession(), loadRadioHistory()]) : next === "chat-translation" ? Promise.all([loadArchive(), loadRadioHistory(), loadCommunicationDevices()]) : Promise.resolve();
-    loader.catch(function (error) {
+    loader.then(markCurrentSpaceRead).catch(function (error) {
       state.error = publicError(error);
     }).finally(function () {
       setBusy(false);
@@ -1508,6 +1674,7 @@
     var mustLeaveRadio = Boolean(state.surface === "radio" && state.radioSession);
     if ((mustLeaveMedia || mustLeaveRadio || state.mediaConnected || state.floorToken) &&
         !window.confirm(t("switchMediaRoomConfirm"))) return;
+    await sendGroupPresence(oldSpaceId, false, false);
     setBusy(true);
     state.error = "";
     try {
@@ -1543,6 +1710,9 @@
       render();
     } catch (error) {
       state.error = publicError(error);
+      if (state.space && state.space.id === oldSpaceId) {
+        sendGroupPresence(oldSpaceId, document.visibilityState === "visible", false);
+      }
       render();
     } finally {
       radioLeaving = false;
@@ -1716,6 +1886,7 @@
         spoken_language: state.profile.spoken_language,
         preferred_output_language: state.profile.preferred_output_language,
         auto_translate_enabled: Boolean(state.profile.auto_translate_enabled),
+        chat_auto_translate_enabled: Boolean(state.profile.chat_auto_translate_enabled),
         auto_read_enabled: Boolean(state.profile.auto_read_enabled),
         show_original_enabled: Boolean(state.profile.show_original_enabled)
       }));
@@ -1739,7 +1910,6 @@
       state.consent = payload.consent;
       notify(granted ? t("consentGranted") : t("off"));
       render();
-      if (granted) window.setTimeout(translateMissingChatMessages, 0);
     } catch (error) {
       notify(publicError(error));
     }
@@ -1822,6 +1992,40 @@
       notify(publicError(error));
       if (error && error.status === 409) await loadSpaces(state.space.id).catch(function () {});
       render();
+    }
+  }
+
+  function focusNotificationDestination() {
+    if (notificationDestination.applied || !notificationDestination.spaceId || !state.space ||
+        state.space.id !== notificationDestination.spaceId) return;
+    notificationDestination.applied = true;
+    if (state.surface !== "chat" || !notificationDestination.resourceId) return;
+    window.requestAnimationFrame(function () {
+      var target = Array.from(root.querySelectorAll("[data-message-id]")).find(function (item) {
+        return item.dataset.messageId === notificationDestination.resourceId;
+      });
+      if (target) {
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+        target.setAttribute("data-notification-target", "true");
+      }
+    });
+  }
+
+  async function saveNotificationPreferences(mode, muteForMinutes) {
+    if (!state.space) return;
+    try {
+      var body = { mode: mode || (state.notificationPreferences && state.notificationPreferences.mode) || "smart" };
+      if (muteForMinutes !== undefined) body.mute_for_minutes = Number(muteForMinutes);
+      var payload = await api(
+        "/api/group/spaces/" + encodeURIComponent(state.space.id) + "/notifications/preferences",
+        json("PUT", body)
+      );
+      state.notificationPreferences = payload.preferences;
+      state.space.notification_mode = payload.preferences.mode;
+      notify(t("notificationSettingsSaved"));
+      render();
+    } catch (error) {
+      notify(publicError(error));
     }
   }
 
@@ -2277,10 +2481,21 @@
     if (name === "remove-member") return updateMember(button, { status: "removed" });
     if (name === "transfer-ownership") return transferOwnership(button);
     if (name === "delete-group") return deleteGroup();
+    if (name === "notification-mode") return saveNotificationPreferences(button.dataset.mode);
+    if (name === "notification-mute") return saveNotificationPreferences(
+      state.notificationPreferences && state.notificationPreferences.mode,
+      button.dataset.minutes
+    );
     if (name === "plugin") return updateSurface("chat-translation");
     if (name === "pin-message") return pinMessage(button);
+    if (name === "translate-message") return translateChatMessage(button.dataset.id, false);
     if (name === "toggle-auto-translate") {
       state.profile.auto_translate_enabled = !state.profile.auto_translate_enabled;
+      render();
+      return saveProfile();
+    }
+    if (name === "toggle-chat-auto-translate") {
+      state.profile.chat_auto_translate_enabled = !state.profile.chat_auto_translate_enabled;
       render();
       return saveProfile();
     }
@@ -2372,6 +2587,14 @@
       state.profile.preferred_output_language = control.value;
       render();
       await saveProfile();
+      return;
+    }
+    if (control.dataset.change === "ringtone-volume") {
+      saveRingtonePreference("incoming_ringtone_volume_percent", control.value);
+      return;
+    }
+    if (control.dataset.change === "ringtone-duration") {
+      saveRingtonePreference("incoming_ringtone_duration_seconds", control.value);
       return;
     }
     if (control.dataset.change === "attachment") return uploadAttachment(control.files && control.files[0]);
@@ -2883,9 +3106,11 @@
     if (lifecycleCleanupStarted) return;
     lifecycleCleanupStarted = true;
     window.clearInterval(heartbeatTimer);
+    window.clearInterval(notificationPresenceTimer);
     window.clearTimeout(archiveConvergence.timer);
     window.clearTimeout(radioConvergence.timer);
     closeGroupEvents();
+    if (state.space) sendGroupPresence(state.space.id, false, true);
     if (state.floorToken && state.radioSession && state.space) {
       window.fetch(radioBase() + "/floor/device-lost", {
         method: "POST",
@@ -2902,6 +3127,11 @@
 
   window.addEventListener("pagehide", cleanupOnExit);
   window.addEventListener("beforeunload", cleanupOnExit);
+  document.addEventListener("visibilitychange", function () {
+    if (!state.space) return;
+    sendGroupPresence(state.space.id, document.visibilityState === "visible", false);
+    if (document.visibilityState === "visible") markCurrentSpaceRead().then(render);
+  });
 
   window.GroupV3Runtime = Object.freeze({
     snapshot: function () {
@@ -2915,6 +3145,7 @@
         spoken_language: state.profile && state.profile.spoken_language || state.locale,
         target_language: state.profile && state.profile.preferred_output_language || "",
         auto_translate: Boolean(state.profile && state.profile.auto_translate_enabled),
+        chat_auto_translate: Boolean(state.profile && state.profile.chat_auto_translate_enabled),
         auto_read: Boolean(state.profile && state.profile.auto_read_enabled),
         consent_status: state.consent && state.consent.status || "",
         membership_id: myMembership() && myMembership().id || "",
@@ -2951,6 +3182,9 @@
     }
   });
 
+  notificationPresenceTimer = window.setInterval(function () {
+    if (state.space) sendGroupPresence(state.space.id, document.visibilityState === "visible", false);
+  }, 25000);
   render();
   refreshAll();
 }(window, document));

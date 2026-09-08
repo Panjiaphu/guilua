@@ -331,11 +331,15 @@ class GroupInvitationService:
                             GroupMembership.principal_user_id == actor.principal_user_id,
                         )
                     )
+                    space = db.get(GroupSpace, item.space_id)
+                    current_sequence = space.message_sequence if space else 0
                     if membership:
                         membership.display_name = actor.display_name
                         membership.role = "member"
                         membership.status = "active"
                         membership.left_at = None
+                        membership.last_seen_sequence = current_sequence
+                        membership.unread_count = 0
                         membership.updated_at = _now()
                     else:
                         membership = GroupMembership(
@@ -347,6 +351,8 @@ class GroupInvitationService:
                             display_name=actor.display_name,
                             role="member",
                             status="active",
+                            last_seen_sequence=current_sequence,
+                            unread_count=0,
                         )
                         db.add(membership)
                     item.status = "accepted"

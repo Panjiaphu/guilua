@@ -113,6 +113,7 @@ class GroupTranslationService:
             "spoken_language": item.spoken_language,
             "preferred_output_language": item.preferred_output_language,
             "auto_translate_enabled": bool(item.auto_translate_enabled),
+            "chat_auto_translate_enabled": bool(item.chat_auto_translate_enabled),
             "auto_read_enabled": bool(item.auto_read_enabled),
             "show_original_enabled": bool(item.show_original_enabled),
             "updated_at": _iso(item.updated_at),
@@ -145,6 +146,7 @@ class GroupTranslationService:
                 "spoken_language": spoken,
                 "preferred_output_language": preferred,
                 "auto_translate_enabled": bool(profile.auto_translate_enabled),
+                "chat_auto_translate_enabled": bool(profile.chat_auto_translate_enabled),
                 "auto_read_enabled": bool(profile.auto_read_enabled),
                 "show_original_enabled": bool(profile.show_original_enabled),
                 "profile_source": "stored",
@@ -158,6 +160,7 @@ class GroupTranslationService:
             "spoken_language": fallback,
             "preferred_output_language": fallback,
             "auto_translate_enabled": True,
+            "chat_auto_translate_enabled": False,
             "auto_read_enabled": False,
             "show_original_enabled": True,
             "profile_source": "fallback",
@@ -176,6 +179,7 @@ class GroupTranslationService:
                         spoken_language=actor.locale,
                         preferred_output_language=actor.locale,
                         auto_translate_enabled=1,
+                        chat_auto_translate_enabled=0,
                         auto_read_enabled=0,
                         show_original_enabled=1,
                     )
@@ -201,6 +205,9 @@ class GroupTranslationService:
                 profile.spoken_language = values["spoken_language"]
                 profile.preferred_output_language = values["preferred_output_language"]
                 profile.auto_translate_enabled = int(values["auto_translate_enabled"])
+                profile.chat_auto_translate_enabled = int(
+                    values["chat_auto_translate_enabled"]
+                )
                 profile.auto_read_enabled = int(values["auto_read_enabled"])
                 profile.show_original_enabled = int(values["show_original_enabled"])
                 profile.updated_at = _now()

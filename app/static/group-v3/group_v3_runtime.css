@@ -55,8 +55,8 @@ html, body, .group-native-app { width: 100%; min-width: 0; height: 100%; min-hei
 .privacy-note strong { font-size: 9px; }
 .runtime-banner { grid-column: 1 / -1; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--teal-strong); background: var(--mint); font-size: 9px; }
 .runtime-banner.is-error { color: var(--danger); background: rgba(212, 71, 53, .08); }
-.member-manager-backdrop { position: absolute; inset: 0; z-index: 160; display: grid; justify-items: end; background: rgba(7, 35, 31, .34); backdrop-filter: blur(2px); }
-.member-manager { width: min(520px, 92vw); height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); color: var(--ink); background: var(--white); box-shadow: -18px 0 46px rgba(10, 49, 43, .22); }
+.member-manager-backdrop { position: absolute; inset: 0; z-index: 160; min-width: 0; min-height: 0; display: grid; justify-items: end; overflow: hidden; background: rgba(7, 35, 31, .34); backdrop-filter: blur(2px); }
+.member-manager { width: min(520px, 92vw); height: 100%; min-height: 0; max-height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; color: var(--ink); background: var(--white); box-shadow: -18px 0 46px rgba(10, 49, 43, .22); }
 .member-manager > header { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
 .member-manager > header > div { min-width: 0; display: grid; gap: 3px; }
 .member-manager > header strong { font-size: 16px; }
@@ -83,6 +83,15 @@ html, body, .group-native-app { width: 100%; min-width: 0; height: 100%; min-hei
 .group-settings-transfer { display: grid; gap: 8px; }
 .group-settings-danger { margin-top: 18px; padding: 14px; border: 1px solid rgba(214, 66, 48, .3); border-radius: 12px; background: rgba(214, 66, 48, .05); }
 .group-settings-danger .action-button { margin-top: 10px; }
+.group-notification-settings { display: grid; gap: 10px; }
+.group-notification-settings h4 { margin: 4px 0 0; color: var(--ink); font-size: 11px; }
+.group-notification-modes, .group-notification-mutes { display: flex; flex-wrap: wrap; gap: 7px; }
+.group-notification-modes .action-button, .group-notification-mutes .action-button { min-height: 38px; }
+.group-ringtone-preferences { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.group-ringtone-preferences label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+.group-ringtone-preferences select { min-height: 40px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; color: var(--ink); background: var(--canvas); }
+.room-unread { min-width: 22px; height: 22px; display: grid; place-items: center; padding: 0 6px; border-radius: 11px; color: var(--white); background: #c74632; font-size: 9px; font-style: normal; }
+@media (max-width: 520px) { .group-ringtone-preferences { grid-template-columns: 1fr; } }
 .attachment-image { width: min(300px, 100%); display: grid; gap: 5px; margin-top: 8px; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; color: var(--teal-strong); background: var(--canvas); text-align: left; cursor: pointer; }
 .attachment-image img { width: 100%; max-height: 240px; display: block; object-fit: cover; }
 .attachment-image span { padding: 0 9px 8px; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
@@ -126,6 +135,9 @@ html, body, .group-native-app { width: 100%; min-width: 0; height: 100%; min-hei
   .member-manager-actions { max-width: 48%; flex-wrap: wrap; }
   .member-manager-actions .action-button { min-width: 44px; }
   .member-manager-actions .action-button span { display: none; }
+  .group-notification-modes .action-button,
+  .group-notification-mutes .action-button,
+  .group-ringtone-preferences select { min-height: 44px; }
   .attachment-viewer-backdrop { align-items: end; padding: 0; }
   .attachment-viewer { width: 100%; max-height: 100dvh; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
   .attachment-viewer-media { max-height: 72dvh; }
@@ -345,6 +357,11 @@ html, body, .group-native-app { width: 100%; min-width: 0; height: 100%; min-hei
 .translation-safety-layer .action-button > span { display: none; }
 .translation-live-status { display: inline-flex; align-items: center; }
 .translation-video-mini { display: inline-flex; align-items: center; gap: 4px; min-width: 0; margin-right: auto; color: var(--teal-strong); font-size: 9px; font-weight: 800; }
+.message-row[data-notification-target="true"] .message-bubble {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px rgba(19, 154, 132, .12);
+}
 
 /* Desktop uses CLOSED/NORMAL/WIDE semantic translation widths. */
 @media (min-width: 641px) {
@@ -413,5 +430,6 @@ html, body, .group-native-app { width: 100%; min-width: 0; height: 100%; min-hei
 @media (prefers-reduced-motion: reduce) {
   .video-call-layout,
   .translation-dock,
-  .video-tile { transition: none !important; }
+  .video-tile,
+  .message-row[data-notification-target="true"] .message-bubble { transition: none !important; }
 }

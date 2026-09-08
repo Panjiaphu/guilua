@@ -838,10 +838,14 @@ def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     radio_router = (ROOT / "app/group_v3/radio_router.py").read_text(encoding="utf-8")
 
     assert "group_v3_app.js" in template
+    assert "group_v3_runtime.css?v=20260908-group-collaboration-2" in template
     assert "group_v3_app.js" not in direct_template
     assert "group_handoff.js" not in direct_template
-    assert "localStorage" not in app_js + translation_js
-    assert "sessionStorage" not in app_js + translation_js
+    assert app_js.count("window.localStorage") == 2
+    assert 'localStorage.getItem("groupV3RingtonePreferences")' in app_js
+    assert 'localStorage.setItem("groupV3RingtonePreferences"' in app_js
+    assert "localStorage" not in translation_js
+    assert "window.sessionStorage" not in app_js + translation_js
     assert "OPENAI_API_KEY" not in app_js + translation_js + template
     assert "https://api.openai.com/v1/realtime/calls" not in translation_js
     assert "RTCPeerConnection" not in translation_js
@@ -892,8 +896,8 @@ def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     assert "AI-COMMUNICATION 會持久保存成員資格" in i18n_js
     assert "Timeblock durably stores" not in i18n_js
     assert "Timeblock lưu bền" not in i18n_js
-    assert 'group_v3_i18n.js?v=20260906-r1-owner-qa-closure-1' in template
-    assert 'group_v3_app.js?v=20260906-r1-owner-qa-closure-1' in template
+    assert 'group_v3_i18n.js?v=20260907-group-collaboration-1' in template
+    assert 'group_v3_app.js?v=20260907-group-collaboration-1' in template
     assert 'class="logout-navigation"' in app_js
     assert 'mobileLogout: logout' in app_js
     assert "logout: 'Đăng xuất'" in i18n_js

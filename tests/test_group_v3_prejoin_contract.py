@@ -52,13 +52,41 @@ def test_group_v3_incoming_ringtone_is_gesture_gated_and_single_tab_coordinated(
     template = (ROOT / "app/templates/group_communication_v3.html").read_text(encoding="utf-8")
     app_js = (ROOT / "app/static/group-v3/group_v3_app.js").read_text(encoding="utf-8")
     ringtone_js = (ROOT / "app/static/group-v3/group_incoming_ringtone.js").read_text(encoding="utf-8")
-    assert "group_incoming_ringtone.js?v=20260904-ringtone-1" in template
+    assert "group_incoming_ringtone.js?v=20260907-ringtone-2" in template
     assert "syncIncomingRingtone" in app_js
     assert "GroupV3IncomingRingtone.arm" in app_js
     assert "BroadcastChannel" in ringtone_js
+    assert "navigator.locks.request" in ringtone_js
+    assert '{ ifAvailable: true, mode: "exclusive" }' in ringtone_js
     assert "AudioContext" in ringtone_js
     assert "getUserMedia" not in ringtone_js
-    assert "localStorage" not in ringtone_js
+    assert "groupV3RingtonePreferences" in ringtone_js
+    assert "durationSeconds" in ringtone_js
+    assert "exhaustedKeys" in ringtone_js
+    assert 'window.addEventListener("pagehide", stop)' in ringtone_js
+    assert 'window.addEventListener("beforeunload", stop)' in ringtone_js
+    assert 'document.addEventListener("visibilitychange"' in ringtone_js
+    assert 'participant.invite_status === "invited"' in app_js
+    assert 'state.mediaSession.status === "ringing"' in app_js
+    assert 'state.mediaSession.initiated_by_membership_id === participant.membership_id' in app_js
+
+
+def test_group_v3_ringtone_never_applies_to_radio_and_coordinates_with_tts():
+    app_js = (ROOT / "app/static/group-v3/group_v3_app.js").read_text(encoding="utf-8")
+    ringtone_js = (ROOT / "app/static/group-v3/group_incoming_ringtone.js").read_text(encoding="utf-8")
+    tts_js = (ROOT / "app/static/group-v3/group_tts_manager.js").read_text(encoding="utf-8")
+
+    ringtone_sync = app_js.split("function syncIncomingRingtone()", 1)[1].split(
+        "function syncCallerRingback()", 1
+    )[0]
+    assert "radioSession" not in ringtone_sync
+    assert "GroupV3IncomingRingtone.start(state.mediaSession.id)" in ringtone_sync
+    assert 'CustomEvent("group-v3:ringtone-started"' in ringtone_js
+    assert 'CustomEvent("group-v3:ringtone-stopped"' in ringtone_js
+    assert 'window.addEventListener("group-v3:ringtone-started"' in tts_js
+    assert 'window.addEventListener("group-v3:ringtone-stopped"' in tts_js
+    assert "ringtoneActive = true" in tts_js
+    assert "cancel();" in tts_js
 
 
 def test_group_v3_caller_ringback_is_gesture_gated_and_stoppable():
