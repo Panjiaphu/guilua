@@ -838,6 +838,7 @@ def test_native_routes_and_ui_enforce_v3_safety_boundaries():
     radio_router = (ROOT / "app/group_v3/radio_router.py").read_text(encoding="utf-8")
 
     assert "group_v3_app.js" in template
+    assert "group_v3_runtime.css?v=20260908-group-collaboration-2" in template
     assert "group_v3_app.js" not in direct_template
     assert "group_handoff.js" not in direct_template
     assert app_js.count("window.localStorage") == 2

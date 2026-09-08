@@ -1395,6 +1395,7 @@ def test_incoming_ringtone_stops_for_every_non_incoming_runtime_state(page, surf
           control.type = 'button';
           control.dataset.action = 'qa-noop';
           control.textContent = 'Arm';
+          control.style.cssText = 'position:fixed;inset:8px auto auto 8px;z-index:10000';
           document.querySelector('#group-native-app').append(control);
         }"""
     )
@@ -1492,13 +1493,19 @@ def test_incoming_ringtone_stops_for_every_non_incoming_runtime_state(page, surf
     page.wait_for_function(
         "GroupV3IncomingRingtone.diagnostics().key === 'r-room-switch'"
     )
-    page.locator('[data-action="select-space"][data-id="s0"]').click()
+    page.set_viewport_size({"width": 1440, "height": 900})
+    expect(page.locator(".context-rail")).to_be_visible()
+    room_s0 = page.locator('.context-rail [data-action="select-space"][data-id="s0"]')
+    expect(room_s0).to_be_visible()
+    room_s0.click()
     page.wait_for_function(
         """() => GroupV3Runtime.snapshot().space_id === 's0'
           && GroupV3IncomingRingtone.diagnostics().key === ''
           && !GroupV3IncomingRingtone.diagnostics().leader"""
     )
-    page.locator('[data-action="select-space"][data-id="s1"]').click()
+    room_s1 = page.locator('.context-rail [data-action="select-space"][data-id="s1"]')
+    expect(room_s1).to_be_visible()
+    room_s1.click()
     page.wait_for_function(
         """() => GroupV3Runtime.snapshot().space_id === 's1'
           && GroupV3IncomingRingtone.diagnostics().key === 'r-room-switch'"""
